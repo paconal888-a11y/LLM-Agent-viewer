@@ -358,9 +358,13 @@ for line in sys.stdin:
                 return super().emit(kind, *a, **kw)
 
         run = Paused("pause", "rpc-pause")
+        # 자식 Python의 시작 시간(Windows 실측 100~133ms)이 아래 0.12초 제한을 잠식하면 검사 대상과
+        # 무관하게 실패한다. 서버가 응답할 수 있는 상태인지 먼저 확인한 뒤 제한을 줄인다.
+        self.client.timeout = 30
+        self.assertEqual(self.client.request(self.run, "ready"), {"id": 1})
         self.client.timeout = 0.12
         self.assertEqual(
-            self.client.request(run, "notice", {"notify": True}), {"id": 1}
+            self.client.request(run, "notice", {"notify": True}), {"id": 2}
         )
         with self.assertRaises(RuntimeFailure):
             self.client.request(run, "never", {"silent": True})
