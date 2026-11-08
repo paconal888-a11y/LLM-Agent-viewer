@@ -9,6 +9,7 @@ DEFAULT_FEATURES = {
     "rules": True,
     "memory": True,
     "compaction": False,
+    "turn_compaction": True,
     "skills": True,
     "tools": True,
     "commands": True,

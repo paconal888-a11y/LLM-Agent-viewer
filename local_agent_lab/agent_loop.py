@@ -23,6 +23,7 @@ from .policy import (
     REPEATED_ANSWER_LIMIT,
 )
 from .integrations import prepare as prepare_integrations
+from .compaction import new_view, prepare_input, remember_measure, view_segments
 from .feedback import recall_and_audit
 from .context_memory import prepare as prepare_memory
 from .orchestration import prepare as prepare_agents, inference_turn
@@ -162,14 +163,19 @@ def execute(harness, run):
             )
             record_message(run, messages, before, "harness", "완료 조건", event_id)
         reviewed = False
+        view = new_view(len(messages))
         for iteration in range(1, run.max_model_calls - run.model_calls + 1):
             if run.stopped:
                 raise RunStopped()
             allowed_tools = tools_for(run)
+            # messages는 전체 기록이다. 모델에는 필요하면 줄인 입력만 보낸다.
+            request_messages, request_origin = prepare_input(
+                harness, run, messages, allowed_tools, view
+            )
             streaming = hasattr(harness.runtime, "stream_json") and run.engine["stream"]
             payload = {
                 "model": harness.model,
-                "messages": messages,
+                "messages": request_messages,
                 "tools": allowed_tools,
                 "stream": streaming,
                 "temperature": run.engine["temperature"],
@@ -235,8 +241,14 @@ def execute(harness, run):
                     else harness.runtime.base_url + "/v1/chat/completions",
                     "serialized_body_bytes": len(json.dumps(payload).encode("utf-8")),
                     "active_skills": sorted(active_skills),
-                    "segments": describe_context(run, messages, allowed_tools),
-                    "message_count": len(messages),
+                    "segments": describe_context(
+                        run,
+                        request_messages,
+                        allowed_tools,
+                        view_segments(run, request_messages, request_origin, view),
+                    ),
+                    "message_count": len(request_messages),
+                    "transcript_message_count": len(messages),
                 },
             )
             with inference_turn(harness, run, iteration):
@@ -247,6 +259,7 @@ def execute(harness, run):
                 response = generate(run, harness.runtime, payload, iteration)
                 observe_slots(run, harness.runtime, iteration, "생성 후")
             run.model_calls += 1
+            remember_measure(view, response, payload)
             if response.get("system_fingerprint"):
                 run.conditions["engine_fingerprint"] = response["system_fingerprint"]
             run.add_usage(response.get("usage"))

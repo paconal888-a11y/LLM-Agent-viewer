@@ -202,6 +202,15 @@ def _information_checks(requests, events, requirements):
                    f"{len(lost)}개 누락" if lost else f"{len(known)}개 모두 다음 요청에 포함",
                    lost[0] if lost else known[-1][0])
         )
+    compacted = _last(events, "context.compact.result")
+    pruned = _last(events, "context.prune")
+    if compacted or pruned:
+        checks.append(
+            _check("information", "context_compacted", "실행 중에 입력이 줄지 않았는가", "warn",
+                   "앞선 메시지가 요약으로 대체됐습니다. 요약에 빠진 사실은 모델이 받지 못합니다." if compacted
+                   else "오래된 도구 결과의 본문을 입력에서 뺐습니다.",
+                   compacted or pruned)
+        )
     selected = _last(events, "memory.select")
     omitted = (selected.get("output") or {}).get("omitted_turns") if selected else None
     count = len(omitted) if isinstance(omitted, list) else omitted

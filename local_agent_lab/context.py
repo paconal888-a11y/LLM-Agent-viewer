@@ -661,8 +661,8 @@ def tools_for(run):
     )
 
 
-def describe_context(run, messages, tools):
-    segments = list(run.context_segments)
+def describe_context(run, messages, tools, parts=None):
+    segments = list(run.context_segments if parts is None else parts)
     covered = {part["message_index"] for part in segments}
     for index, message in enumerate(messages):
         if index not in covered:
