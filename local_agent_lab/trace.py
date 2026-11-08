@@ -198,6 +198,7 @@ class Run:
         self.integration_info = []
         self.plan = []
         self.conditions = {}
+        self.settings = {}
         self.implementation = None
         self.paused_seconds = 0.0
         self.pause_started = None
@@ -440,6 +441,7 @@ class Run:
                     "engine": self.engine,
                     "effective_prompt": self.effective_prompt,
                     "conditions": self.conditions,
+                    "settings": self.settings,
                     "implementation": self.implementation,
                     "step_mode": self.step_mode,
                     "answer": self.answer,

@@ -124,9 +124,10 @@ def validate_tool_call(run, workspace, allowed, call, parent):
             "integrations.json",
             "agents.json",
             "memory.json",
+            "agent-lens.json",
         }
         or any(
-            part.casefold() in {"skills", "commands"}
+            part.casefold() in {"skills", "commands", ".user-home"}
             for part in path.relative_to(workspace).parts
         )
     ):

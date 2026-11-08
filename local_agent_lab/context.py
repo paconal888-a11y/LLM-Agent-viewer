@@ -14,35 +14,234 @@ Be concise. Produce a final answer when the task is complete.
 """
 
 
+# 사용자 전역 위치(~/... 등)를 흉내 낸 실습 폴더. 프로젝트 밖 파일은 읽지 않는다.
+USER_LAYER = ".user-home"
+SETTINGS_FILE = "agent-lens.json"
+# 키별 코드 기본값과 허용 범위. 값은 코드 기본값 < 사용자 < 프로젝트 < 실행 모드 순서로 덮어쓴다.
+SETTINGS = {
+    "rules.file_names": (["AGENTS.md", "agent.md"], "names"),
+    "rules.directory_rules": (True, "bool"),
+    "loop.max_model_calls": (8, (1, 16)),
+    "context.compact_at_ratio": (0.8, (0.1, 0.95)),
+    "context.compact_at_tokens": (0, (0, 200000)),
+    "context.keep_recent_messages": (4, (2, 20)),
+    "context.prune_tool_characters": (1500, (200, 60000)),
+    "context.max_summaries": (2, (0, 5)),
+}
+
+
+def default_settings():
+    return {key: value for key, (value, _) in SETTINGS.items()}
+
+
+def effective_settings(run):
+    return {**default_settings(), **run.settings}
+
+
+def checked_setting(key, value, source):
+    if key not in SETTINGS:
+        raise ValueError(f"{source}: 지원하지 않는 설정입니다: {key}")
+    _, rule = SETTINGS[key]
+    if rule == "names":
+        valid = (
+            isinstance(value, list)
+            and 1 <= len(value) <= 4
+            and all(
+                isinstance(name, str) and re.fullmatch(r"[A-Za-z0-9._-]{1,64}", name)
+                for name in value
+            )
+        )
+    elif rule == "bool":
+        valid = type(value) is bool
+    else:
+        low, high = rule
+        kind = int if isinstance(low, int) and isinstance(high, int) else (int, float)
+        valid = (
+            isinstance(value, kind)
+            and not isinstance(value, bool)
+            and low <= value <= high
+        )
+    if not valid:
+        raise ValueError(f"{source}: {key} 값이 허용 범위를 벗어났습니다.")
+    return value
+
+
+def flatten_settings(data, source):
+    if not isinstance(data, dict):
+        raise ValueError(f"{source}: JSON 객체여야 합니다.")
+    flat = {}
+    for group, values in data.items():
+        if not isinstance(values, dict):
+            raise ValueError(f"{source}: {group}은 객체여야 합니다.")
+        for name, value in values.items():
+            key = f"{group}.{name}"
+            flat[key] = checked_setting(key, value, source)
+    return flat
+
+
+def resolve_settings(run, workspace, overrides=None):
+    """설정 파일을 낮은 층부터 읽어 키마다 어느 층의 값이 적용됐는지 남긴다."""
+    stacks = {
+        key: [{"layer": "default", "value": value}]
+        for key, value in default_settings().items()
+    }
+    files = []
+    for layer, relative in (
+        ("user", f"{USER_LAYER}/{SETTINGS_FILE}"),
+        ("project", SETTINGS_FILE),
+    ):
+        text = read_traced(
+            run,
+            workspace_path(workspace, relative),
+            "context",
+            reason=f"{layer} 층의 설정 파일을 찾습니다. 없으면 이 층은 건너뜁니다.",
+            required=False,
+        )
+        files.append({"layer": layer, "path": relative, "found": bool(text.strip())})
+        if text.strip():
+            for key, value in flatten_settings(json.loads(text), relative).items():
+                stacks[key].append({"layer": layer, "path": relative, "value": value})
+    for key, (layer, value) in (overrides or {}).items():
+        stacks[key].append({"layer": layer, "value": checked_setting(key, value, layer)})
+    run.settings = {key: stack[-1]["value"] for key, stack in stacks.items()}
+    run.emit(
+        "config.resolve",
+        "설정 파일 계층에서 값 결정",
+        "코드 기본값 위에 사용자 층과 프로젝트 층을 차례로 덮어씁니다. 나중 층의 값이 이깁니다. 모델은 이 결정에 참여하지 않습니다.",
+        category="context",
+        input={"order": ["default", "user", "project", "mode"], "files": files},
+        output={
+            "settings": [
+                {
+                    "key": key,
+                    "value": stack[-1]["value"],
+                    "source": stack[-1].get("path") or stack[-1]["layer"],
+                    "layer": stack[-1]["layer"],
+                    "layers": stack,
+                }
+                for key, stack in stacks.items()
+            ]
+        },
+    )
+    return run.settings
+
+
+def rule_block(source, text, scope=None, precedence=None):
+    attributes = f" scope='{scope}' precedence='{precedence}'" if scope else ""
+    return f"\n<project_rules source='{source}'{attributes}>\n{text}\n</project_rules>\n"
+
+
 def discover_rules(run, workspace):
+    names = effective_settings(run)["rules.file_names"]
+    layers = (("user", f"{USER_LAYER}/"), ("project", ""))
     run.emit(
         "function.enter",
         "프로젝트 규칙 로더 호출",
         "build_context()가 discover_rules()를 호출했습니다. 모델의 판단 없이 하네스 코드가 실행합니다.",
         category="rules",
-        input={"workspace": str(workspace), "candidates": ["AGENTS.md", "agent.md"]},
+        input={
+            "workspace": str(workspace),
+            "candidates": [prefix + name for _, prefix in layers for name in names],
+        },
     )
-    for name in ("AGENTS.md", "agent.md"):
-        candidate = workspace_path(workspace, name)
-        text = read_traced(
-            run,
-            candidate,
-            "rules",
-            reason="설정된 후보 이름을 작업 공간 경로와 결합했습니다.",
-            required=False,
-        )
-        if text:
-            wrapped = f"\n<project_rules source='{name}'>\n{text}\n</project_rules>\n"
-            run.emit(
-                "rules.wrap",
-                "원문을 프로젝트 지침 블록으로 구성",
-                "읽은 규칙의 본문은 유지하고 출처·경계 표시를 추가합니다. system 메시지에 포함할 블록입니다.",
-                category="rules",
-                input={"raw_text": text},
-                output={"instruction_block": wrapped},
+    found = []
+    for scope, prefix in layers:
+        for name in names:
+            relative = prefix + name
+            text = read_traced(
+                run,
+                workspace_path(workspace, relative),
+                "rules",
+                reason="설정된 후보 이름을 작업 공간 경로와 결합했습니다.",
+                required=False,
             )
-            return wrapped
-    return ""
+            if text.strip():
+                found.append((scope, relative, text))
+                break
+    layered = len(found) > 1
+    blocks = []
+    for precedence, (scope, relative, text) in enumerate(found, 1):
+        wrapped = (
+            rule_block(relative, text, scope, precedence)
+            if layered
+            else rule_block(relative, text)
+        )
+        run.emit(
+            "rules.wrap",
+            "원문을 프로젝트 지침 블록으로 구성",
+            "읽은 규칙의 본문은 유지하고 출처·경계 표시를 추가합니다. system 메시지에 포함할 블록입니다.",
+            category="rules",
+            input={"raw_text": text},
+            output={"instruction_block": wrapped},
+        )
+        blocks.append(wrapped)
+    conflict = (
+        "\nIf project_rules blocks conflict, follow the block with the higher precedence number.\n"
+        if layered
+        else ""
+    )
+    run.emit(
+        "rules.resolve",
+        "규칙 파일의 적용 순서 결정",
+        "사용자 층, 프로젝트 층 순서로 system 메시지에 넣고 번호가 큰 쪽을 따르라고 안내합니다. 코드는 순서와 안내만 정하며 모델이 실제로 따르는지는 강제하지 않습니다.",
+        category="rules",
+        output={
+            "order": [
+                {"precedence": index, "scope": scope, "source": relative}
+                for index, (scope, relative, _) in enumerate(found, 1)
+            ],
+            "conflict_instruction": conflict.strip() or None,
+            "directory_rules": "파일 도구가 하위 폴더를 건드릴 때 그 폴더의 규칙을 추가합니다.",
+        },
+    )
+    return conflict + "".join(blocks)
+
+
+def load_directory_rules(run, workspace, paths, loaded, messages):
+    """파일 도구가 닿은 폴더의 규칙을 처음 한 번만 다음 입력에 추가한다."""
+    settings = effective_settings(run)
+    if not run.features["rules"] or not settings["rules.directory_rules"]:
+        return
+    workspace = workspace.resolve()
+    for path in paths:
+        parts = path.replace("\\", "/").split("/")[:-1]
+        for depth in range(1, len(parts) + 1):
+            folder = "/".join(parts[:depth])
+            if folder in loaded or parts[0] == USER_LAYER:
+                continue
+            loaded.add(folder)
+            for name in settings["rules.file_names"]:
+                relative = f"{folder}/{name}"
+                text = read_traced(
+                    run,
+                    workspace_path(workspace, relative),
+                    "rules",
+                    reason=f"도구가 {path}에 닿아 그 폴더의 규칙 파일을 찾습니다.",
+                    required=False,
+                )
+                if not text.strip():
+                    continue
+                before = len(messages)
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": "[폴더 규칙 · 이 폴더의 파일을 다룰 때 적용 · 위의 규칙과 충돌하면 이 규칙을 따른다]"
+                        + rule_block(relative, text, "directory", 3 + depth),
+                    }
+                )
+                event_id = run.emit(
+                    "rules.directory",
+                    "폴더 규칙을 다음 입력에 추가",
+                    "시작할 때 모든 폴더를 읽지 않고, 도구가 그 폴더의 파일을 다룬 뒤 처음 한 번만 추가합니다. 언제 읽을지는 코드가, 어느 파일을 건드릴지는 모델이 정합니다.",
+                    category="rules",
+                    input={"trigger_path": path, "folder": folder, "source": relative},
+                    output={
+                        "appended_message": messages[-1],
+                        "message_count_after": len(messages),
+                    },
+                )
+                record_message(run, messages, before, "harness", "폴더 규칙", event_id)
+                break
 
 
 SKILL_METADATA_FORMAT = {

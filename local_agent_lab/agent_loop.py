@@ -13,6 +13,8 @@ from .context import (
     tools_for,
     describe_context,
     record_message,
+    resolve_settings,
+    load_directory_rules,
 )
 from .policy import (
     final_gate,
@@ -101,6 +103,15 @@ def execute(harness, run):
                 "생성 중 KV를 끄는 실험은 교육용 Python 실행기에서 지원합니다."
             )
         prepare_agents(run, harness)
+        settings = resolve_settings(
+            run,
+            harness.workspace,
+            # 집중 모드·하위 에이전트처럼 실행 자체가 정한 예산은 설정 파일보다 우선한다.
+            {"loop.max_model_calls": ("mode", run.max_model_calls)}
+            if run.parent_run or run.mode == "deep" or run.max_model_calls != 8
+            else None,
+        )
+        run.max_model_calls = settings["loop.max_model_calls"]
         run.emit(
             "config.apply",
             "실제 실행에 적용할 하네스 구성",
@@ -117,6 +128,7 @@ def execute(harness, run):
         run.turn_message_offset = initial_count
         recall_and_audit(run, history, messages)
         active_skills = set()
+        rule_folders = set()
         dirty = set()
         checked = set()
         successful = []
@@ -403,6 +415,7 @@ def execute(harness, run):
                 raise RuntimeFailure(
                     "모델이 같은 tool_call id를 두 번 사용했습니다. 결과와 요청을 짝지을 수 없어 실행하지 않습니다."
                 )
+            touched = []
             for call in calls:
                 if (
                     not isinstance(call, dict)
@@ -430,6 +443,12 @@ def execute(harness, run):
                             "result": result,
                         }
                     )
+                if (
+                    name in {"read_file", "write_file", "check_file"}
+                    and "error" not in result
+                    and isinstance(result.get("path"), str)
+                ):
+                    touched.append(result["path"])
                 if name == "write_file" and "written_bytes" in result:
                     dirty.add(result["path"])
                     checked.discard(result["path"])
@@ -452,6 +471,9 @@ def execute(harness, run):
                         "segments": describe_context(run, messages, allowed_tools),
                     },
                 )
+            load_directory_rules(
+                run, harness.workspace, touched, rule_folders, messages
+            )
         else:
             raise RuntimeFailure(
                 f"모델 호출 {run.max_model_calls}회 제한에 도달했습니다. 최종 완료 조건을 만족하지 못했습니다."
