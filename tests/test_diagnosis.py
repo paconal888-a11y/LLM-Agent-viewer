@@ -271,7 +271,7 @@ class SampleRecordTests(unittest.TestCase):
 
     def test_every_sample_can_be_analysed_and_keeps_the_expected_focus(self):
         samples = self.load()
-        self.assertEqual(len(samples), 9)
+        self.assertEqual(len(samples), 16)
         results = {slug: diagnose(data) for slug, data in samples.items()}
         self.assertEqual(results["repeat-guard"]["focus"], "model")
         self.assertEqual(results["repeat-before"]["focus"], "model")

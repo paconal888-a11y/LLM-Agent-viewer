@@ -13,6 +13,13 @@
 | summary-reuse | llama.cpp / Qwen3-4B | 요약을 다시 생성하지 않고 저장된 요약과 최근 원문을 읽어 응답. 원문 저장소 스냅샷 포함 |
 | repeat-before | llama.cpp / Qwen3-4B | 필수 도구를 호출하지 않고 보완 지시 후에도 같은 답변을 반복, 8회 호출 한도로 실패 |
 | repeat-guard | llama.cpp / Qwen3-4B | 첫 모델 입력이 같은 재실행에서 동일한 미검증 응답을 3회 감지해 실패로 중단 |
+| rules-layers | llama.cpp / Qwen3-4B | 사용자 층과 프로젝트 층의 규칙이 충돌하는 입력, 폴더 규칙의 지연 추가, 설정값의 층별 출처. 최종 답변은 폴더 규칙의 문구만 남겨 요약을 빠뜨렸고, 도구 호출만 검사하는 완료 조건은 통과했습니다 |
+| skill-load | llama.cpp / Qwen3-4B | 이름·설명 목록이 먼저 입력되고, 완료 조건 미충족 뒤 load_skill을 요청해 본문이 다음 입력에 들어가는 과정 |
+| turn-compaction | llama.cpp / Qwen3-4B | 기준을 1,250토큰으로 낮춘 실습. 입력 크기 확인 → 오래된 도구 결과 생략 → 실제 모델 요약 → 다음 입력 |
+| compaction-lost-facts | llama.cpp / Qwen3-4B | 수정 전 코드의 실패. 자리표시자를 요약해 최종 답변에 "내용 누락"이 그대로 남음 |
+| compaction-fixed | llama.cpp / Qwen3-4B | 위 실패와 같은 프롬프트·설정에서 요약 입력만 원본으로 고친 기록. 최근 메시지를 2개만 남긴 탓에 다시 읽은 결과가 빠지고 최종 답변 한 줄이 틀림 |
+| resume-stopped | llama.cpp / Qwen3-4B | 첫 도구 결과를 받은 뒤 중지. 호출 전에 저장한 상태 파일 기록 |
+| resume-continued | llama.cpp / Qwen3-4B | 위 실행을 이어서 끝낸 기록. 규칙을 다시 읽지 않고 저장된 messages로 다음 호출 시작 |
 
 `index.json`의 id는 원본 실행 ID입니다. API와 화면은 `sample-슬러그`로 구별하며 원본 ID를 별도 보존합니다. 사용자 홈·프로젝트 경로는 `<USER_HOME>`·`<PROJECT>`로 익명화했습니다. 프롬프트·응답·수치·당시 소스는 보존했습니다. 현재 소스가 이후에 바뀌었을 수 있으므로 기록 속 스냅샷을 기준으로 읽으세요.
 

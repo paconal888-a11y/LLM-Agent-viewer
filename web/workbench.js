@@ -1726,6 +1726,10 @@
         '<p class="note">모델의 내부 계산 상태(KV 캐시 등)는 저장하지 않습니다. 저장되는 것은 대화와 진행 상태입니다.</p>'
       );
     if (e.kind === "run.resume") {
+      // 샘플의 원래 실행 ID는 저장소에 없으므로 짝이 되는 샘플로 연결한다.
+      const origin = state.run?.sample
+        ? state.run.sample.previous && "sample-" + state.run.sample.previous
+        : e.input?.resumed_from;
       const warnings = [
         ...(o.unanswered_tool_calls?.length
           ? [`결과를 받지 못한 도구 요청: ${o.unanswered_tool_calls.join(", ")} · 다시 실행하지 않고 '결과 미확인'으로 모델에 알렸습니다.`]
@@ -1745,8 +1749,8 @@
           ["이어서 시작할 호출", o.next_call + " / " + o.last_call],
         ]) +
         warnings.map((text) => `<div class="diagnostic"><strong>${esc(text)}</strong></div>`).join("") +
-        (e.input?.resumed_from
-          ? `<button class="secondary" data-run="${esc(e.input.resumed_from)}">중단된 원래 실행 열기 ↗</button>`
+        (origin
+          ? `<button class="secondary" data-run="${esc(origin)}">중단된 원래 실행 열기 ↗</button>`
           : "") +
         '<p class="note">복원한 것은 하네스의 대화와 진행 상태입니다. 규칙 파일을 다시 읽거나 입력을 다시 조립하지 않습니다.</p>'
       );
