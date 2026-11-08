@@ -70,15 +70,15 @@ A 다음 B를 한 번 실행한 시간 차이는 순서·캐시·워밍업·관�
 | RPC 시간 초과 뒤 늦은 응답 | 이전 ID를 별도 기록하고 후속 정상 요청 처리. 원래 작업은 재실행하지 않음 |
 | RPC 관찰 단계에서 오래 정지 | 관찰 콜백 시간을 deadline에서 제외. 실제 서버 무응답은 계속 시간 초과 |
 | top_k·top_p 변경 | 유효 실행 설정 전체와 차이 기록. 다른 설정은 동일 조건으로 표시하지 않음 |
-| 모델·스케줄러 시간 | Python forward는 hook 포함·사용자 정지 제외라고 명시. queue 이벤트의 정지는 lock 대기에서 제외 |
+| 모델·스케줄러 시간 | Python forward는 세 값을 기록: hook 포함 벽시간(`observed_forward_ms`), hook 본문에서 잰 관찰 비용(`observer_hook_ms`), 둘의 차이인 hook 제외 추정값(`forward_ms_excluding_hooks`). 모두 사용자 정지 제외이며 순수 커널 시간은 아님. queue 이벤트의 정지는 lock 대기에서 제외 |
 
 이전 샘플에는 origin이 없는 메시지가 있습니다. 출처를 API role만으로 만들어 채우지 않으며 전체 값은 당시 기록을 유지합니다. 파일과 입력의 값 일치, 메시지를 추가한 기록, 모델이 실제로 지시를 따랐는지는 서로 다른 증거입니다.
 
 ## 의존성·모델 파일 확인
 
-Transformers를 4.57.3에서 5.22.2로 갱신했습니다. 실제 고정 Qwen3-0.6B의 토큰 생성·attention 기록과 두 번째 호출의 KV 14개 위치 재사용을 확인했습니다. 작은 실제 신경망 테스트는 KV 사용/재계산, 접두부 crop, 중지와 관찰 시간의 표시 의미를 검사합니다.
+Transformers를 4.57.3에서 5.22.2로 갱신했습니다. 실제 고정 Qwen3-0.6B의 토큰 생성·attention 기록과 두 번째 호출의 접두부 KV 재사용을 확인했습니다(배포 샘플 **토큰·실제 텐서·KV**의 `reference.cache.select` 기록: 1회차 995토큰 중 재사용 0, 2회차 1,061토큰 중 991 위치 재사용). 작은 실제 신경망 테스트는 KV 사용/재계산, 접두부 crop, 중지와 관찰 시간의 표시 의미를 검사합니다.
 
-`pip-audit`로 현재 Windows 환경의 50개 항목을 검사했습니다. 검사 가능한 49개에서는 알려진 취약점을 찾지 못했고, `torch==2.8.0+cpu`는 PyPI에서 감사할 수 없어 제외됐습니다. 이는 모든 의존성의 안전 보증이 아닙니다. 이전 버전 관련 권고의 예는 [LightGlue 설정 로딩](https://github.com/advisories/GHSA-fgcw-684q-jj6r)입니다.
+`pip-audit`로 현재 Windows 환경의 50개 항목을 검사했습니다. 검사 가능한 49개에서는 알려진 취약점을 찾지 못했고, `torch==2.8.0+cpu`는 로컬 빌드 태그 때문에 PyPI 기준으로 감사되지 않아 제외됐습니다. 공식 권고 데이터베이스(GitHub Advisory Database·OSV, 2026-11-08 확인)를 따로 대조하면 torch 2.8.0은 [CVE-2026-24747](https://github.com/advisories/GHSA-63cw-57p8-fm3p)(High, `torch.load(..., weights_only=True)`로 조작된 체크포인트를 열 때 메모리 손상, 2.10.0에서 수정), [CVE-2026-4538](https://osv.dev/vulnerability/PYSEC-2026-139)(pt2 로딩 핸들러의 안전하지 않은 역직렬화, 로컬 접근, 2.10.0까지 영향)과 2.9.0에서 수정된 서비스 거부 계열([CVE-2025-55551](https://osv.dev/vulnerability/PYSEC-2025-203) 등)의 영향 버전입니다. 이 앱은 `torch.load`·pt2 로딩·해당 선형대수 연산을 호출하지 않고 크기·SHA256을 고정한 safetensors만 읽지만, 그것이 영향 없음의 보증은 아닙니다. transformers 5.22.2와 python-lsp-server 1.15.0은 같은 날짜 기준으로 미해결 공개 권고가 없었습니다. 이는 모든 의존성의 안전 보증이 아닙니다. 이전 버전 관련 권고의 예는 [LightGlue 설정 로딩](https://github.com/advisories/GHSA-fgcw-684q-jj6r)입니다.
 
 가중치·tokenizer·설정 파일의 크기와 SHA256을 고정 snapshot과 대조합니다. 다운로드뿐 아니라 Python 모델 로드 직전에도 검사하며, 불일치하면 모델을 불러오지 않습니다.
 
