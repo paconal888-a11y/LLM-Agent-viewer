@@ -1191,6 +1191,8 @@
     ]
       .map((s) => `<span>${s}</span>`)
       .join("");
+    // 학습 흐름 탭은 실행 상태(검사 결과·완료 판정)를 함께 보여 주므로 새 기록이 오면 다시 그린다.
+    if (state.tab === "learn" && !state.live) renderDetail();
   }
   function answerScope(data) {
     // '통과'가 무엇을 검사한 결과인지 적는다. 도구·인자만 대조했는지, 결과 값까지 대조했는지는 완료 조건에 달려 있다.
@@ -1270,6 +1272,7 @@
     state.cursor = -1;
     state.inputMessage = -1;
     state.timelineRendered = false;
+    resetBodySearch();
     $("journeyView").classList.add("focus");
     state.openGroups = new Set();
     state.openSteps = new Set();
@@ -1920,7 +1923,7 @@
     );
     $("inputLinks").classList.toggle(
       "hidden",
-      !targets.length || state.tab === "input",
+      !targets.length || ["input", "learn"].includes(state.tab),
     );
     $("inputLinks").innerHTML = targets.length
       ? inspectionLink(
@@ -1934,7 +1937,7 @@
       peek = $("sourcePeek");
     peek.classList.toggle(
       "hidden",
-      !source || ["code", "input"].includes(state.tab),
+      !source || ["code", "input", "learn"].includes(state.tab),
     );
     if (source && state.tab !== "code") {
       const lines = source.code.split("\n"),
@@ -1960,6 +1963,7 @@
       );
     const c = $("detailContent");
     if (state.tab === "input") c.innerHTML = renderInputView();
+    else if (state.tab === "learn") renderLearningFlow(c);
     else if (state.tab === "values")
       c.innerHTML = box("전체 이벤트 · 원본 값", e);
     else if (state.tab === "code") {
@@ -2787,10 +2791,356 @@
     }, 650);
   };
   $("eventSearch").oninput = renderTimeline;
-  $("export").onclick = () => {
-    if (state.run)
-      window.location.assign("/api/runs/" + state.run.id + "/export");
+  // EXPORT_PREVIEW_START
+  // 내보내기 대화상자: 저장 전에 공유용 사본에서 무엇이 몇 번 치환될지 서버(/export/preview)에 묻는다.
+  // 원본 저장(/export)은 그대로 두고, 공유용 사본(/export/share)만 치환한다. 치환은 정규식 기반이며 서버 응답의 note를 그대로 보여 준다.
+  const exportOptionKeys = [
+    "paths",
+    "secrets",
+    "emails",
+    "ips",
+    "omit_file_text",
+    "omit_sources",
+  ];
+  const exportCategoryLabels = {
+    path: "경로 (작업 공간 · 프로젝트 · 홈 · LOCALAPPDATA)",
+    user: "사용자 이름",
+    secret: "비밀값 (API 키 · 토큰 · 개인 키)",
+    email: "이메일",
+    ip: "IP 주소",
+    omitted_file_text: "제거한 파일 원문 · 도구 결과",
+    omitted_source: "제거한 소스 스냅샷",
   };
+  function exportQuery() {
+    return exportOptionKeys
+      .map(
+        (key) =>
+          key +
+          "=" +
+          ($("exportOptions").querySelector(`[data-option="${key}"]`).checked
+            ? "1"
+            : "0"),
+      )
+      .join("&");
+  }
+  async function loadExportPreview() {
+    const run = state.run?.id;
+    if (!run) return;
+    $("exportPreview").innerHTML =
+      '<p class="note">치환 대상을 세는 중…</p>';
+    $("exportShare").disabled = true;
+    const preview = await api(
+      `/api/runs/${encodeURIComponent(run)}/export/preview?${exportQuery()}`,
+    );
+    if (state.run?.id !== run || !$("exportDialog").open) return;
+    const counts = Object.entries(preview.counts || {}),
+      includes = preview.includes || {};
+    const rows = counts.length
+      ? counts
+          .map(
+            ([key, count]) =>
+              `<tr><th>${esc(exportCategoryLabels[key] || key)}</th><td>${num(count)}회</td><td>${(preview.examples?.[key] || []).map((text) => `<code>${esc(text)}</code>`).join(" ") || "—"}</td></tr>`,
+          )
+          .join("")
+      : '<tr><td colspan="3">현재 옵션으로 찾은 치환 대상이 없습니다. 원본과 사본의 본문이 같습니다(share 필드만 추가).</td></tr>';
+    $("exportPreview").innerHTML =
+      `<table class="exporttable"><thead><tr><th>치환 대상</th><th>횟수</th><th>예시 (치환 전 원문)</th></tr></thead><tbody>${rows}</tbody></table>` +
+      `<p class="exportincludes">사본에 들어가는 것 · 기록 ${num(preview.event_count)}개 · 프롬프트 ${includes.prompt ? "포함" : "없음"} · 파일 원문 ${num(includes.file_texts)}개 · 도구 결과 ${num(includes.tool_results)}개 · 모델 요청 ${num(includes.model_requests)}개 · 소스 스냅샷 ${num(includes.source_snapshots)}개 · 브라우저 입력 ${num(includes.browser_input)}개</p>`;
+    $("exportNote").textContent = preview.note || "";
+    $("exportShare").disabled = false;
+  }
+  function openExport() {
+    if (!state.run?.id) return;
+    $("exportRun").textContent =
+      `실행 ${state.run.id} · 원본 기록 파일은 바뀌지 않습니다. 공유용 사본은 아래 옵션으로 치환한 깊은 복사본이며 share.redacted=true 와 치환 횟수를 함께 기록합니다. 바이트 수·해시·토큰 수는 치환 전 측정값 그대로입니다.`;
+    $("exportNote").textContent = "";
+    $("exportDialog").showModal();
+    loadExportPreview().catch((error) => {
+      $("exportPreview").innerHTML =
+        `<p class="note">미리보기 실패: ${esc(error.message)}</p>`;
+    });
+  }
+  $("export").onclick = openExport;
+  $("closeExport").onclick = () => $("exportDialog").close();
+  $("exportOptions").addEventListener("change", () =>
+    loadExportPreview().catch((error) => toast(error.message)),
+  );
+  $("exportOriginal").onclick = () => {
+    if (state.run)
+      window.location.assign(
+        "/api/runs/" + encodeURIComponent(state.run.id) + "/export",
+      );
+  };
+  $("exportShare").onclick = () => {
+    if (state.run)
+      window.location.assign(
+        `/api/runs/${encodeURIComponent(state.run.id)}/export/share?${exportQuery()}`,
+      );
+  };
+  // EXPORT_PREVIEW_END
+  // BODY_SEARCH_START
+  // 본문 검색: 제목이 아니라 모델 요청 messages·tools, 도구 결과, 파일 원문 안의 문자열을 서버(/search)에서 찾는다.
+  // 적중을 누르면 해당 이벤트(메시지 적중이면 그 messages[i])로 이동한다. 검색은 기록을 읽기만 한다.
+  let bodySearchTimer = null,
+    bodySearchSequence = 0;
+  function showBodySearch(visible) {
+    // 본문 검색 결과는 기록 트레이에서 단계 목록 자리를 대신 차지한다(트레이 높이가 작아 둘을 같이 두지 않는다).
+    $("bodySearchResults").classList.toggle("hidden", !visible);
+    document.querySelector(".recordtray")?.classList.toggle("searching", visible);
+  }
+  function resetBodySearch() {
+    bodySearchSequence++;
+    showBodySearch(false);
+    $("bodySearchResults").innerHTML = "";
+  }
+  function bodySearchTab(hit) {
+    // 모델 입력 탭은 확정된 model.request만 보여 준다. context.assemble 등 다른 기록의 messages 적중은 데이터 변화 탭에서 본다.
+    return hit.kind === "model.request" ? "input" : "change";
+  }
+  async function runBodySearch() {
+    const query = $("bodySearch").value.trim(),
+      panel = $("bodySearchResults");
+    if (!state.run?.id || !query) {
+      resetBodySearch();
+      return;
+    }
+    const sequence = ++bodySearchSequence,
+      run = state.run.id,
+      kind = $("bodySearchKind").value;
+    showBodySearch(true);
+    panel.innerHTML = '<p class="note">본문을 찾는 중…</p>';
+    let result;
+    try {
+      result = await api(
+        `/api/runs/${encodeURIComponent(run)}/search?q=${encodeURIComponent(query)}${kind ? "&kind=" + encodeURIComponent(kind) : ""}`,
+      );
+    } catch (error) {
+      if (sequence === bodySearchSequence)
+        panel.innerHTML = `<p class="note">검색 실패: ${esc(error.message)}</p>`;
+      return;
+    }
+    if (sequence !== bodySearchSequence || state.run?.id !== run) return;
+    const originLabels = {
+      user: "사용자",
+      harness: "하네스",
+      model: "모델",
+      tool: "도구",
+      unknown: "미기록",
+    };
+    const items = result.hits
+      .map((hit) => {
+        const inMessage =
+          hit.message_index !== undefined && hit.message_index !== null;
+        const where = inMessage
+          ? `messages[${hit.message_index}] · ${hit.role || "?"}${hit.origin ? " · 작성: " + (originLabels[hit.origin] || hit.origin) : " · 작성 주체 미기록"}`
+          : hit.field;
+        const title =
+          (hit.request_number ? `요청 #${hit.request_number} · ` : "") +
+          (eventNames[hit.kind] || hit.kind);
+        return `<button class="bodyhit" data-inspection-event="${hit.event_id}" data-inspection-tab="${bodySearchTab(hit)}" data-inspection-message="${inMessage ? hit.message_index : -1}"><span class="bodyhit-head"><code>#${hit.event_id}</code><strong>${esc(title)}</strong><small>${esc(where)}</small>${hit.agent_name ? `<em>${esc(hit.agent_name)}</em>` : ""}</span><span class="bodyhit-snippet">${esc(String(hit.snippet || "").replace(/\s+/g, " "))}</span></button>`;
+      })
+      .join("");
+    const byKind = Object.entries(result.by_kind || {})
+      .map(([key, count]) => `${eventNames[key] || key} ${count}`)
+      .join(" · ");
+    panel.innerHTML =
+      `<div class="bodysearch-summary"><strong>${num(result.count)}건</strong>${result.truncated ? '<span class="warn">상한에 걸려 앞부분만 표시 · 검색어를 더 구체적으로</span>' : ""}${byKind ? `<span>${esc(byKind)}</span>` : ""}<small>${esc(result.scope || "")}</small></div>` +
+      (items ||
+        '<p class="note">본문에서 찾지 못했습니다. 단계 이름·파일·도구 이름은 위의 단계 검색을 쓰세요.</p>');
+  }
+  $("bodySearch").oninput = () => {
+    clearTimeout(bodySearchTimer);
+    bodySearchTimer = setTimeout(
+      () => runBodySearch().catch((error) => toast(error.message)),
+      350,
+    );
+  };
+  $("bodySearch").onkeydown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      clearTimeout(bodySearchTimer);
+      runBodySearch().catch((error) => toast(error.message));
+    }
+  };
+  $("bodySearchKind").onchange = () =>
+    runBodySearch().catch((error) => toast(error.message));
+  // BODY_SEARCH_END
+  // LEARNING_FLOW_START
+  // 학습 흐름 패널: 예측 → 증거 확인 → 원인 설명 → 한 조건 수정 → 재검증.
+  // 기존 구조도·기록 선택을 그대로 따라가며, 모든 값은 이 실행의 기록에서 읽는다. 인과를 단정하는 문구는 쓰지 않는다.
+  function learningPrediction() {
+    return stored("prediction." + (state.run?.id || "")) || "";
+  }
+  function renderLearningFlow(body) {
+    // 단계 상세의 '학습 흐름' 탭. body는 #detailContent.
+    const run = state.run,
+      event = state.events[state.cursor];
+    if (!run || run.status === "loading" || !state.events.length) {
+      body.innerHTML =
+        '<p class="note">실행 기록을 선택하면 단계별 안내가 표시됩니다.</p>';
+      return;
+    }
+    const sample = state.health.mode === "sample" || !!run.sample;
+    const terminal = ["completed", "failed", "stopped", "interrupted"].includes(
+      run.status,
+    );
+    const stateLabel = sample
+      ? "재생 기록 · 1~3단계는 그대로, 4~5단계는 실제 실행 모드 안내"
+      : terminal
+        ? "실제 실행 기록 · 5단계 모두 가능"
+        : "실행 중 · 기록이 늘어나는 중";
+    // 1단계: 예측 (이 브라우저에만 저장. 실행 기록에는 넣지 않는다)
+    const existing = body.querySelector("#learningPrediction");
+    const typing = existing && document.activeElement === existing;
+    const predictionValue = typing ? existing.value : learningPrediction();
+    const step1 = `<section class="learningstep" data-step="1"><h3><span>1</span>예측</h3><p>기록을 열기 전에 적어 두세요: 하네스가 읽을 파일, 모델이 요청할 도구, 완료 조건의 통과 여부. 예측은 이 브라우저에만 저장되며 실행 기록에는 들어가지 않습니다.</p><textarea id="learningPrediction" rows="3" placeholder="예: AGENTS.md를 먼저 읽고 read_file → write_file → check_file 순서로 도구를 요청할 것이다."></textarea><small id="learningPredictionState">${predictionValue ? "저장됨 · 실행 " + esc(run.id) : "아직 적지 않음"}</small></section>`;
+    // 2단계: 증거 확인 — 선택한 기록의 증거 종류와 연결
+    const evidence = event ? AgentInspection.evidence(event) : null;
+    const consumers = event
+      ? AgentInspection.consumers(state.events, state.cursor, rootAgentId())
+      : [];
+    const origins =
+      event?.kind === "model.request" && Array.isArray(event.input?.messages)
+        ? event.input.messages.length
+        : 0;
+    const step2 = `<section class="learningstep" data-step="2"><h3><span>2</span>증거 확인</h3>${
+      event
+        ? `<p>선택한 기록 <button class="inspection-link" data-event="${event.id}">#${event.id} ${esc(eventName(event))}</button> · <b class="evidence-kind" data-evidence="${esc(evidence.type)}">${esc(evidence.label)}</b><br>${esc(evidence.explanation)}</p><div class="learninglinks">${
+            consumers.length
+              ? inspectionLink(
+                  consumers[0],
+                  `이 값이 들어간 모델 입력 #${consumers[0].event.id} 보기`,
+                  "input",
+                  consumers[0].indices[0],
+                ) + `<small>동일한 값이 포함된 요청 ${consumers.length}개</small>`
+              : ""
+          }${
+            origins
+              ? `<button class="inspection-link" data-inspection-event="${event.id}" data-inspection-tab="input" data-inspection-message="-1">messages ${origins}개의 작성 주체 · 출처 기록 보기</button>`
+              : ""
+          }${
+            event.source
+              ? `<button class="inspection-link" data-inspection-event="${event.id}" data-inspection-tab="code" data-inspection-message="-1">이 기록을 남긴 코드 줄 보기</button>`
+              : ""
+          }</div><p class="note">“파일에 있음 · 모델 입력에 있음 · 모델이 따랐음”은 각각 다른 기록으로 확인합니다. 값의 일치는 모델이 내용을 이해했다는 뜻이 아닙니다.</p>`
+        : '<p class="note">기록 목록이나 구조도에서 단계를 선택하세요.</p>'
+    }</section>`;
+    // 3단계: 원인 설명 — run.error면 진단 요약, 아니면 검사 결과
+    const errorEvent = state.events.findLast((item) => item.kind === "run.error");
+    const checks = state.events.filter(
+      (item) =>
+        item.kind.startsWith("validation.") &&
+        (item.agent_id || rootAgentId()) === rootAgentId(),
+    );
+    const checkRow = (item) => {
+      const o = item.output || {};
+      const verdict =
+        item.kind === "validation.requirements"
+          ? o.passed
+            ? "통과"
+            : `미충족 ${o.missing?.length || 0}개`
+          : item.kind === "validation.final"
+            ? o.passed
+              ? "통과"
+              : `미검사 파일 ${o.unchecked_files?.length || 0}개`
+            : item.kind === "validation.repeat"
+              ? `반복 ${o.streak || 0} / ${o.limit || 0}회`
+              : item.status === "ok"
+                ? "통과"
+                : item.status;
+      return `<div class="diagrow"><span>${esc(eventName(item))}</span><strong>${esc(verdict)}</strong><button class="quiet" data-event="${item.id}">#${item.id} →</button></div>`;
+    };
+    const step3 = `<section class="learningstep" data-step="3"><h3><span>3</span>원인 설명</h3>${
+      errorEvent
+        ? errorDiagnosis(errorEvent)
+        : checks.length
+          ? `<p>이 실행의 검사 기록입니다. 검사는 정책 코드가 도구 결과·실행 상태를 대조한 결과이며, 모델이 왜 그렇게 행동했는지는 기록이 말해 주지 않습니다.</p><div class="diagnosis">${checks.map(checkRow).join("")}</div>${run.status === "completed" ? `<p class="note">${esc(answerScope(run))}</p>` : ""}`
+          : `<p class="note">${terminal ? "이 실행에는 검사 기록이 없습니다." : "실행이 끝나면 완료 조건·수정 파일 검사 결과가 여기에 표시됩니다."}</p>`
+    }</section>`;
+    // 4단계: 한 조건 수정 — 코드 · 작업 공간 파일 · 하네스 스위치 · 완료 조건 중 하나
+    const codeFile = event?.source?.file?.replaceAll("\\", "/");
+    const dataPath = pathOf(event);
+    const dataFile = dataPath
+      ? dataPath.startsWith("demo_workspace/")
+        ? dataPath
+        : "demo_workspace/" + dataPath
+      : null;
+    const knownFiles = new Set(
+      [...document.querySelectorAll("#fileTree [data-file]")].map(
+        (b) => b.dataset.file,
+      ),
+    );
+    const step4 = `<section class="learningstep" data-step="4"><h3><span>4</span>한 조건 수정</h3><p>한 번에 하나만 바꿔야 재실행 결과의 차이를 그 조건과 비교할 수 있습니다.</p><div class="learninglinks">${
+      codeFile && knownFiles.has(codeFile)
+        ? `<button class="secondary" data-file="${esc(codeFile)}">이 기록의 하네스 코드 열기 · ${esc(codeFile.split("/").at(-1))}</button>`
+        : ""
+    }${
+      dataFile && knownFiles.has(dataFile)
+        ? `<button class="secondary" data-file="${esc(dataFile)}">이 기록의 작업 공간 파일 열기 · ${esc(dataFile.split("/").at(-1))}</button>`
+        : ""
+    }<button class="secondary" data-learning="features">하네스 스위치로 이동</button><button class="secondary" data-learning="requirements">완료 조건 편집으로 이동</button></div>${
+      sample
+        ? '<p class="note">재생 기록에서는 파일 저장과 실행이 꺼져 있습니다. 실제 실행 모드(Start-AgentLens.ps1)에서 조건을 바꾼 뒤 같은 요청을 실행하세요.</p>'
+        : '<p class="note">파일 저장은 다음 파일 읽기부터, Python 변경은 다음 실행부터 적용됩니다. 과거 기록의 소스 스냅샷은 바뀌지 않습니다.</p>'
+    }</section>`;
+    // 5단계: 재검증 — 같은 요청으로 다시 실행하고 비교
+    const step5 = `<section class="learningstep" data-step="5"><h3><span>5</span>재검증</h3><p>같은 요청과 설정으로 다시 실행한 뒤, 예측·이전 기록과 대조합니다. 같은 조건으로 다시 실행해도 결과가 같다는 보장은 없습니다.</p><div class="learninglinks"><button class="secondary" data-learning="import">이 실행의 요청 · 설정을 입력란에 가져오기</button><button class="secondary" data-learning="compare">두 번의 실제 실행 비교(A/B) 열기</button></div>${
+      sample
+        ? '<p class="note">재생 기록은 당시 모델·작업 공간을 다시 만들지 않습니다. 설정은 가져올 수 있지만 재실행은 실제 실행 모드에서만 가능합니다.</p>'
+        : '<p class="note">가져온 설정은 restoreNote에 복원 범위와 달라진 조건을 적습니다. 실행은 직접 누르세요.</p>'
+    }</section>`;
+    body.innerHTML =
+      `<div class="learningbody"><header class="learninghead"><strong>학습 흐름</strong><span>예측 → 증거 확인 → 원인 설명 → 한 조건 수정 → 재검증</span><small>${esc(stateLabel)}</small></header>` +
+      step1 +
+      step2 +
+      step3 +
+      step4 +
+      step5 +
+      "</div>";
+    const area = $("learningPrediction");
+    area.value = predictionValue;
+    area.oninput = () => {
+      store("prediction." + run.id, area.value);
+      $("learningPredictionState").textContent = area.value
+        ? "저장됨 · 실행 " + run.id
+        : "아직 적지 않음";
+    };
+    if (typing) {
+      area.focus();
+      area.setSelectionRange(area.value.length, area.value.length);
+    }
+  }
+  $("openLearning").onclick = () => {
+    state.tab = "learn";
+    renderDetail();
+    $("inspector").classList.add("open");
+  };
+  document.addEventListener(
+    "click",
+    action(async (e) => {
+      const b = e.target.closest("[data-learning]");
+      if (!b) return;
+      if (b.dataset.learning === "features") {
+        $("journeyView").classList.remove("focus");
+        $("configuration").open = true;
+        $("features").scrollIntoView({ behavior: "smooth", block: "center" });
+        $("features").querySelector("input")?.focus();
+      } else if (b.dataset.learning === "requirements") {
+        $("journeyView").classList.remove("focus");
+        $("configuration").open = true;
+        $("requirements").scrollIntoView({ behavior: "smooth", block: "center" });
+        $("requirements").focus();
+      } else if (b.dataset.learning === "import") {
+        if (state.run?.prompt) await importRunSettings(state.run);
+        $("journeyView").classList.remove("focus");
+        $("prompt").focus();
+      } else if (b.dataset.learning === "compare") {
+        view("learn");
+        $("experimentCase").scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }),
+  );
+  // LEARNING_FLOW_END
   $("openDetail").onclick = () => $("inspector").classList.add("open");
   $("showInput").onclick = () => {
     state.tab = "input";
@@ -2984,7 +3334,11 @@
     const execution = document.querySelector(".execution"),
       tray = document.createElement("div");
     tray.className = "recordtray";
-    tray.append(document.querySelector(".eventtoolbar"), $("timeline"));
+    tray.append(
+      document.querySelector(".eventtoolbar"),
+      $("bodySearchResults"),
+      $("timeline"),
+    );
     execution.append(tray);
     AgentArchitecture.init($("architecture"), { select: selectComponent });
     featureUI();

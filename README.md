@@ -42,6 +42,8 @@ cd LLM-Agent-viewer
 - **대화 관리** — 원문·요약·현재 모델 입력을 비교하고 저장된 요약의 재사용 확인
 - **에이전트 모드** — 단일 실행, 계획, 추가 점검, 하위 에이전트별 대화와 도구 권한 비교
 - **MCP·LSP 연결** — 외부 서버의 도구 목록·호출·응답과 연결 전후의 토큰·시간 비교
+- **본문 검색·공유용 내보내기** — 모델 입력 messages·도구 결과·파일 원문 안의 문자열을 찾아 해당 기록으로 이동, 경로·사용자 이름·비밀값을 치환한 공유용 사본을 치환 횟수 미리보기와 함께 저장(원본 기록은 유지)
+- **학습 흐름** — 단계 상세의 ‘학습 흐름’ 탭에서 예측 → 증거 확인 → 원인 설명 → 한 조건 수정 → 재검증 순서로 기록을 살펴보는 안내
 
 <details>
 <summary>모델 입력, KV 캐시와 대화 저장소 화면</summary>
@@ -82,10 +84,10 @@ cd LLM-Agent-viewer
 ```powershell
 uv sync --python 3.12 --extra reference --extra integrations --locked
 uv run --extra reference --extra integrations --offline python -m unittest discover -s tests -v
-node --test tests/architecture.test.cjs tests/inspection.test.cjs tests/editor.test.cjs
+node --test tests/architecture.test.cjs tests/inspection.test.cjs tests/editor.test.cjs tests/settings.test.cjs tests/export_search.test.cjs
 ```
 
-Node.js는 구조도·입력 검사·편집기 테스트에만 필요합니다. [이슈](https://github.com/paconal888-a11y/LLM-Agent-viewer/issues)에 재현 절차와 실행기 정보를 남기거나, 변경한 기능의 테스트와 함께 PR을 보내 주세요.
+Node.js는 구조도·입력 검사·편집기·설정 복원·내보내기/본문 검색 화면 테스트에만 필요합니다. [이슈](https://github.com/paconal888-a11y/LLM-Agent-viewer/issues)에 재현 절차와 실행기 정보를 남기거나, 변경한 기능의 테스트와 함께 PR을 보내 주세요.
 
 ## 지원 범위
 

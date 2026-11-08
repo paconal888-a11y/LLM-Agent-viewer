@@ -261,6 +261,7 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
                 <button id="showInput" class="quiet" disabled>모델 입력</button>
                 <button id="showAnswer" class="quiet" disabled>답변</button>
                 <button id="export" class="quiet" disabled>내보내기</button
+                ><button id="openLearning" class="quiet" title="예측 → 증거 확인 → 원인 설명 → 한 조건 수정 → 재검증 순서로 기록을 살펴보는 안내를 단계 상세에 엽니다">학습 흐름</button
                 ><button id="openDetail" class="quiet">코드 · 데이터</button>
               </div>
             </div>
@@ -312,8 +313,26 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
                 type="search"
                 placeholder="단계 이름 · 파일 · 도구 찾기"
                 aria-label="단계 검색"
-              /><span id="eventCount">기록 없음</span>
+              /><span id="eventCount">기록 없음</span
+              ><input
+                id="bodySearch"
+                type="search"
+                placeholder="본문 검색 · 모델 입력 messages · 도구 결과 · 파일 원문"
+                aria-label="본문 검색"
+                title="제목이 아니라 모델 요청 messages·tools, 도구 결과, 파일 원문 안의 문자열을 찾습니다"
+              /><select id="bodySearchKind" aria-label="본문 검색 범위">
+                <option value="">전체 본문</option>
+                <option value="model.request">모델 요청 (messages · tools)</option>
+                <option value="tool.result">도구 결과</option>
+                <option value="file.decode">파일 원문</option>
+                <option value="model.response">모델 응답</option>
+              </select>
             </div>
+            <div
+              id="bodySearchResults"
+              class="bodysearchresults hidden"
+              aria-live="polite"
+            ></div>
             <div id="timeline" class="timeline">
               <div class="empty">
                 <span class="emptyglyph">→</span>
@@ -537,7 +556,8 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
             <button data-detail="change" class="active">데이터 변화</button
             ><button data-detail="code">실행 코드</button
             ><button data-detail="input">모델 입력</button
-            ><button data-detail="values">전체 값</button>
+            ><button data-detail="values">전체 값</button
+            ><button data-detail="learn">학습 흐름</button>
           </nav>
           <div id="sourcePeek" class="sourcepeek hidden"></div>
           <div id="detailContent" class="detailcontent"></div>
@@ -593,5 +613,28 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
       </p>
     </dialog>
     <div id="toast" role="status" class="toast hidden"></div>
+    <dialog id="exportDialog" class="exportdialog">
+      <div class="dialogbar">
+        <h2>내보내기</h2>
+        <button id="closeExport" class="icon" aria-label="내보내기 닫기">×</button>
+      </div>
+      <p id="exportRun" class="note"></p>
+      <form id="exportOptions" class="exportoptions">
+        <label><input type="checkbox" data-option="paths" checked />경로 · 사용자 이름</label>
+        <label><input type="checkbox" data-option="secrets" checked />API 키 · 토큰 · 개인 키</label>
+        <label><input type="checkbox" data-option="emails" checked />이메일</label>
+        <label><input type="checkbox" data-option="ips" checked />IP 주소 (loopback 제외)</label>
+        <label><input type="checkbox" data-option="omit_file_text" />파일 원문 · 도구 결과 본문 제거</label>
+        <label><input type="checkbox" data-option="omit_sources" />소스 스냅샷 코드 제거</label>
+      </form>
+      <div id="exportPreview" class="exportpreview">
+        <p class="note">미리보기를 불러오는 중…</p>
+      </div>
+      <p id="exportNote" class="note"></p>
+      <div class="exportactions">
+        <button id="exportOriginal" class="secondary">원본 그대로 저장</button
+        ><button id="exportShare" class="primary">공유용 사본 저장</button>
+      </div>
+    </dialog>
   </body>
 </html>

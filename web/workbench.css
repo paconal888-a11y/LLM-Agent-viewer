@@ -2342,3 +2342,267 @@ dialog ol {
     white-space: nowrap;
   }
 }
+
+/* 본문 검색 (BODY_SEARCH) — 단계 검색 옆에 두고, 결과는 트레이에서 단계 목록 자리에 표시한다 */
+.eventtoolbar {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.eventtoolbar #eventSearch {
+  flex: 1 1 220px;
+  width: auto;
+  min-width: 160px;
+}
+.eventtoolbar #bodySearch {
+  flex: 1 1 260px;
+  width: auto;
+  min-width: 180px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  background: #fafbfd;
+  border-radius: 6px;
+  font-size: 11px;
+}
+.eventtoolbar #bodySearchKind {
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 11px;
+  color: #5b6778;
+}
+.recordtray.searching #timeline {
+  display: none;
+}
+.recordtray.searching {
+  height: 300px;
+}
+.bodysearchresults {
+  padding: 6px 8px 8px;
+}
+.bodysearch-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 8px 8px;
+  font-size: 11px;
+  color: #5b6778;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 6px;
+}
+.bodysearch-summary strong {
+  color: var(--ink);
+}
+.bodysearch-summary .warn {
+  color: #b74045;
+}
+.bodysearch-summary small {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.bodyhit {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+.bodyhit:hover,
+.bodyhit:focus-visible {
+  background: var(--soft);
+  border-color: #cdd7f3;
+}
+.bodyhit-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: baseline;
+  font-size: 11px;
+}
+.bodyhit-head code {
+  font: 11px var(--mono);
+  color: var(--blue);
+}
+.bodyhit-head strong {
+  font-weight: 600;
+}
+.bodyhit-head small,
+.bodyhit-head em {
+  font-size: 11px;
+  color: #5b6778;
+  font-style: normal;
+}
+.bodyhit-snippet {
+  display: block;
+  margin-top: 3px;
+  font: 11px var(--mono);
+  color: #4f5b6b;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+}
+
+/* 학습 흐름 탭 (LEARNING_FLOW) — 단계 상세 안의 탭. 구조도 화면의 고정 높이 레이아웃을 건드리지 않는다 */
+.learninghead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  font-size: 12px;
+  padding-bottom: 8px;
+}
+.learninghead span {
+  color: #5b6778;
+}
+.learninghead small {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: #5b6778;
+}
+.learningbody {
+  display: grid;
+  gap: 12px;
+}
+.learningstep {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.learningstep h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.learningstep h3 span {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--soft);
+  color: var(--blue);
+  font: 600 11px var(--mono);
+}
+.learningstep p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #4f5b6b;
+}
+.learningstep p .evidence-kind {
+  margin: 0 2px;
+}
+.learningstep .note {
+  margin: 6px 0 0;
+  font-size: 11px;
+}
+.learningstep textarea {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.6;
+  resize: vertical;
+  background: #fafbfd;
+}
+.learningstep small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #5b6778;
+}
+.learninglinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+.learninglinks small {
+  display: inline;
+  margin: 0;
+}
+.learninglinks .secondary {
+  font-size: 11px;
+}
+.learningstep .diagnosis {
+  margin-top: 6px;
+}
+
+/* 내보내기 대화상자 (EXPORT_PREVIEW) */
+.exportdialog {
+  width: min(680px, 92vw);
+  max-width: 680px;
+}
+.exportoptions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 6px 14px;
+  margin: 6px 0 12px;
+}
+.exportoptions label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+.exportoptions input {
+  accent-color: var(--blue);
+}
+.exporttable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.exporttable th,
+.exporttable td {
+  text-align: left;
+  vertical-align: top;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  line-height: 1.6;
+}
+.exporttable thead th {
+  color: #5b6778;
+  font-weight: 600;
+  background: #f7f8fb;
+}
+.exporttable tbody th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.exporttable code {
+  display: inline-block;
+  margin: 1px 4px 1px 0;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--soft);
+  font: 11px var(--mono);
+  word-break: break-all;
+}
+.exportincludes {
+  font-size: 11px;
+  color: #5b6778;
+  line-height: 1.8;
+  margin-top: 8px;
+}
+.exportdialog #exportNote {
+  margin: 10px 0 0;
+}
+.exportactions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.exportactions .secondary {
+  font-size: 11px;
+}

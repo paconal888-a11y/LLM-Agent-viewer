@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test tests/architecture.test.cjs tests/inspection.test.cjs tests/editor.test.cjs
+      - run: node --test tests/architecture.test.cjs tests/inspection.test.cjs tests/editor.test.cjs tests/settings.test.cjs tests/export_search.test.cjs
   reference:
     runs-on: ubuntu-latest
     steps:
