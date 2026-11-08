@@ -41,6 +41,13 @@ class LauncherSourceTests(unittest.TestCase):
         self.assertNotRegex(text, r"(?m)&\s+\(Join-Path \$projectDir '\.venv")
         self.assertGreaterEqual(len(re.findall(r"Invoke-Native\s+'uv'", text)), 3)
 
+    def test_cmd_entry_points_do_not_inherit_a_powershell_7_module_path(self):
+        for name in ("Start-AgentLens.cmd", "Stop-AgentLens.cmd"):
+            with self.subTest(script=name):
+                text = (ROOT / name).read_text(encoding="utf-8")
+                self.assertLess(text.index("setlocal"), text.index('set "PSModulePath="'))
+                self.assertLess(text.index('set "PSModulePath="'), text.index("powershell -NoProfile"))
+
     def test_data_home_follows_the_override(self):
         with mock.patch.dict(os.environ, {"AGENT_LENS_HOME": "D:/agent-lens-data"}):
             self.assertEqual(data_home(), Path("D:/agent-lens-data"))
@@ -92,7 +99,8 @@ class NativeStderrTests(unittest.TestCase):
             encoding="utf-8",
             errors="replace",
             env={
-                **os.environ,
+                # 콘솔에서 시작한 Windows PowerShell과 같은 조건. PowerShell 7이 물려준 모듈 경로를 지운다.
+                **{k: v for k, v in os.environ.items() if k.upper() != "PSMODULEPATH"},
                 "PROBE_PYTHON": sys.executable,
                 "PROBE_CODE": STDERR_CODE,
                 "PROBE_LAUNCHER": str(LAUNCHER),
