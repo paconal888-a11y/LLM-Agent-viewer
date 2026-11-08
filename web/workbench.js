@@ -1140,6 +1140,8 @@
         data.totals?.completion_tokens ?? data.usage?.completion_tokens;
     $("summaryMeta").textContent =
       `${data.sample ? "저장 기록 재생 · 새 계산 아님 · " : ""}${data.conditions?.model || "로컬 모델"} · 주 모델 ${data.model_calls}회 · 주 도구 ${data.tool_calls}회${data.agents?.length ? " · 하위 " + data.agents.length + "개 / 전체 모델 " + data.totals.model_calls + "회" : ""} · 입력 ${num(promptTokens)} / 출력 ${num(completionTokens)} 토큰(실행기 보고${data.totals?.usage_missing_calls ? ", 미수집 호출 " + data.totals.usage_missing_calls + "회" : ""}) · 활동 ${num(data.active_seconds)}초${data.implementation ? " · 하네스 " + data.implementation.version.slice(0, 10) : ""}`;
+    // 구조도 화면(focus)에서는 한 줄로 잘리므로 전체 문구를 title 로도 둔다.
+    $("summaryMeta").title = $("summaryMeta").textContent;
     $("scrubber").max = Math.max(0, state.events.length - 1);
     $("eventCount").textContent = state.events.length + " 기록";
     $("runStatus").textContent =
@@ -2708,6 +2710,15 @@
       if (d.open) state.openSteps.delete(d.dataset.step);
       else state.openSteps.add(d.dataset.step);
     }
+  });
+  // 예제 팝오버는 바깥을 누르거나 Esc 로 닫는다(U-23). 예제 버튼을 누른 뒤에는 입력란에 초점이 가므로 그때도 닫는다.
+  document.addEventListener("click", (e) => {
+    const examples = document.querySelector("details.examples");
+    if (examples?.open && !examples.contains(e.target)) examples.open = false;
+  });
+  document.addEventListener("keydown", (e) => {
+    const examples = document.querySelector("details.examples");
+    if (e.key === "Escape" && examples?.open) examples.open = false;
   });
   $("features").addEventListener("change", (e) => {
     if (e.target.dataset.feature) {

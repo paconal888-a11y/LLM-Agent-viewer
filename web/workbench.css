@@ -3,11 +3,11 @@
   --bg: #f4f5f7;
   --paper: #fff;
   --ink: #202832;
-  --muted: #727c8c;
+  --muted: #5b6778;
   --line: #e3e7ed;
   --blue: #3d61d8;
   --soft: #edf1ff;
-  --green: #23836a;
+  --green: #1d7058;
   --mono: Consolas, "Cascadia Code", monospace;
   font-family: "Segoe UI", "Malgun Gothic", sans-serif;
   color: var(--ink);
@@ -179,7 +179,7 @@ p {
   font-weight: 650;
 }
 .treeheading {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   font-weight: 700;
   display: flex;
@@ -225,8 +225,8 @@ p {
 }
 .filetree button i {
   font-style: normal;
-  color: #9aa4b2;
-  font: 10px var(--mono);
+  color: #5b6778;
+  font: 11px var(--mono);
   flex-shrink: 0;
 }
 .filetree button:hover {
@@ -244,7 +244,7 @@ p {
 }
 .filetree button.hit:after {
   content: "읽음";
-  font-size: 9px;
+  font-size: 11px;
   margin-left: auto;
   flex-shrink: 0;
 }
@@ -266,13 +266,13 @@ p {
 .history button small {
   display: block;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 .project footer {
   margin-top: auto;
   padding: 20px 12px 0;
-  font-size: 9px;
-  color: #8b95a3;
+  font-size: 11px;
+  color: #5b6778;
   line-height: 1.9;
 }
 .main {
@@ -302,7 +302,7 @@ p {
 .quiet {
   padding: 7px 9px;
   border-radius: 6px;
-  color: #657185;
+  color: #5b6778;
   font-size: 11px;
 }
 .danger {
@@ -316,7 +316,7 @@ p {
   margin-bottom: 22px;
 }
 .eyebrow {
-  font: 9px var(--mono);
+  font: 11px var(--mono);
   letter-spacing: 1.6px;
   color: var(--muted);
   margin-bottom: 8px;
@@ -334,7 +334,7 @@ p {
   white-space: nowrap;
   border: 1px solid var(--line);
   border-radius: 5px;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--muted);
   background: white;
 }
@@ -346,7 +346,7 @@ p {
   padding: 16px;
 }
 .composer > label {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   font-weight: 650;
 }
@@ -370,8 +370,8 @@ p {
   box-shadow: 0 0 0 3px #3d61d80b;
 }
 .draftinfo {
-  font-size: 9px;
-  color: #8b95a3;
+  font-size: 11px;
+  color: #5b6778;
   margin: 2px 0 12px;
   line-height: 1.6;
 }
@@ -387,7 +387,7 @@ p {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 11px;
   color: #5f6a7c;
   line-height: 1.6;
 }
@@ -407,7 +407,7 @@ p {
   background: #3153c4;
 }
 .primary kbd {
-  font: 9px var(--mono);
+  font: 11px var(--mono);
   opacity: 0.6;
   margin-left: 10px;
 }
@@ -416,7 +416,7 @@ p {
   border: 1px solid #d7dde7;
   border-radius: 6px;
   padding: 7px 10px;
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .examples {
@@ -427,12 +427,12 @@ p {
   margin: 12px 0 18px;
 }
 .examples > span {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--muted);
   margin-right: 4px;
 }
 .examples button {
-  font-size: 10px;
+  font-size: 11px;
   background: #fff;
   border: 1px solid var(--line);
   padding: 5px 8px;
@@ -453,7 +453,7 @@ p {
   display: flex;
   justify-content: space-between;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 11px;
   padding: 12px;
 }
 .configuration summary:before {
@@ -475,7 +475,7 @@ p {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 10px;
+  font-size: 11px;
   color: #5f6a7c;
 }
 .field select,
@@ -489,7 +489,7 @@ p {
   width: 100%;
 }
 .note {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   margin: 10px 0;
   line-height: 1.9;
@@ -501,7 +501,7 @@ p {
   margin-top: 14px;
 }
 .configline strong {
-  font-size: 10px;
+  font-size: 11px;
   margin-right: auto;
 }
 .switches {
@@ -528,11 +528,11 @@ p {
   gap: 9px;
 }
 .sectionbar > span {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--muted);
 }
 .status {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--muted);
   padding: 4px 7px;
@@ -568,8 +568,8 @@ p {
   flex-direction: column;
   align-items: center;
   gap: 7px;
-  font-size: 9px;
-  color: #9ba4b1;
+  font-size: 11px;
+  color: #5b6778;
   padding: 0 1px;
 }
 .routenode:not(:last-child):after {
@@ -588,7 +588,7 @@ p {
   height: 25px;
   border: 1px solid #e4e8ef;
   border-radius: 7px;
-  font: 10px var(--mono);
+  font: 11px var(--mono);
   background: #f9fafc;
 }
 .routenode.seen {
@@ -610,9 +610,9 @@ p {
   box-shadow: 0 0 0 4px #e8edfc;
 }
 .routenode small {
-  font: 8px var(--mono);
+  font: 11px var(--mono);
   height: 10px;
-  color: #8f9cb0;
+  color: #5b6778;
 }
 .controls {
   display: flex;
@@ -626,7 +626,7 @@ p {
   gap: 8px;
 }
 .controls > span {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--blue);
 }
 .controls > div {
@@ -651,9 +651,13 @@ p {
 }
 .replay button:last-child {
   font:
-    9px "Segoe UI",
+    11px "Segoe UI",
+    "Malgun Gothic",
     sans-serif;
   margin-left: 5px;
+  min-width: auto;
+  padding: 0 9px;
+  white-space: nowrap;
 }
 .replay input {
   width: 100%;
@@ -662,10 +666,11 @@ p {
   height: 3px;
 }
 .replay span {
-  font: 9px var(--mono);
-  min-width: 52px;
+  font: 11px var(--mono);
+  min-width: 70px;
   text-align: center;
   color: var(--muted);
+  white-space: nowrap;
 }
 .composition {
   padding: 10px 12px;
@@ -677,8 +682,8 @@ p {
 .composition header {
   display: flex;
   justify-content: space-between;
-  font-size: 9px;
-  color: #6d788b;
+  font-size: 11px;
+  color: #5b6778;
   margin-bottom: 8px;
 }
 .stackbar {
@@ -697,7 +702,7 @@ p {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  font-size: 8px;
+  font-size: 11px;
   color: var(--muted);
   margin-top: 7px;
 }
@@ -720,10 +725,10 @@ p {
   border: 1px solid var(--line);
   background: #fafbfd;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .eventtoolbar > span {
-  font: 9px var(--mono);
+  font: 11px var(--mono);
   color: var(--muted);
   white-space: nowrap;
 }
@@ -747,22 +752,22 @@ p {
 .chapter > summary:before {
   content: "›";
   font-size: 14px;
-  color: #8a96a8;
+  color: #5b6778;
   width: 10px;
 }
 .chapter[open] > summary:before {
   content: "⌄";
 }
 .chapter > summary .chaptericon {
-  font: 9px var(--mono);
+  font: 11px var(--mono);
   background: #e7ebf2;
-  color: #687790;
+  color: #5b6778;
   border-radius: 5px;
   padding: 5px;
 }
 .chapter > summary small {
   margin-left: auto;
-  font: 9px var(--mono);
+  font: 11px var(--mono);
   font-weight: 400;
   color: var(--muted);
 }
@@ -805,7 +810,7 @@ p {
   box-sizing: content-box;
 }
 .event.past {
-  opacity: 0.6;
+  opacity: 0.8;
 }
 .event .actor {
   width: 21px;
@@ -815,9 +820,9 @@ p {
   border-radius: 5px;
   display: grid;
   place-items: center;
-  font: 9px var(--mono);
+  font: 11px var(--mono);
   flex-shrink: 0;
-  color: #768399;
+  color: #5b6778;
 }
 .event .actor.llm {
   color: var(--blue);
@@ -840,8 +845,8 @@ p {
 }
 .event .eventsub {
   display: block;
-  font: 9px var(--mono);
-  color: #8a96a8;
+  font: 11px var(--mono);
+  color: #5b6778;
   margin-top: 3px;
   overflow: hidden;
   white-space: nowrap;
@@ -849,8 +854,8 @@ p {
   max-width: 100%;
 }
 .event .eventid {
-  color: #9aa5b3;
-  font: 9px var(--mono);
+  color: #5b6778;
+  font: 11px var(--mono);
   flex-shrink: 0;
 }
 /* 실패·경고 기록: 통과 기록과 같은 모양이면 완료 검사 실패가 보이지 않는다. */
@@ -867,7 +872,7 @@ p {
   margin-left: 6px;
   padding: 0 5px;
   border-radius: 3px;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 16px;
   font-weight: 600;
   font-style: normal;
@@ -920,7 +925,7 @@ p {
   align-items: center;
   gap: 7px;
   padding: 9px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .tokenstep > summary:before {
   content: "+";
@@ -935,14 +940,14 @@ p {
   border-radius: 4px;
   color: var(--blue);
   padding: 4px 6px;
-  font-size: 9px;
+  font-size: 11px;
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .tokenstep summary small {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--muted);
   margin-left: auto;
 }
@@ -961,7 +966,7 @@ p {
   margin-bottom: 10px;
 }
 .empty p {
-  font-size: 10px;
+  font-size: 11px;
 }
 .emptyglyph {
   font-size: 28px;
@@ -989,8 +994,8 @@ p {
   padding-top: 14px;
   margin-top: 16px;
   border-top: 1px solid var(--line);
-  font: 9px var(--mono);
-  color: #7c899c;
+  font: 11px var(--mono);
+  color: #5b6778;
 }
 .inspector {
   background: white;
@@ -1019,7 +1024,7 @@ p {
   font-size: 11px;
 }
 .inspectbar span {
-  font: 9px var(--mono);
+  font: 11px var(--mono);
   color: var(--muted);
   margin-left: auto;
 }
@@ -1045,10 +1050,10 @@ p {
   border-top: 1px solid var(--line);
   margin-top: 35px;
   padding-top: 20px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .actorlegend b {
-  font: 10px var(--mono);
+  font: 11px var(--mono);
   display: inline-block;
   width: 20px;
   color: #5f729a;
@@ -1063,8 +1068,8 @@ p {
   letter-spacing: -0.4px;
 }
 .detailhead > code {
-  font: 9px var(--mono);
-  color: #8c98a9;
+  font: 11px var(--mono);
+  color: #5b6778;
   overflow-wrap: anywhere;
 }
 .detailhead p {
@@ -1079,7 +1084,7 @@ p {
   padding: 0 21px;
 }
 .detailtabs button {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   padding: 12px 0;
   border-bottom: 2px solid transparent;
@@ -1103,8 +1108,8 @@ p {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 9px;
-  color: #77849a;
+  font-size: 11px;
+  color: #5b6778;
   margin-bottom: 8px;
 }
 .datalabel i {
@@ -1117,7 +1122,7 @@ p {
 .rawvalue {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font: 10px/1.85 var(--mono);
+  font: 11px/1.85 var(--mono);
   background: #f7f9fc;
   border: 1px solid #e7ebf2;
   border-radius: 7px;
@@ -1133,8 +1138,8 @@ p {
   text-align: center;
 }
 .sourcepath {
-  font: 9px/1.8 var(--mono);
-  color: #71819c;
+  font: 11px/1.8 var(--mono);
+  color: #5b6778;
   overflow-wrap: anywhere;
   margin-bottom: 10px;
 }
@@ -1149,7 +1154,7 @@ p {
 .codeline {
   display: flex;
   min-width: max-content;
-  font: 9px/1.9 var(--mono);
+  font: 11px/1.9 var(--mono);
   white-space: pre;
 }
 .codeline > span {
@@ -1157,7 +1162,7 @@ p {
   flex-shrink: 0;
   text-align: right;
   padding-right: 11px;
-  color: #a4afbf;
+  color: #5b6778;
   user-select: none;
 }
 .codeline > code {
@@ -1174,9 +1179,9 @@ p {
   margin-bottom: 13px;
 }
 .stackframes button {
-  font: 9px/1.6 var(--mono);
+  font: 11px/1.6 var(--mono);
   text-align: left;
-  color: #72819a;
+  color: #5b6778;
   overflow-wrap: anywhere;
   padding: 6px 7px;
   border-radius: 5px;
@@ -1194,7 +1199,7 @@ p {
   margin-bottom: 12px;
 }
 .codeactions span {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--muted);
 }
 .statgrid {
@@ -1216,7 +1221,7 @@ p {
   overflow-wrap: anywhere;
 }
 .stat small {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--muted);
   display: block;
   margin-top: 4px;
@@ -1238,14 +1243,14 @@ p {
   padding: 6px;
   min-width: 33px;
   background: white;
-  font: 10px var(--mono);
+  font: 11px var(--mono);
   text-align: left;
   white-space: pre-wrap;
 }
 .tokenchip small {
   display: block;
-  font: 8px var(--mono);
-  color: #8b99b0;
+  font: 11px var(--mono);
+  color: #5b6778;
   margin-top: 4px;
 }
 .tokenchip.selected {
@@ -1257,9 +1262,9 @@ p {
   border-top: 2px solid #8fbead;
 }
 .tokeninfo {
-  font: 9px/1.8 var(--mono);
+  font: 11px/1.8 var(--mono);
   margin: 9px 0 17px;
-  color: #71819a;
+  color: #5b6778;
   overflow-wrap: anywhere;
 }
 .heatgrid {
@@ -1276,8 +1281,8 @@ p {
   background: #eef1f8;
 }
 .matrixnote {
-  font: 8px/1.8 var(--mono);
-  color: #8c98ad;
+  font: 11px/1.8 var(--mono);
+  color: #5b6778;
   margin: 6px 0 18px;
 }
 .bars {
@@ -1290,8 +1295,8 @@ p {
   grid-template-columns: minmax(65px, 1fr) 2fr 44px;
   gap: 9px;
   align-items: center;
-  font: 9px var(--mono);
-  color: #75839a;
+  font: 11px var(--mono);
+  color: #5b6778;
 }
 .barrow code {
   overflow: hidden;
@@ -1336,7 +1341,7 @@ p {
   flex-wrap: wrap;
 }
 .editbar > span {
-  font: 9px var(--mono);
+  font: 11px var(--mono);
   color: var(--muted);
 }
 .editbar > div {
@@ -1360,7 +1365,7 @@ p {
   padding: 14px 10px;
   font: 11px/1.8 var(--mono);
   white-space: pre;
-  color: #a0aec1;
+  color: #5b6778;
   background: #fafbfd;
   border-right: 1px solid var(--line);
 }
@@ -1379,7 +1384,7 @@ p {
   overflow: auto;
 }
 .notice {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--green);
   padding: 12px 0;
   line-height: 1.8;
@@ -1388,7 +1393,7 @@ p {
   color: #b33f4c;
 }
 .diff {
-  font: 10px/1.9 var(--mono);
+  font: 11px/1.9 var(--mono);
   border: 1px solid var(--line);
   border-radius: 7px;
   background: white;
@@ -1430,29 +1435,29 @@ p {
 }
 .componentcard p {
   font-size: 11px;
-  color: #6d7b90;
+  color: #5b6778;
 }
 .componentcard details {
   margin: 12px 0;
-  font-size: 10px;
-  color: #6d7b90;
+  font-size: 11px;
+  color: #5b6778;
   line-height: 1.8;
 }
 .componentcard summary {
   cursor: pointer;
   color: var(--blue);
-  font-size: 10px;
+  font-size: 11px;
 }
 .componentcard details p {
   margin: 10px 0;
 }
 .componentcard button {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--blue);
   padding: 5px 0;
 }
 .componentcard .unavailable {
-  color: #9ba5b5;
+  color: #5b6778;
 }
 .compare {
   background: white;
@@ -1486,7 +1491,7 @@ p {
   margin-bottom: 12px;
 }
 .comparison p {
-  font-size: 10px;
+  font-size: 11px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 200px;
@@ -1495,21 +1500,21 @@ p {
 .comparison dl {
   display: grid;
   grid-template-columns: 1fr auto;
-  font: 9px/2.4 var(--mono);
-  color: #7a879b;
+  font: 11px/2.4 var(--mono);
+  color: #5b6778;
 }
 .comparison dt,
 .comparison dd {
   margin: 0;
 }
 .comparison button {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--blue);
   margin-top: 10px;
 }
 .checks {
-  font-size: 9px;
-  color: #75839a;
+  font-size: 11px;
+  color: #5b6778;
   line-height: 2;
   margin-top: 14px;
 }
@@ -1549,7 +1554,7 @@ dialog p,
 dialog li {
   font-size: 12px;
   line-height: 2;
-  color: #65758c;
+  color: #5b6778;
 }
 dialog li {
   margin-bottom: 12px;
@@ -1575,7 +1580,7 @@ dialog ol {
     padding: 25px;
   }
   .codeline {
-    font-size: 10px;
+    font-size: 11px;
   }
 }
 @media (max-width: 1250px) {
@@ -1638,10 +1643,10 @@ dialog ol {
     font-size: 16px;
   }
   .connection {
-    font-size: 9px;
+    font-size: 11px;
   }
   .appbar > .quiet {
-    font-size: 10px;
+    font-size: 11px;
     padding: 6px;
   }
   .workspacebar {
@@ -1682,7 +1687,7 @@ dialog ol {
     line-height: 1.5;
   }
   .appbar > .quiet {
-    font-size: 9px;
+    font-size: 11px;
     padding: 5px;
   }
   .main {
@@ -1701,7 +1706,7 @@ dialog ol {
     font-size: 22px;
   }
   .pageintro p:not(.eyebrow) {
-    font-size: 10px;
+    font-size: 11px;
   }
   .composer {
     padding: 13px;
@@ -1713,7 +1718,7 @@ dialog ol {
     align-items: flex-start;
   }
   .composer-bottom .check {
-    font-size: 9px;
+    font-size: 11px;
     max-width: 160px;
   }
   .primary kbd {
@@ -1723,17 +1728,17 @@ dialog ol {
     gap: 5px;
   }
   .examples button {
-    font-size: 9px;
+    font-size: 11px;
     padding: 5px 6px;
   }
   .configuration summary {
-    font-size: 9px;
+    font-size: 11px;
   }
   .route {
     padding: 14px 4px;
   }
   .routenode {
-    font-size: 8px;
+    font-size: 11px;
     gap: 7px;
   }
   .routenode b {
@@ -1741,7 +1746,7 @@ dialog ol {
     height: 23px;
   }
   .routenode small {
-    font-size: 7px;
+    font-size: 11px;
   }
   .routenode:not(:last-child):after {
     width: calc(100% - 28px);
@@ -1753,13 +1758,13 @@ dialog ol {
     flex-direction: column;
   }
   .event .eventtitle {
-    font-size: 10px;
+    font-size: 11px;
   }
   .event .eventsub {
-    font-size: 8px;
+    font-size: 11px;
   }
   .event .eventid {
-    font-size: 8px;
+    font-size: 11px;
   }
   .chapterbody {
     padding-left: 8px;
@@ -1783,7 +1788,7 @@ dialog ol {
   }
   .editbar .primary,
   .editbar .secondary {
-    font-size: 9px;
+    font-size: 11px;
     padding: 7px;
   }
   .configgrid {
@@ -1796,21 +1801,21 @@ dialog ol {
     padding: 17px;
   }
   .pageintro > .secondary {
-    font-size: 9px;
+    font-size: 11px;
     padding: 6px;
   }
   .sectionbar h2 {
     font-size: 14px;
   }
   .sectionbar .quiet {
-    font-size: 9px;
+    font-size: 11px;
   }
 }
 .event .eventtitle {
   font-size: 12px;
 }
 .event .eventsub {
-  font-size: 10px;
+  font-size: 11px;
 }
 .detailhead p,
 .componentcard p {
@@ -1821,7 +1826,7 @@ dialog ol {
   font-size: 11px;
 }
 .codeline {
-  font-size: 10px;
+  font-size: 11px;
 }
 .filetree button {
   font-size: 12px;
@@ -1863,13 +1868,13 @@ dialog ol {
   padding: 0;
   text-align: left;
   margin-bottom: 8px;
-  color: #5e79af;
+  color: #2f55c7;
 }
 .sourcepeek .sourcecode {
   max-height: 130px;
 }
 .sourcepeek .codeline {
-  font-size: 9px;
+  font-size: 11px;
 }
 .sourcepeek .codeline > span {
   width: 38px;
@@ -1879,13 +1884,13 @@ dialog ol {
   content: attr(data-hit-label);
 }
 .filecounts {
-  font: 8px var(--mono);
-  color: #7c9d91;
+  font: 11px var(--mono);
+  color: #2f6b58;
   flex-shrink: 0;
   margin-left: auto;
 }
 .sourcepeek .codeline {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .requestsummary {
@@ -1900,7 +1905,7 @@ dialog ol {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 7px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
 }
 .requestsummary p {
@@ -1913,8 +1918,8 @@ dialog ol {
   overflow-wrap: anywhere;
 }
 .requestsummary small {
-  font: 9px/1.8 var(--mono);
-  color: #8b98ad;
+  font: 11px/1.8 var(--mono);
+  color: #5b6778;
   display: block;
   margin-top: 10px;
 }
@@ -1936,13 +1941,13 @@ dialog ol {
 }
 .registeredtools summary {
   font-size: 11px;
-  color: #69778c;
+  color: #5b6778;
   cursor: pointer;
   padding: 7px 0;
 }
 .registeredtools summary span {
-  font: 9px var(--mono);
-  color: #97a3b6;
+  font: 11px var(--mono);
+  color: #5b6778;
   margin-left: 5px;
 }
 .registeredtools button {
@@ -1957,13 +1962,13 @@ dialog ol {
   background: #e8edf7;
 }
 .registeredtools code {
-  font: 10px var(--mono);
+  font: 11px var(--mono);
   display: block;
   color: #5e759c;
 }
 .registeredtools small {
-  font-size: 9px;
-  color: #8794a8;
+  font-size: 11px;
+  color: #5b6778;
 }
 .registeredtools button.active {
   background: #e7f4ec;
@@ -2002,14 +2007,14 @@ dialog ol {
   color: #536e9e;
 }
 .connectioncard small {
-  font: 9px var(--mono);
+  font: 11px var(--mono);
   color: var(--muted);
   margin-left: 5px;
 }
 .connectioncard > span {
-  font: 9px var(--mono);
+  font: 11px var(--mono);
   display: block;
-  color: #8492aa;
+  color: #5b6778;
   margin-top: 6px;
 }
 .connectioncard.active {
@@ -2054,7 +2059,7 @@ dialog ol {
   border-color: #d9e2fa;
 }
 .repairgrid pre {
-  font-size: 10px;
+  font-size: 11px;
   max-height: 260px;
 }
 .evidencerow {
@@ -2063,7 +2068,7 @@ dialog ol {
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 20px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--green);
 }
 .evidencebutton {
@@ -2081,7 +2086,7 @@ dialog ol {
 }
 .evidencebutton code {
   color: var(--blue);
-  font-size: 9px;
+  font-size: 11px;
 }
 .memoryaudit {
   padding: 18px;
@@ -2102,7 +2107,7 @@ dialog ol {
   cursor: pointer;
 }
 .memoryrow code {
-  font: 9px var(--mono);
+  font: 11px var(--mono);
   color: var(--muted);
 }
 .pill.included {
@@ -2111,7 +2116,7 @@ dialog ol {
   border-color: #d0e6d9;
 }
 .pill.omitted {
-  color: #a47533;
+  color: #7a5620;
   background: #fbf3e6;
   border-color: #ebddc7;
 }
@@ -2128,8 +2133,8 @@ dialog ol {
   color: #9c613c;
 }
 .diagnostic p {
-  font: 9px/1.8 var(--mono);
-  color: #a18672;
+  font: 11px/1.8 var(--mono);
+  color: #7a5620;
 }
 .streamnote {
   padding: 0 10px;
@@ -2171,12 +2176,12 @@ dialog ol {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   margin-bottom: 10px;
 }
 .planpanel small {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--muted);
   font-weight: 400;
 }
@@ -2185,7 +2190,7 @@ dialog ol {
   gap: 8px;
   align-items: center;
   font-size: 11px;
-  color: #71829c;
+  color: #5b6778;
 }
 .planpanel > div > span {
   color: var(--green);
@@ -2207,17 +2212,17 @@ dialog ol {
   background: #fffaf0;
   padding: 13px 16px;
   margin-bottom: 18px;
-  color: #8a723f;
+  color: #6b4b10;
 }
 .samplebanner strong {
   font-size: 11px;
 }
 .samplebanner p {
-  font-size: 10px;
+  font-size: 11px;
   margin-top: 6px;
 }
 .samplebanner small {
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.8;
   display: block;
   margin-top: 7px;
@@ -2283,19 +2288,19 @@ dialog ol {
   font-size: 12px;
 }
 .agentcard strong span {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--green);
 }
 .agentcard small {
   display: block;
-  color: #7887a0;
+  color: #5b6778;
   margin-top: 6px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .agentcard p {
   margin-top: 8px;
   font-size: 11px;
-  color: #6c7c94;
+  color: #5b6778;
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
@@ -2325,9 +2330,9 @@ dialog ol {
 }
 .agentpanel > small {
   display: block;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.8;
-  color: #8290a5;
+  color: #5b6778;
 }
 @media (max-width: 800px) {
   .layout.reading {
