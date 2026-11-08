@@ -53,7 +53,7 @@ body {
   padding: 0;
 }
 .breadcrumbs {
-  font-size: 11px;
+  font-size: 12px;
 }
 .eyebrow {
   display: none;
@@ -69,13 +69,13 @@ body {
   font-size: 12px;
 }
 .treeheading {
-  font-size: 11px;
+  font-size: 12px;
 }
 .filetree button {
-  font-size: 11px;
+  font-size: 12px;
 }
 .history button {
-  font-size: 11px;
+  font-size: 12px;
 }
 .quiet,
 .secondary,
@@ -119,7 +119,7 @@ body {
   border-radius: 3px;
   padding: 3px 6px;
   margin-left: 5px;
-  font-size: 11px;
+  font-size: 12px;
   color: #3b638e;
   background: #edf4fc;
 }
@@ -133,7 +133,7 @@ body {
   border-radius: 3px;
   padding: 3px 6px;
   margin-left: 5px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #3d4f63;
   background: #eef1f5;
@@ -203,11 +203,11 @@ body {
 }
 .inputlinks small {
   color: #5b6778;
-  font-size: 11px;
+  font-size: 12px;
 }
 .inspection-link {
   padding: 4px 7px;
-  font-size: 11px;
+  font-size: 12px;
   border: 1px solid #ccdaeb;
   background: #f4f8fe;
   border-radius: 3px;
@@ -228,7 +228,7 @@ body {
 }
 .input-snapshot > header span {
   color: #5b6778;
-  font-size: 11px;
+  font-size: 12px;
 }
 .input-navigation {
   display: flex;
@@ -248,7 +248,7 @@ body {
   background: #f4f7fb;
   padding: 8px 5px;
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
   border-radius: 4px;
 }
@@ -259,7 +259,7 @@ body {
 .input-audit {
   padding: 6px 0 10px;
   color: #5b6778;
-  font-size: 11px;
+  font-size: 12px;
 }
 .input-diff {
   padding: 9px;
@@ -275,14 +275,14 @@ body {
   font-size: 12px;
 }
 .input-diff .note {
-  font-size: 11px;
+  font-size: 12px;
 }
 .input-diff-counts {
   display: flex;
   gap: 10px;
   padding: 4px 0 8px;
   color: #66768b;
-  font-size: 11px;
+  font-size: 12px;
 }
 .input-change {
   padding: 6px 0;
@@ -292,7 +292,7 @@ body {
   display: flex;
   gap: 9px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
 }
 .change-added {
   color: #24815d;
@@ -318,11 +318,11 @@ body {
 }
 .input-message > summary code {
   color: #5b6778;
-  font-size: 11px;
+  font-size: 12px;
 }
 .input-message > summary span {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
 }
 .input-message[open] > summary {
@@ -335,7 +335,7 @@ body {
   margin-bottom: 8px;
 }
 .message-labels span {
-  font-size: 11px;
+  font-size: 12px;
   background: #edf2f9;
   color: #5e7695;
   padding: 2px 5px;
@@ -348,7 +348,7 @@ body {
   padding-top: 8px;
 }
 .input-origins > small {
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
 }
 .input-tools {
@@ -386,7 +386,7 @@ body {
 .message-fragment > summary,
 .message-json > summary {
   color: #52729b;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
 }
 .message-fragment .valuebox {
@@ -396,16 +396,16 @@ body {
   margin-top: 10px;
 }
 .datalabel {
-  font-size: 11px;
+  font-size: 12px;
 }
 .databox pre {
-  font-size: 11px;
+  font-size: 12px;
 }
 .codeline {
-  font-size: 11px;
+  font-size: 12px;
 }
 .sourcepeek {
-  font-size: 11px;
+  font-size: 12px;
 }
 .activitybar {
   height: 42px;
@@ -458,7 +458,7 @@ body {
   padding: 7px 12px;
   margin: 0;
   min-height: 29px;
-  font-size: 11px;
+  font-size: 12px;
   border-radius: 4px;
 }
 #journeyView .samplebanner p,
@@ -484,7 +484,7 @@ body {
   margin: 0;
 }
 #journeyView .requestsummary small {
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 0;
 }
 #journeyView.focus .execution > .sectionbar {
@@ -566,7 +566,7 @@ body {
 #journeyView .examples button {
   padding: 4px 7px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 12px;
 }
 #journeyView .configuration {
   margin: 0;
@@ -606,12 +606,15 @@ body {
   border: 0;
 }
 .execution > .sectionbar {
+  flex-wrap: wrap;
+  gap: 2px 12px;
   min-height: 33px;
-  height: 33px;
+  height: auto;
   margin: 0;
   padding: 0 2px;
 }
 .execution .sectionbar h2 {
+  white-space: nowrap;
   font-size: 13px;
 }
 .execution .sectionbar > div {
@@ -621,7 +624,7 @@ body {
 }
 .execution .sectionbar button {
   padding: 4px 7px;
-  font-size: 11px;
+  font-size: 12px;
 }
 #showAnswer.ready {
   color: #187554;
@@ -635,7 +638,7 @@ body {
   justify-content: space-between;
   min-height: 24px;
   padding: 1px 7px 5px;
-  font-size: 11px;
+  font-size: 12px;
   color: #456ba7;
 }
 .diagram-caption > span:first-child {
@@ -647,7 +650,7 @@ body {
 .diagram-caption select {
   max-width: 180px;
   padding: 2px 5px;
-  font-size: 11px;
+  font-size: 12px;
   border: 1px solid #d1dbe7;
   border-radius: 3px;
 }
@@ -657,7 +660,7 @@ body {
   gap: 5px;
 }
 .componentnav label {
-  font-size: 11px;
+  font-size: 12px;
   color: #65758a;
 }
 .componentnav select {
@@ -672,7 +675,7 @@ body {
 .diagram-caption > span:last-child {
   white-space: nowrap;
   color: #2f55c7;
-  font-size: 11px;
+  font-size: 12px;
 }
 .diagram-caption i {
   font-style: normal;
@@ -826,7 +829,7 @@ body {
 }
 .stepheading .quiet {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
 }
 .stepnumber {
   font: 11px var(--mono);
@@ -837,7 +840,7 @@ body {
   grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
   gap: 10px;
   margin-top: 4px;
-  font-size: 11px;
+  font-size: 12px;
   align-items: center;
 }
 .steptransfer > div {
@@ -849,7 +852,7 @@ body {
 .steptransfer small {
   color: #5b6778;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12px;
 }
 .steptransfer span {
   overflow: hidden;
@@ -881,7 +884,7 @@ body {
 }
 .controls button {
   padding: 4px 9px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .diagram-layout #route,
 .diagram-layout #connections,
@@ -920,7 +923,7 @@ body {
 }
 .recordtray .eventsub,
 .recordtray .eventid {
-  font-size: 11px;
+  font-size: 12px;
 }
 .recordtray .chapter > summary {
   font-size: 12px;
@@ -1045,10 +1048,10 @@ body {
   }
   .activitybar button {
     padding: 4px 7px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .execution .sectionbar button {
-    font-size: 11px;
+    font-size: 12px;
     padding: 4px;
   }
   .execution .sectionbar h2 {
@@ -1083,7 +1086,7 @@ body {
   flex: 1;
 }
 .memory-session code {
-  font-size: 11px;
+  font-size: 12px;
 }
 .memory-check {
   background: #fff;
@@ -1106,7 +1109,7 @@ body {
 }
 #memoryCheckResult {
   color: #536987;
-  font-size: 11px;
+  font-size: 12px;
 }
 .storage-grid {
   display: grid;
@@ -1132,12 +1135,12 @@ body {
   margin: 0;
 }
 .storecard header span {
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
 }
 .storage-path {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   overflow-wrap: anywhere;
   color: #5b6778;
   line-height: 1.8;
@@ -1167,7 +1170,7 @@ body {
 .stored-turn summary code {
   max-width: 80px;
   overflow: hidden;
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
 }
 .storecard pre {
@@ -1256,10 +1259,10 @@ body {
   grid-column: 2;
   grid-row: 1;
   float: none;
-  font-size: 11px;
+  font-size: 12px;
 }
 #journeyView .composer .modebar label {
-  font-size: 11px;
+  font-size: 12px;
 }
 #journeyView .composer .modebar select {
   max-width: 190px;
@@ -1270,7 +1273,7 @@ body {
 #journeyView .composer-bottom .check {
   grid-column: 2;
   grid-row: 2;
-  font-size: 11px;
+  font-size: 12px;
 }
 #journeyView .composer-bottom .primary {
   grid-column: 3;
@@ -1306,7 +1309,7 @@ body {
   border: 1px solid #d3dbe5;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
 }
 .examplebuttons {
   display: grid;
@@ -1344,7 +1347,7 @@ body {
   #journeyView .composer-bottom .check {
     grid-column: 1;
     grid-row: 3;
-    font-size: 11px;
+    font-size: 12px;
   }
   #journeyView .composer-bottom .primary {
     grid-column: 2;
@@ -1395,18 +1398,29 @@ body {
   border-radius: 4px;
 }
 .sizemeter {
+  display: block;
+  width: 100%;
   height: 8px;
   margin: 0 0 12px;
   overflow: hidden;
+  border: 0;
   border-radius: 4px;
   background: var(--line);
+  appearance: none;
 }
-.sizemeter i {
-  display: block;
-  height: 100%;
+.sizemeter::-webkit-progress-bar {
+  background: var(--line);
+}
+.sizemeter::-webkit-progress-value {
   background: var(--blue);
 }
-.sizemeter.over i {
+.sizemeter::-moz-progress-bar {
+  background: var(--blue);
+}
+.sizemeter.over::-webkit-progress-value {
+  background: #c9711a;
+}
+.sizemeter.over::-moz-progress-bar {
   background: #c9711a;
 }
 @media (max-width: 720px) {
@@ -1414,4 +1428,384 @@ body {
     align-items: stretch;
     flex-direction: column;
   }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.toolgroups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+}
+.toolgroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.toolgroup + .toolgroup {
+  padding-left: 14px;
+  border-left: 1px solid var(--line);
+}
+.agentfocuslabel {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: auto;
+}
+.agentfocuslabel:has(+ .hidden) {
+  display: none;
+}
+.samplelist {
+  margin: 0 8px 14px;
+}
+.samplelist summary {
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 12px;
+  color: #5b6778;
+}
+.samplelist summary span {
+  float: right;
+}
+.shortcuts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  font-size: 13px;
+}
+.shortcuts dt {
+  font: 12px var(--mono);
+}
+.shortcuts dd {
+  margin: 0;
+  color: var(--muted);
+}
+.lesson-active #sampleBanner,
+.lesson-active #requestSummary {
+  display: none !important;
+}
+.coach {
+  flex: none;
+  padding: 10px 14px;
+  border: 1px solid #cdd8f6;
+  border-left: 3px solid var(--blue);
+  border-radius: 6px;
+  background: #fff;
+}
+.coach header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.coach header button {
+  flex: none;
+}
+.coachname {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+  font-weight: 600;
+}
+.coachname b {
+  margin-right: 8px;
+  color: var(--blue);
+}
+.coachdots {
+  display: inline-flex;
+  flex: none;
+  gap: 3px;
+}
+.coachdots i {
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+.coachdots i.done {
+  background: #a9bbf0;
+}
+.coachdots i.current {
+  background: var(--blue);
+}
+.coachsource {
+  flex: none;
+  margin-left: auto;
+  color: #8a6416;
+}
+.coachbody {
+  max-height: 38dvh;
+  overflow: auto;
+}
+.coachbody h2 {
+  margin: 8px 0 4px;
+  font-size: 16px;
+  letter-spacing: -0.2px;
+}
+.coachbody p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.coachbody code,
+.lessonrun code {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--soft);
+  font: 12.5px var(--mono);
+}
+.coachbody .coachlook {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.coachbody .coachowner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.coachtake {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--soft);
+}
+.coachtake strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--blue);
+}
+.coachtake strong:first-child {
+  margin-top: 0;
+}
+.coachtake button {
+  margin-top: 8px;
+}
+.coach footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.coachdetail {
+  display: none;
+}
+.lessons {
+  max-width: 920px;
+  margin: 0 auto;
+  padding-bottom: 56px;
+}
+.lessonhero {
+  padding: 26px 0 22px;
+}
+.lessonhero h1 {
+  font-size: 27px;
+  line-height: 1.35;
+  letter-spacing: -0.5px;
+}
+.lessonhero p {
+  max-width: 66ch;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.7;
+}
+.lessonactions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.lessonactions .primary {
+  padding: 10px 18px;
+  font-size: 14px;
+}
+.ownerlegend,
+.lessonrun {
+  margin-bottom: 26px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.ownerlegend h2,
+.lessonrun h2 {
+  font-size: 15px;
+}
+.ownerlegend > p,
+.lessonrun p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.lessonrun button {
+  margin-top: 10px;
+}
+.ownerlegend > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px 18px;
+  margin-top: 12px;
+}
+.ownerlegend article {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+.ownerlegend small {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.lessonchapter {
+  margin-bottom: 26px;
+}
+.lessonchapter h2 {
+  font-size: 18px;
+  letter-spacing: -0.2px;
+}
+.lessonchapter h2 small {
+  margin-right: 8px;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 600;
+}
+.lessonchapter > p {
+  margin: 2px 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.lessonchapter > div {
+  display: grid;
+  gap: 6px;
+}
+.lessoncard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  text-align: left;
+}
+.lessoncard:hover {
+  border-color: #b9c6ee;
+  background: #fafbff;
+}
+.lessoncard b {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--soft);
+  color: var(--blue);
+  font-size: 13px;
+  line-height: 28px;
+  text-align: center;
+}
+.lessoncard.done b {
+  background: #dff1ea;
+  color: var(--green);
+}
+.lessoncard span {
+  flex: 1;
+  min-width: 0;
+}
+.lessoncard strong {
+  display: block;
+  font-size: 14px;
+}
+.lessoncard small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.lessoncard i {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+.lessonglossary {
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.lessonglossary summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+.lessonglossary dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 18px;
+  margin: 12px 0 2px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.lessonglossary dt {
+  font-weight: 600;
+}
+.lessonglossary dd {
+  margin: 0;
+  color: var(--muted);
+}
+@media (max-width: 800px) {
+  .coachdetail {
+    display: inline-flex;
+  }
+  .coachsource,
+  .coachdots {
+    display: none;
+  }
+  .lessonhero h1 {
+    font-size: 22px;
+  }
+  .lessonglossary dl {
+    grid-template-columns: 1fr;
+  }
+  .lessonglossary dd {
+    margin-bottom: 6px;
+  }
+  .toolgroup + .toolgroup {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+.samplenote {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: 5px;
+  background: #fffaf0;
+  color: #6b4b10;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.samplenote code {
+  font: 12.5px var(--mono);
 }

@@ -333,9 +333,10 @@
   }
   function view(name) {
     state.view = name;
-    for (const v of ["journey", "editor", "learn", "feedback", "memory"])
+    for (const v of ["lessons", "journey", "editor", "learn", "feedback", "memory"])
       $(v + "View").classList.toggle("hidden", v !== name);
     $("pageName").textContent = {
+      lessons: "배우기",
       journey: "구조 · 실행",
       editor: "파일 편집",
       learn: "구성 · 비교",
@@ -350,11 +351,18 @@
       .querySelector(".layout")
       .classList.toggle(
         "reading",
-        ["feedback", "learn", "memory"].includes(name),
+        ["lessons", "feedback", "learn", "memory"].includes(name),
       );
     document
       .querySelector(".layout")
       .classList.toggle("diagram-layout", name === "journey");
+    store("view", name);
+    if (name === "lessons") {
+      $("inspector").classList.remove("open");
+      renderLessons();
+      window.history.replaceState(null, "", "#/lessons");
+    } else if (name !== "journey") window.history.replaceState(null, "", location.pathname);
+    renderCoach();
     if (name === "memory") loadMemory().catch((e) => toast(e.message));
     if (name === "feedback") {
       if (
@@ -454,6 +462,7 @@
     }
     $("startCompare").disabled = !state.health.connected || busy();
     $("backend").disabled = busy() || state.health.mode === "sample";
+    $("sampleComposerNote").classList.toggle("hidden", state.health.mode !== "sample");
     if (state.health.mode === "sample") {
       $("connection").textContent = "샘플 기록 · 모델 실행 없음";
       $("backend").disabled = true;
@@ -911,6 +920,125 @@
       );
     store("selection", { id: state.run?.id, cursor: state.cursor });
     if (open) $("inspector").classList.add("open");
+    renderCoach();
+    if (!state.lesson && state.view === "journey" && state.run?.id && current)
+      window.history.replaceState(
+        null,
+        "",
+        "#/run/" + encodeURIComponent(state.run.id) + "/" + current.id,
+      );
+  }
+  // 강의: 실제 저장 기록의 단계를 순서대로 열어 준다. 새 계산을 만들지 않는다.
+  function lessonProgress() {
+    const saved = stored("lessons");
+    return { done: saved?.done || {}, last: saved?.last || null };
+  }
+  function lessonText(value) {
+    return esc(value).replace(/`([^`]+)`/g, "<code>$1</code>");
+  }
+  function renderCoach() {
+    const lesson = state.lesson && AgentLessons.byId(state.lesson.id),
+      shown = !!lesson && state.view === "journey";
+    document.body.classList.toggle("lesson-active", shown);
+    $("coach").classList.toggle("hidden", !shown);
+    if (!shown) return;
+    const index = state.lesson.step,
+      step = lesson.steps[index],
+      last = index === lesson.steps.length - 1,
+      next = AgentLessons.nextOf(lesson.id),
+      expected = AgentLessons.locate(state.events, step),
+      event = state.events[expected],
+      owner = event ? AgentInspection.decision(event, state.events) : null,
+      away = expected >= 0 && expected !== state.cursor;
+    $("coach").innerHTML =
+      `<header><span class="coachname"><b>${lesson.number}강</b>${esc(lesson.title)}</span><span class="coachdots" role="img" aria-label="${index + 1} / ${lesson.steps.length}단계">${lesson.steps.map((_, i) => `<i class="${i < index ? "done" : i === index ? "current" : ""}"></i>`).join("")}</span><small>${index + 1} / ${lesson.steps.length}</small><span class="coachsource">실제 저장 기록 재생</span><button class="quiet" data-coach="list">목록</button><button class="icon" data-coach="exit" aria-label="강의 닫기">×</button></header>` +
+      `<div class="coachbody"><h2>${esc(step.title)}</h2><p>${lessonText(step.body)}</p>${step.look ? `<p class="coachlook">${lessonText(step.look)}</p>` : ""}${owner ? `<p class="coachowner"><span class="decision-kind" data-owner="${owner.owner}">${esc(owner.label)}</span>이 단계를 정한 쪽</p>` : ""}${last ? `<div class="coachtake"><strong>핵심</strong><p>${lessonText(lesson.takeaway)}</p><strong>직접 해 보기</strong><p>${lessonText(lesson.tryIt.text)}</p><button class="secondary" data-coach="try">${lesson.tryIt.file ? "파일 열기 ↗" : lesson.tryIt.view ? "화면 열기 ↗" : "실행 화면으로 ↗"}</button></div>` : ""}</div>` +
+      `<footer>${away ? '<button class="quiet" data-coach="back">강의 위치로 돌아가기</button>' : ""}<button class="quiet coachdetail" data-coach="detail">상세 열기</button><button class="secondary" data-coach="prev" ${index ? "" : "disabled"}>← 이전</button><button class="primary" data-coach="next">${last ? (next ? "다음 강의 →" : "코스 마치기") : "다음 →"}</button></footer>`;
+  }
+  async function openLesson(id, index = 0) {
+    const lesson = AgentLessons.byId(id);
+    if (!lesson) return;
+    const step = lesson.steps[index],
+      run = AgentLessons.sampleOf(lesson, step),
+      ticket = (state.lessonTicket || 0) + 1;
+    state.lessonTicket = ticket;
+    state.lesson = { id, step: index };
+    if (state.run?.id !== run || !state.events.length) await loadRun(run);
+    if (ticket !== state.lessonTicket) return;
+    view("journey");
+    state.agentFilter = "all";
+    state.live = false;
+    stopPlay();
+    const at = AgentLessons.locate(state.events, step);
+    if (at < 0) throw Error("기록에서 이 단계를 찾지 못했습니다.");
+    state.tab = step.tab || "change";
+    state.inputMessage = AgentLessons.messageIndex(state.events[at], step);
+    select(at, { open: window.innerWidth > 800 });
+    window.history.replaceState(null, "", "#/lesson/" + id + "/" + (index + 1));
+    const progress = lessonProgress();
+    progress.last = { id, step: index };
+    if (index === lesson.steps.length - 1) progress.done[id] = true;
+    store("lessons", progress);
+  }
+  async function lessonMove(delta) {
+    const lesson = AgentLessons.byId(state.lesson.id),
+      target = state.lesson.step + delta;
+    if (target < 0) return;
+    if (target < lesson.steps.length) return openLesson(lesson.id, target);
+    const next = AgentLessons.nextOf(lesson.id);
+    if (next) return openLesson(next.id, 0);
+    endLesson();
+    view("lessons");
+  }
+  function endLesson() {
+    if (!state.lesson) return;
+    state.lesson = null;
+    state.lessonTicket = (state.lessonTicket || 0) + 1;
+    renderCoach();
+  }
+  function renderLessons() {
+    const progress = lessonProgress(),
+      all = AgentLessons.lessons,
+      finished = all.filter((lesson) => progress.done[lesson.id]).length,
+      resume = progress.last && AgentLessons.byId(progress.last.id),
+      first = all.find((lesson) => !progress.done[lesson.id]) || all[0],
+      target = resume && !progress.done[resume.id] ? resume : first,
+      step = target === resume ? progress.last.step : 0,
+      sample = state.health.mode === "sample";
+    $("lessonsView").innerHTML =
+      `<div class="lessons"><header class="lessonhero"><h1>에이전트가 실제로 하는 일을 기록으로 배웁니다</h1><p>프롬프트 한 줄이 파일 읽기, 모델 호출, 도구 실행, 완료 판정으로 이어지는 과정을 단계별로 따라갑니다. 모든 강의는 실제 로컬 모델을 돌려 저장한 기록이며, 모델을 설치하지 않아도 볼 수 있습니다.</p><div class="lessonactions"><button class="primary" data-lesson="${target.id}" data-step="${step}">${finished === all.length ? "처음부터 다시 보기" : finished || (resume && step) ? `이어서: ${target.number}강 ${esc(target.title)}` : "1강부터 시작"}</button><span>${finished} / ${all.length}강 완료</span></div></header>` +
+      `<section class="ownerlegend" aria-label="결정 주체 표시"><h2>기록을 읽는 기준: 누가 정했나</h2><p>모든 단계에 이 표시가 붙습니다. 무엇을 고쳐야 결과가 달라지는지 알려 주는 표시입니다.</p><div>${AgentLessons.owners.map(([key, label, note]) => `<article><span class="decision-kind" data-owner="${key}">${esc(label)}</span><small>${esc(note)}</small></article>`).join("")}</div></section>` +
+      AgentLessons.chapters
+        .map(
+          (chapter, order) =>
+            `<section class="lessonchapter"><h2><small>${order + 1}부</small>${esc(chapter.title)}</h2><p>${esc(chapter.note)}</p><div>${all
+              .filter((lesson) => lesson.chapter === chapter.id)
+              .map(
+                (lesson) =>
+                  `<button class="lessoncard ${progress.done[lesson.id] ? "done" : ""}" data-lesson="${lesson.id}" data-step="0"><b>${progress.done[lesson.id] ? "✓" : lesson.number}</b><span><strong>${esc(lesson.title)}</strong><small>${esc(lesson.question)}</small></span><i>${lesson.steps.length}단계</i></button>`,
+              )
+              .join("")}</div></section>`,
+        )
+        .join("") +
+      `<section class="lessonrun"><h2>직접 실행해 보기</h2><p>${sample ? "지금은 샘플 보기 모드입니다. 직접 프롬프트를 실행하려면 <code>Start-AgentLens.ps1</code>을 일반 모드로 시작하세요. 첫 실행에 모델을 내려받습니다." : "로컬 모델이 연결되어 있습니다. 구조 · 실행 화면에서 요청을 실행하고, 하네스 파일을 고친 뒤 다시 측정할 수 있습니다."}</p><button class="secondary" data-view="${sample ? "learn" : "journey"}">${sample ? "구성 설명 보기" : "실행 화면으로"}</button></section>` +
+      `<details class="lessonglossary"><summary>용어</summary><dl>${AgentLessons.glossary.map(([term, text]) => `<dt>${esc(term)}</dt><dd>${esc(text)}</dd>`).join("")}</dl></details></div>`;
+  }
+  async function route() {
+    const target = AgentLessons.parseRoute(location.hash);
+    if (!target) return false;
+    if (target.name === "lessons") view("lessons");
+    else if (target.name === "view") view(target.view);
+    else if (target.name === "lesson") await openLesson(target.id, target.step);
+    else {
+      endLesson();
+      await loadRun(target.id);
+      const at = state.events.findIndex((e) => e.id === target.event);
+      if (at >= 0) {
+        if (target.tab) state.tab = target.tab;
+        select(at, { open: !!target.tab });
+      }
+    }
+    return true;
   }
   function hydrate(source) {
     if (!source) return null;
@@ -1395,6 +1523,7 @@
       return;
     }
     saveDraft();
+    endLesson();
     state.generation = (state.generation || 0) + 1;
     stopPlay();
     const payload = {
@@ -1689,11 +1818,11 @@
           ["추정 입력 토큰", num(used)],
           ["줄이기 시작하는 기준", threshold == null ? "미확인" : num(threshold)],
           ["컨텍스트 창", windowTokens == null ? "미확인" : num(windowTokens)],
-          ["판정", o.needed ? "줄임" : "그대로 전송"],
+          ["판정", o.needed ? "기준 초과" : "기준 이하"],
         ]) +
         (percent == null
           ? ""
-          : `<div class="sizemeter ${o.needed ? "over" : ""}" role="img" aria-label="기준 대비 ${percent}%"><i style="width:${percent}%"></i></div>`) +
+          : `<progress class="sizemeter ${o.needed ? "over" : ""}" max="100" value="${percent}" aria-label="기준 대비 ${percent}%"></progress>`) +
         `<p class="note">${esc(o.estimate_basis)}. 호출 전에 계산한 추정값이며, 실제 토큰 수는 뒤따르는 모델 응답의 usage로 확인합니다. 창 크기 출처: ${esc(e.input?.window_source)}, 기준 출처: ${esc(e.input?.threshold_source)}.</p>`
       );
     }
@@ -2145,7 +2274,7 @@
       peek = $("sourcePeek");
     peek.classList.toggle(
       "hidden",
-      !source || ["code", "input", "learn"].includes(state.tab),
+      !source || !!state.lesson || ["code", "input", "learn"].includes(state.tab),
     );
     if (source && state.tab !== "code") {
       const lines = source.code.split("\n"),
@@ -2368,6 +2497,7 @@
           `<button data-run="${r.id}">${esc(r.title)}<small>실제 기록 재생 · ${r.events}단계</small></button>`,
       )
       .join("");
+    $("sampleCount").textContent = state.samples.length;
     feedbackOptions();
   }
   async function history() {
@@ -2923,7 +3053,10 @@
         }
       }
       if (b.dataset.file) await openFile(b.dataset.file);
-      if (b.dataset.run) await loadRun(b.dataset.run);
+      if (b.dataset.run) {
+        endLesson();
+        await loadRun(b.dataset.run);
+      }
       if (b.dataset.tool) {
         const tool = state.catalog.tools.find((t) => t.name === b.dataset.tool);
         if (tool) {
@@ -3049,6 +3182,57 @@
     if (!$("useKv").checked) $("prefixCache").checked = false;
   };
   $("prompt").oninput = observeInput;
+  $("coach").onclick = action(async (e) => {
+    const button = e.target.closest("[data-coach]");
+    if (!button || !state.lesson) return;
+    const lesson = AgentLessons.byId(state.lesson.id),
+      command = button.dataset.coach;
+    if (command === "next") await lessonMove(1);
+    else if (command === "prev") await lessonMove(-1);
+    else if (command === "back") await openLesson(lesson.id, state.lesson.step);
+    else if (command === "detail") $("inspector").classList.add("open");
+    else if (command === "list") view("lessons");
+    else if (command === "exit") {
+      endLesson();
+      view("journey");
+    } else if (command === "try") {
+      const { file, view: screen } = lesson.tryIt;
+      if (file) await openFile(file);
+      else if (screen) view(screen);
+      else {
+        endLesson();
+        $("inspector").classList.remove("open");
+        $("journeyView").classList.remove("focus");
+        $("prompt").focus();
+      }
+    }
+  });
+  $("lessonsView").onclick = action(async (e) => {
+    const card = e.target.closest("[data-lesson]");
+    if (card) await openLesson(card.dataset.lesson, Number(card.dataset.step) || 0);
+  });
+  window.addEventListener("hashchange", action(route));
+  document.addEventListener(
+    "keydown",
+    action(async (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector("dialog[open]")) return;
+      if (e.target.closest?.("input,textarea,select,[contenteditable]")) return;
+      if (e.key === "?") {
+        e.preventDefault();
+        $("guide").showModal();
+      } else if (e.key === "Escape") $("inspector").classList.remove("open");
+      else if (
+        (e.key === "ArrowLeft" || e.key === "ArrowRight") &&
+        state.view === "journey" &&
+        state.events.length
+      ) {
+        e.preventDefault();
+        const delta = e.key === "ArrowRight" ? 1 : -1;
+        if (state.lesson) await lessonMove(delta);
+        else $(delta > 0 ? "nextEvent" : "prev").click();
+      }
+    }),
+  );
   $("resumeBanner").onclick = action(async (e) => {
     if (e.target.closest("#resumeRun")) await resumeRun();
   });
@@ -3773,17 +3957,28 @@
     state.ready = true;
     modeUI();
     const selection = stored("selection"),
+      lastView = stored("view"),
       activity = await refreshActivity({ recover: true });
     if (!activity.run && !activity.experiment) {
-      if (selection?.id) {
-        try {
-          await loadRun(selection.id);
-          select(selection.cursor || 0);
-        } catch {
-          store("selection", null);
-        }
-      } else if (state.health.mode === "sample")
-        await loadRun("sample-verified-write");
+      let routed = false;
+      try {
+        routed = await route();
+      } catch (error) {
+        toast(error.message);
+      }
+      if (!routed) {
+        if (selection?.id) {
+          try {
+            await loadRun(selection.id);
+            select(selection.cursor || 0);
+          } catch {
+            store("selection", null);
+          }
+        } else if (state.health.mode === "sample")
+          await loadRun("sample-verified-write");
+        // 처음 온 사용자는 배우기에서 시작한다. 다시 온 사용자는 머물던 화면으로 돌아간다.
+        if (lastView === null || lastView === "lessons") view("lessons");
+      }
     }
     renderArchitecture();
     document.addEventListener("input", (e) => {

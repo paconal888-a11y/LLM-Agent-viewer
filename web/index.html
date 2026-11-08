@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="/diagram.css" />
     <script src="/architecture.js" defer></script>
     <script src="/inspection.js" defer></script>
+    <script src="/lessons.js" defer></script>
     <script src="/workbench.js" defer></script>
   </head>
   <body>
@@ -17,12 +18,12 @@
       <button id="menu" class="icon mobile" aria-label="프로젝트 열기">
         ☰</button
       ><a href="/" class="brand"
-        ><span class="brandmark">a</span> Agent Lens <small>실행 분석</small></a
+        ><span class="brandmark">a</span> Agent Lens <small>에이전트 동작 관찰</small></a
       >
       <div class="connection">
         <i id="statusDot"></i><span id="connection">모델 확인 중</span>
       </div>
-      <button id="help" class="quiet">사용 안내</button>
+      <button id="help" class="quiet" title="사용 안내와 단축키 (?)">사용 안내</button>
     </header>
     <div id="activityBar" class="activitybar hidden" role="status"></div>
     <div class="layout diagram-layout">
@@ -38,23 +39,14 @@
           </button>
         </div>
         <nav class="mainnav">
-          <button data-view="journey" class="active">
+          <button data-view="lessons">
+            ◈ <span>배우기</span></button
+          ><button data-view="journey" class="active">
             ◉ <span>구조 · 실행</span></button
           ><button data-view="learn">▦ <span>구성 · 비교</span></button>
           <button data-view="feedback">↺ <span>오류 · 기억</span></button>
           <button data-view="memory">▤ <span>대화 저장소</span></button>
         </nav>
-        <div class="treeheading">
-          파일
-          <button id="reloadFiles" class="icon" aria-label="파일 목록 새로고침">
-            ↻
-          </button>
-        </div>
-        <div id="fileTree" class="filetree"></div>
-        <details class="registeredtools">
-          <summary>등록된 도구 <span id="toolCount">0</span></summary>
-          <div id="toolList"></div>
-        </details>
         <div class="treeheading">
           최근 실행
           <button
@@ -66,8 +58,21 @@
           </button>
         </div>
         <div id="history" class="history"></div>
-        <div class="treeheading">예제 기록</div>
-        <div id="samples" class="history"></div>
+        <details class="samplelist">
+          <summary>예제 기록 <span id="sampleCount">0</span></summary>
+          <div id="samples" class="history"></div>
+        </details>
+        <div class="treeheading">
+          파일
+          <button id="reloadFiles" class="icon" aria-label="파일 목록 새로고침">
+            ↻
+          </button>
+        </div>
+        <div id="fileTree" class="filetree"></div>
+        <details class="registeredtools">
+          <summary>등록된 도구 <span id="toolCount">0</span></summary>
+          <div id="toolList"></div>
+        </details>
         <footer>
           모델과 기록은 이 PC에 저장됩니다.<br />외부 API로 자동 전환하지
           않습니다.
@@ -81,7 +86,10 @@
           </div>
           <button id="newSession" class="quiet">＋ 새 대화</button>
         </div>
+        <section id="lessonsView" class="view hidden" aria-label="배우기"></section>
         <section id="journeyView" class="view">
+          <h1 class="visually-hidden">구조 · 실행</h1>
+          <section id="coach" class="coach hidden" aria-label="강의 안내" aria-live="polite"></section>
           <div id="sampleBanner" class="samplebanner hidden"></div>
           <div id="resumeBanner" class="resumebanner hidden" role="status"></div>
           <div id="requestSummary" class="requestsummary hidden">
@@ -101,6 +109,10 @@
             </div>
           </div>
           <form id="promptForm" class="composer">
+            <p id="sampleComposerNote" class="samplenote hidden">
+              샘플 보기 모드라 실행할 수 없습니다. 입력과 설정은 살펴볼 수 있으며,
+              직접 실행하려면 <code>Start-AgentLens.ps1</code>을 일반 모드로 시작하세요.
+            </p>
             <div class="modebar">
               <label for="agentMode">작업 방식</label
               ><select id="agentMode">
@@ -251,24 +263,28 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
           <section class="execution" aria-label="전체 실행 과정">
             <div class="sectionbar">
               <h2>전체 구조 <span id="runStatus" class="status">대기</span></h2>
-              <div>
-                <button id="zoomOut" class="quiet" aria-label="구조도 축소">
-                  −</button
-                ><button id="zoomFit" class="quiet">전체 보기</button
-                ><button id="zoomIn" class="quiet" aria-label="구조도 확대">
-                  ＋
-                </button>
-                <button id="toggleRecords" class="quiet">기록</button>
-                <button id="showInput" class="quiet" disabled>모델 입력</button>
-                <button id="showAnswer" class="quiet" disabled>답변</button>
-                <button id="export" class="quiet" disabled>내보내기</button
-                ><button id="openLearning" class="quiet" title="예측 → 증거 확인 → 원인 설명 → 한 조건 수정 → 재검증 순서로 기록을 살펴보는 안내를 단계 상세에 엽니다">학습 흐름</button
-                ><button id="openDetail" class="quiet">코드 · 데이터</button>
+              <div class="toolgroups">
+                <div class="toolgroup" role="group" aria-label="구조도 배율">
+                  <button id="zoomOut" class="quiet" aria-label="구조도 축소">−</button
+                  ><button id="zoomFit" class="quiet">전체 보기</button
+                  ><button id="zoomIn" class="quiet" aria-label="구조도 확대">＋</button>
+                </div>
+                <div class="toolgroup" role="group" aria-label="기록 보기">
+                  <button id="toggleRecords" class="quiet" title="실행 단계를 시간순 목록으로 펼칩니다">단계 목록</button
+                  ><button id="showInput" class="quiet" disabled title="선택한 시점에 모델이 받은 입력을 봅니다">모델 입력</button
+                  ><button id="openDetail" class="quiet" title="선택한 단계의 데이터와 실행 코드를 봅니다">코드 · 데이터</button
+                  ><button id="showAnswer" class="quiet" disabled>답변</button>
+                </div>
+                <div class="toolgroup" role="group" aria-label="분석">
+                  <button id="openLearning" class="quiet" title="예측 → 증거 확인 → 원인 설명 → 한 조건 수정 → 재검증 순서로 기록을 살펴봅니다">원인 찾기</button
+                  ><button id="export" class="quiet" disabled>내보내기</button>
+                </div>
               </div>
             </div>
             <div class="diagram-caption">
               <span id="diagramLocation"
                 >구성 요소를 선택하면 역할과 코드를 볼 수 있습니다.</span
+              ><label for="agentFocus" class="agentfocuslabel">관찰 대상</label
               ><select
                 id="agentFocus"
                 class="hidden"
@@ -584,7 +600,7 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
             ><button data-detail="code">실행 코드</button
             ><button data-detail="input">모델 입력</button
             ><button data-detail="values">전체 값</button
-            ><button data-detail="learn">학습 흐름</button>
+            ><button data-detail="learn">원인 찾기</button>
           </nav>
           <div id="sourcePeek" class="sourcepeek hidden"></div>
           <div id="detailContent" class="detailcontent"></div>
@@ -602,9 +618,12 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
       </p>
       <ol>
         <li>
-          <strong>기록부터 보기</strong> — 왼쪽 실제 실행 샘플은 모델 설치
-          없이도 재생할 수 있습니다. 저장 기록과 지금 실행하는 계산을 구분해
-          표시합니다.
+          <strong>배우기</strong> — 실제 기록을 단계별로 따라가는 강의입니다.
+          모델을 설치하지 않아도 볼 수 있습니다.
+        </li>
+        <li>
+          <strong>기록 보기</strong> — 왼쪽 예제 기록을 직접 재생할 수도 있습니다.
+          저장 기록과 지금 실행하는 계산을 구분해 표시합니다.
         </li>
         <li>
           <strong>실행</strong> — 예제를 선택하고 실행하세요. 하네스가 실제
@@ -633,6 +652,17 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
           기록으로 이동합니다.
         </li>
       </ol>
+      <h3>단축키</h3>
+      <dl class="shortcuts">
+        <dt>← →</dt>
+        <dd>이전·다음 단계. 강의 중에는 강의 단계를 이동합니다</dd>
+        <dt>Esc</dt>
+        <dd>상세 패널 닫기</dd>
+        <dt>?</dt>
+        <dd>이 안내 열기</dd>
+        <dt>Ctrl + Enter</dt>
+        <dd>입력란에서 실행</dd>
+      </dl>
       <p class="note">
         텐서는 선택한 레이어·head·위치의 표본입니다. 전체 값의 범위와 실제 캐시
         측정치는 각 단계에 표시됩니다. 기록에는 입력과 파일 내용이 포함되므로

@@ -108,7 +108,7 @@ p {
   font-style: italic;
 }
 .brand small {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--muted);
   border-left: 1px solid var(--line);
@@ -120,7 +120,7 @@ p {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .connection i {
@@ -179,7 +179,7 @@ p {
   font-weight: 650;
 }
 .treeheading {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   font-weight: 700;
   display: flex;
@@ -202,7 +202,7 @@ p {
   margin: 4px 0 8px;
 }
 .filetree summary {
-  font-size: 11px;
+  font-size: 12px;
   padding: 8px 10px;
   cursor: pointer;
   color: #4b5668;
@@ -213,7 +213,7 @@ p {
   align-items: center;
   text-align: left;
   gap: 7px;
-  font-size: 11px;
+  font-size: 12px;
   padding: 7px 10px 7px 23px;
   border-left: 2px solid transparent;
   overflow: hidden;
@@ -244,7 +244,7 @@ p {
 }
 .filetree button.hit:after {
   content: "읽음";
-  font-size: 11px;
+  font-size: 12px;
   margin-left: auto;
   flex-shrink: 0;
 }
@@ -257,7 +257,7 @@ p {
   padding: 8px;
   border-radius: 6px;
   text-align: left;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
 }
 .history button:hover {
@@ -266,12 +266,12 @@ p {
 .history button small {
   display: block;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .project footer {
   margin-top: auto;
   padding: 20px 12px 0;
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
   line-height: 1.9;
 }
@@ -288,7 +288,7 @@ p {
   margin-bottom: 27px;
 }
 .breadcrumbs {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .breadcrumbs span {
@@ -303,7 +303,7 @@ p {
   padding: 7px 9px;
   border-radius: 6px;
   color: #5b6778;
-  font-size: 11px;
+  font-size: 12px;
 }
 .danger {
   color: #b74045 !important;
@@ -323,7 +323,7 @@ p {
 }
 .pageintro p:not(.eyebrow) {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 8px;
 }
 .pill {
@@ -334,7 +334,7 @@ p {
   white-space: nowrap;
   border: 1px solid var(--line);
   border-radius: 5px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   background: white;
 }
@@ -346,7 +346,7 @@ p {
   padding: 16px;
 }
 .composer > label {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   font-weight: 650;
 }
@@ -370,7 +370,7 @@ p {
   box-shadow: 0 0 0 3px #3d61d80b;
 }
 .draftinfo {
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
   margin: 2px 0 12px;
   line-height: 1.6;
@@ -387,7 +387,7 @@ p {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 12px;
   color: #5f6a7c;
   line-height: 1.6;
 }
@@ -400,7 +400,7 @@ p {
   border-radius: 7px;
   padding: 9px 14px;
   font-weight: 600;
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 .primary:hover {
@@ -416,7 +416,7 @@ p {
   border: 1px solid #d7dde7;
   border-radius: 6px;
   padding: 7px 10px;
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 .examples {
@@ -427,12 +427,12 @@ p {
   margin: 12px 0 18px;
 }
 .examples > span {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-right: 4px;
 }
 .examples button {
-  font-size: 11px;
+  font-size: 12px;
   background: #fff;
   border: 1px solid var(--line);
   padding: 5px 8px;
@@ -453,7 +453,7 @@ p {
   display: flex;
   justify-content: space-between;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   padding: 12px;
 }
 .configuration summary:before {
@@ -475,7 +475,7 @@ p {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 11px;
+  font-size: 12px;
   color: #5f6a7c;
 }
 .field select,
@@ -489,7 +489,7 @@ p {
   width: 100%;
 }
 .note {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin: 10px 0;
   line-height: 1.9;
@@ -501,7 +501,7 @@ p {
   margin-top: 14px;
 }
 .configline strong {
-  font-size: 11px;
+  font-size: 12px;
   margin-right: auto;
 }
 .switches {
@@ -528,11 +528,11 @@ p {
   gap: 9px;
 }
 .sectionbar > span {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .status {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--muted);
   padding: 4px 7px;
@@ -568,7 +568,7 @@ p {
   flex-direction: column;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
   padding: 0 1px;
 }
@@ -626,7 +626,7 @@ p {
   gap: 8px;
 }
 .controls > span {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--blue);
 }
 .controls > div {
@@ -682,7 +682,7 @@ p {
 .composition header {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
   margin-bottom: 8px;
 }
@@ -702,7 +702,7 @@ p {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-top: 7px;
 }
@@ -725,7 +725,7 @@ p {
   border: 1px solid var(--line);
   background: #fafbfd;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .eventtoolbar > span {
   font: 11px var(--mono);
@@ -746,7 +746,7 @@ p {
   gap: 9px;
   cursor: pointer;
   padding: 8px 0;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 650;
 }
 .chapter > summary:before {
@@ -838,7 +838,7 @@ p {
 }
 .event .eventtitle {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 550;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -872,7 +872,7 @@ p {
   margin-left: 6px;
   padding: 0 5px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 16px;
   font-weight: 600;
   font-style: normal;
@@ -959,7 +959,7 @@ p {
 }
 .diaglayer > summary em {
   font-style: normal;
-  font-size: 11px;
+  font-size: 12px;
   color: #fff;
   background: #2f55c7;
   border-radius: 3px;
@@ -967,7 +967,7 @@ p {
 }
 .diaglayer > summary span {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
 }
 .diaglayer[data-status="issue"] {
@@ -1024,7 +1024,7 @@ p {
   align-items: center;
   gap: 7px;
   padding: 9px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .tokenstep > summary:before {
   content: "+";
@@ -1039,14 +1039,14 @@ p {
   border-radius: 4px;
   color: var(--blue);
   padding: 4px 6px;
-  font-size: 11px;
+  font-size: 12px;
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .tokenstep summary small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-left: auto;
 }
@@ -1065,7 +1065,7 @@ p {
   margin-bottom: 10px;
 }
 .empty p {
-  font-size: 11px;
+  font-size: 12px;
 }
 .emptyglyph {
   font-size: 28px;
@@ -1120,7 +1120,7 @@ p {
   z-index: 5;
 }
 .inspectbar strong {
-  font-size: 11px;
+  font-size: 12px;
 }
 .inspectbar span {
   font: 11px var(--mono);
@@ -1143,13 +1143,13 @@ p {
   font-weight: 550;
 }
 .inspectempty > p {
-  font-size: 11px;
+  font-size: 12px;
 }
 .actorlegend {
   border-top: 1px solid var(--line);
   margin-top: 35px;
   padding-top: 20px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .actorlegend b {
   font: 11px var(--mono);
@@ -1172,7 +1172,7 @@ p {
   overflow-wrap: anywhere;
 }
 .detailhead p {
-  font-size: 11px;
+  font-size: 12px;
   color: #68758b;
   margin-top: 14px;
 }
@@ -1183,7 +1183,7 @@ p {
   padding: 0 21px;
 }
 .detailtabs button {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   padding: 12px 0;
   border-bottom: 2px solid transparent;
@@ -1197,7 +1197,7 @@ p {
   min-width: 0;
 }
 .detailcontent h3 {
-  font-size: 11px;
+  font-size: 12px;
   margin: 0 0 9px;
 }
 .databox {
@@ -1207,7 +1207,7 @@ p {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
   margin-bottom: 8px;
 }
@@ -1298,7 +1298,7 @@ p {
   margin-bottom: 12px;
 }
 .codeactions span {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .statgrid {
@@ -1320,7 +1320,7 @@ p {
   overflow-wrap: anywhere;
 }
 .stat small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   display: block;
   margin-top: 4px;
@@ -1423,12 +1423,12 @@ p {
 }
 .filedescription p,
 .learning-path p {
-  font-size: 11px;
+  font-size: 12px;
   color: #617499;
 }
 .filedescription strong,
 .learning-path strong {
-  font-size: 11px;
+  font-size: 12px;
   color: #466397;
 }
 .editbar {
@@ -1483,7 +1483,7 @@ p {
   overflow: auto;
 }
 .notice {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--green);
   padding: 12px 0;
   line-height: 1.8;
@@ -1533,25 +1533,25 @@ p {
   font-size: 13px;
 }
 .componentcard p {
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
 }
 .componentcard details {
   margin: 12px 0;
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
   line-height: 1.8;
 }
 .componentcard summary {
   cursor: pointer;
   color: var(--blue);
-  font-size: 11px;
+  font-size: 12px;
 }
 .componentcard details p {
   margin: 10px 0;
 }
 .componentcard button {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--blue);
   padding: 5px 0;
 }
@@ -1569,7 +1569,7 @@ p {
   margin-top: 10px;
 }
 .compareprogress {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--blue);
   padding-top: 17px;
 }
@@ -1586,11 +1586,11 @@ p {
   min-width: 0;
 }
 .comparison h3 {
-  font-size: 11px;
+  font-size: 12px;
   margin-bottom: 12px;
 }
 .comparison p {
-  font-size: 11px;
+  font-size: 12px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 200px;
@@ -1607,12 +1607,12 @@ p {
   margin: 0;
 }
 .comparison button {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--blue);
   margin-top: 10px;
 }
 .checks {
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
   line-height: 2;
   margin-top: 14px;
@@ -1627,7 +1627,7 @@ p {
   color: white;
   border-radius: 8px;
   padding: 12px 20px;
-  font-size: 11px;
+  font-size: 12px;
   box-shadow: 0 4px 16px #0002;
   max-width: 90vw;
   line-height: 1.7;
@@ -1679,7 +1679,7 @@ dialog ol {
     padding: 25px;
   }
   .codeline {
-    font-size: 11px;
+    font-size: 12px;
   }
 }
 @media (max-width: 1250px) {
@@ -1742,10 +1742,10 @@ dialog ol {
     font-size: 16px;
   }
   .connection {
-    font-size: 11px;
+    font-size: 12px;
   }
   .appbar > .quiet {
-    font-size: 11px;
+    font-size: 12px;
     padding: 6px;
   }
   .workspacebar {
@@ -1786,7 +1786,7 @@ dialog ol {
     line-height: 1.5;
   }
   .appbar > .quiet {
-    font-size: 11px;
+    font-size: 12px;
     padding: 5px;
   }
   .main {
@@ -1805,7 +1805,7 @@ dialog ol {
     font-size: 22px;
   }
   .pageintro p:not(.eyebrow) {
-    font-size: 11px;
+    font-size: 12px;
   }
   .composer {
     padding: 13px;
@@ -1817,7 +1817,7 @@ dialog ol {
     align-items: flex-start;
   }
   .composer-bottom .check {
-    font-size: 11px;
+    font-size: 12px;
     max-width: 160px;
   }
   .primary kbd {
@@ -1827,17 +1827,17 @@ dialog ol {
     gap: 5px;
   }
   .examples button {
-    font-size: 11px;
+    font-size: 12px;
     padding: 5px 6px;
   }
   .configuration summary {
-    font-size: 11px;
+    font-size: 12px;
   }
   .route {
     padding: 14px 4px;
   }
   .routenode {
-    font-size: 11px;
+    font-size: 12px;
     gap: 7px;
   }
   .routenode b {
@@ -1845,7 +1845,7 @@ dialog ol {
     height: 23px;
   }
   .routenode small {
-    font-size: 11px;
+    font-size: 12px;
   }
   .routenode:not(:last-child):after {
     width: calc(100% - 28px);
@@ -1857,13 +1857,13 @@ dialog ol {
     flex-direction: column;
   }
   .event .eventtitle {
-    font-size: 11px;
+    font-size: 12px;
   }
   .event .eventsub {
-    font-size: 11px;
+    font-size: 12px;
   }
   .event .eventid {
-    font-size: 11px;
+    font-size: 12px;
   }
   .chapterbody {
     padding-left: 8px;
@@ -1887,7 +1887,7 @@ dialog ol {
   }
   .editbar .primary,
   .editbar .secondary {
-    font-size: 11px;
+    font-size: 12px;
     padding: 7px;
   }
   .configgrid {
@@ -1900,21 +1900,21 @@ dialog ol {
     padding: 17px;
   }
   .pageintro > .secondary {
-    font-size: 11px;
+    font-size: 12px;
     padding: 6px;
   }
   .sectionbar h2 {
     font-size: 14px;
   }
   .sectionbar .quiet {
-    font-size: 11px;
+    font-size: 12px;
   }
 }
 .event .eventtitle {
   font-size: 12px;
 }
 .event .eventsub {
-  font-size: 11px;
+  font-size: 12px;
 }
 .detailhead p,
 .componentcard p {
@@ -1922,16 +1922,16 @@ dialog ol {
 }
 .databox pre,
 .rawvalue {
-  font-size: 11px;
+  font-size: 12px;
 }
 .codeline {
-  font-size: 11px;
+  font-size: 12px;
 }
 .filetree button {
   font-size: 12px;
 }
 .treeheading {
-  font-size: 11px;
+  font-size: 12px;
 }
 .inspectempty > p {
   font-size: 12px;
@@ -1973,7 +1973,7 @@ dialog ol {
   max-height: 130px;
 }
 .sourcepeek .codeline {
-  font-size: 11px;
+  font-size: 12px;
 }
 .sourcepeek .codeline > span {
   width: 38px;
@@ -1989,7 +1989,7 @@ dialog ol {
   margin-left: auto;
 }
 .sourcepeek .codeline {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .requestsummary {
@@ -2004,7 +2004,7 @@ dialog ol {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 7px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .requestsummary p {
@@ -2039,7 +2039,7 @@ dialog ol {
   margin: 12px 8px 18px;
 }
 .registeredtools summary {
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
   cursor: pointer;
   padding: 7px 0;
@@ -2066,7 +2066,7 @@ dialog ol {
   color: #5e759c;
 }
 .registeredtools small {
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
 }
 .registeredtools button.active {
@@ -2158,7 +2158,7 @@ dialog ol {
   border-color: #d9e2fa;
 }
 .repairgrid pre {
-  font-size: 11px;
+  font-size: 12px;
   max-height: 260px;
 }
 .evidencerow {
@@ -2167,7 +2167,7 @@ dialog ol {
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 20px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--green);
 }
 .evidencebutton {
@@ -2181,11 +2181,11 @@ dialog ol {
   text-align: left;
   margin: 7px 0;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .evidencebutton code {
   color: var(--blue);
-  font-size: 11px;
+  font-size: 12px;
 }
 .memoryaudit {
   padding: 18px;
@@ -2275,12 +2275,12 @@ dialog ol {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   margin-bottom: 10px;
 }
 .planpanel small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   font-weight: 400;
 }
@@ -2288,7 +2288,7 @@ dialog ol {
   display: flex;
   gap: 8px;
   align-items: center;
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
 }
 .planpanel > div > span {
@@ -2314,14 +2314,14 @@ dialog ol {
   color: #6b4b10;
 }
 .samplebanner strong {
-  font-size: 11px;
+  font-size: 12px;
 }
 .samplebanner p {
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 6px;
 }
 .samplebanner small {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
   display: block;
   margin-top: 7px;
@@ -2334,7 +2334,7 @@ dialog ol {
 }
 .modebar label {
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 .modebar select {
@@ -2387,18 +2387,18 @@ dialog ol {
   font-size: 12px;
 }
 .agentcard strong span {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--green);
 }
 .agentcard small {
   display: block;
   color: #5b6778;
   margin-top: 6px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .agentcard p {
   margin-top: 8px;
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
   line-height: 1.7;
   overflow-wrap: anywhere;
@@ -2422,14 +2422,14 @@ dialog ol {
   left: 50%;
 }
 .agentpanel .agentfoot {
-  font-size: 11px;
+  font-size: 12px;
   color: #4d668d;
   line-height: 1.8;
   margin: 12px 0 6px;
 }
 .agentpanel > small {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
   color: #5b6778;
 }
@@ -2465,14 +2465,14 @@ dialog ol {
   border: 1px solid var(--line);
   background: #fafbfd;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 12px;
 }
 .eventtoolbar #bodySearchKind {
   padding: 7px 8px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: #fff;
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
 }
 .recordtray.searching #timeline {
@@ -2525,7 +2525,7 @@ dialog ol {
   flex-wrap: wrap;
   gap: 6px 8px;
   align-items: baseline;
-  font-size: 11px;
+  font-size: 12px;
 }
 .bodyhit-head code {
   font: 11px var(--mono);
@@ -2536,7 +2536,7 @@ dialog ol {
 }
 .bodyhit-head small,
 .bodyhit-head em {
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
   font-style: normal;
 }
@@ -2564,7 +2564,7 @@ dialog ol {
 }
 .learninghead small {
   flex-basis: 100%;
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
 }
 .learningbody {
@@ -2593,7 +2593,7 @@ dialog ol {
   font: 600 11px var(--mono);
 }
 .learningstep p {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
   color: #4f5b6b;
 }
@@ -2602,7 +2602,7 @@ dialog ol {
 }
 .learningstep .note {
   margin: 6px 0 0;
-  font-size: 11px;
+  font-size: 12px;
 }
 .learningstep textarea {
   width: 100%;
@@ -2610,7 +2610,7 @@ dialog ol {
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
   resize: vertical;
   background: #fafbfd;
@@ -2618,7 +2618,7 @@ dialog ol {
 .learningstep small {
   display: block;
   margin-top: 4px;
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
 }
 .learninglinks {
@@ -2633,7 +2633,7 @@ dialog ol {
   margin: 0;
 }
 .learninglinks .secondary {
-  font-size: 11px;
+  font-size: 12px;
 }
 .learningstep .diagnosis {
   margin-top: 6px;
@@ -2664,7 +2664,7 @@ dialog ol {
 .exporttable {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: 12px;
 }
 .exporttable th,
 .exporttable td {
@@ -2693,7 +2693,7 @@ dialog ol {
   word-break: break-all;
 }
 .exportincludes {
-  font-size: 11px;
+  font-size: 12px;
   color: #5b6778;
   line-height: 1.8;
   margin-top: 8px;
@@ -2708,5 +2708,5 @@ dialog ol {
   margin-top: 16px;
 }
 .exportactions .secondary {
-  font-size: 11px;
+  font-size: 12px;
 }
