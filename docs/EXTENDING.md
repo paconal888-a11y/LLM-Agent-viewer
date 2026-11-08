@@ -19,9 +19,33 @@ schema는 `function_tool("multiply", "두 정수를 곱합니다.", {"a": {"type
 
 에이전트 루프는 파일 변경의 완료 조건을 추적하기 위해 write_file과 check_file의 결과를 사용합니다. 새로운 쓰기 도구를 추가하면 agent_loop.py의 dirty/checked 추적도 함께 확장해야 합니다. schema만 추가했다고 실행 권한 검사가 충분한 것은 아닙니다.
 
+## 설정과 규칙의 층
+
+`agent-lens.json`은 코드 기본값 위에 사용자 층(`demo_workspace/.user-home/`), 프로젝트 층(`demo_workspace/`) 순서로 덮어씁니다. 프로젝트 밖의 실제 사용자 폴더는 읽지 않으며, `.user-home`은 전역 설정 위치를 흉내 낸 실습 폴더입니다. 허용 범위를 벗어난 값이나 없는 키가 있으면 실행 전에 거부합니다. 모델의 파일 도구는 이 설정 파일과 `.user-home`을 수정할 수 없습니다.
+
+```json
+{
+  "rules": { "file_names": ["AGENTS.md", "agent.md"], "directory_rules": true },
+  "loop": { "max_model_calls": 8 },
+  "context": {
+    "compact_at_ratio": 0.8,
+    "compact_at_tokens": 0,
+    "keep_recent_messages": 4,
+    "prune_tool_characters": 1500,
+    "max_summaries": 2
+  }
+}
+```
+
+위 값이 코드 기본값입니다. `compact_at_tokens`가 0이면 컨텍스트 창의 `compact_at_ratio` 비율을 기준으로 씁니다. 어떤 층의 값이 적용됐는지는 `config.resolve` 기록의 표에서 확인합니다.
+
+규칙 파일이 둘 이상이면 사용자 층에 1번, 프로젝트 층에 2번을 붙여 system 메시지에 넣고, 충돌하면 번호가 큰 쪽을 따르라는 문장을 더합니다. 코드가 정하는 것은 순서와 문장뿐이며 모델이 따르는지는 강제하지 않습니다. 하위 폴더의 AGENTS.md는 시작할 때 읽지 않고, 파일 도구가 그 폴더의 파일을 다룬 뒤 처음 한 번만 추가합니다.
+
 ## 규칙·스킬·커맨드 바꾸기
 
 - context.py: 탐색할 파일명, 지침 감싸기, 메시지 배치, 도구 목록.
+- compaction.py: 입력을 줄이는 시점과 방법, 요약 지시문. 대화 기록 원본은 건드리지 않습니다.
+- checkpoint.py: 저장할 진행 상태. 모델 내부 상태는 저장하지 않습니다.
 - demo_workspace/skills/*/SKILL.md: 이름·설명과 실제 절차. 검색 결과와 본문 로드를 구분.
   - 지원 형식(`skill-front-matter/1`): 첫 줄 `---`부터 다음 단독 `---` 줄까지의 front matter에서 줄 시작의 `name:`과 `description:`만 읽습니다. 값은 한 줄 스칼라이며 따옴표 없는 평문(` #` 뒤는 주석), `"..."`, `'...'`를 지원합니다. CRLF와 UTF-8 BOM, 다른 키(무시하고 기록)는 허용합니다. name은 64자, description은 500자까지입니다.
   - 지원하지 않는 표현은 다른 값으로 바꾸지 않습니다. 여러 줄 값(`>`, `|`), 흐름 컬렉션(`[ ]`, `{ }`), anchor·alias·tag(`&`, `*`, `!`), 들여쓴 키, 중복 키, 빈 값, 닫히지 않은 따옴표가 있으면 그 스킬을 목록에서 제외하고 `skills.metadata` 이벤트(status=warning)와 `skills.catalog`의 `skipped`에 파일 경로·줄 번호·사유를 남깁니다. 일반 YAML 파서가 아니며 전체 YAML을 지원한다고 주장하지 않습니다.
