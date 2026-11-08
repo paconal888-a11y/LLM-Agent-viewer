@@ -25,6 +25,7 @@ MODULES = (
     "context",
     "inference",
     "compaction",
+    "checkpoint",
     "agent_loop",
     "harness",
 )

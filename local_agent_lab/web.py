@@ -19,6 +19,7 @@ from . import app_version
 from .harness import Harness, workspace_path
 from .runtime import RuntimeFailure
 from .trace import ROOT, Run, expand_sources, pack_sources
+from .checkpoint import load_checkpoint, resume_summary
 from .experiments import ExperimentService, CASES
 from .observatory import catalog
 from .project import ProjectFiles, HarnessFactory, check_text
@@ -199,6 +200,36 @@ class Application:
             self.launch(run)
         return run
 
+    def resume(self, run_id, extra_model_calls=0, step=False):
+        """저장된 상태에서 새 Run을 만들어 이어간다. 원래 기록은 그대로 둔다."""
+        if self.samples_only:
+            raise ValueError("샘플 보기 모드에서는 실행을 이어갈 수 없습니다.")
+        if type(extra_model_calls) is not int or not 0 <= extra_model_calls <= 8:
+            raise ValueError("추가 호출 수는 0~8 정수입니다.")
+        saved = load_checkpoint(self.harness.state_dir, run_id)
+        last_iteration = saved["last_iteration"] + extra_model_calls
+        if saved["next_iteration"] > last_iteration:
+            raise ValueError("남은 호출 예산이 없습니다. 추가 호출 수를 지정하세요.")
+        request = saved["request"]
+        run = self.start(
+            saved["prompt"],
+            saved["session_id"],
+            step,
+            launch=False,
+            features=request["features"],
+            engine=request["engine"],
+            requirements=request["requirements"],
+            mode=request["mode"],
+        )
+        run.checkpoint = {
+            **saved,
+            "last_iteration": last_iteration,
+            "max_model_calls": saved["max_model_calls"] + extra_model_calls,
+        }
+        run.resumed_from = run_id
+        self.launch(run)
+        return run
+
     def launch(self, run):
         try:
             if self.factory:
@@ -376,7 +407,9 @@ class Application:
         if not run_id.isalnum() or len(run_id) != 16:
             raise ValueError("실행 ID가 올바르지 않습니다.")
         if run_id in self.runs:
-            return self.runs[run_id].snapshot(after, compact=compact)
+            live = self.runs[run_id].snapshot(after, compact=compact)
+            live["resume"] = resume_summary(self.harness.state_dir, run_id, live["status"])
+            return live
         path = self.harness.state_dir / "traces" / (run_id + ".json")
         if not path.exists():
             raise ValueError("실행 기록을 찾을 수 없습니다.")
@@ -388,6 +421,7 @@ class Application:
                 "이전 서버의 미완료 기록입니다. 현재 실행 중인 작업은 없습니다."
             )
         data["events"] = data["events"][after:]
+        data["resume"] = resume_summary(self.harness.state_dir, run_id, data.get("status"))
         if compact:
             return data if "source_snapshots" in data else pack_sources(data)
         return expand_sources(data)
@@ -408,6 +442,9 @@ class Application:
                         for key in HISTORY_FIELDS
                     }
                     collected[item["id"]]["backend"] = (item.get("conditions") or {}).get("backend")
+                    collected[item["id"]]["resume"] = resume_summary(
+                        self.harness.state_dir, item["id"], item.get("status")
+                    )
                 except (OSError, ValueError, KeyError):
                     continue
         with self.lock:
@@ -415,6 +452,9 @@ class Application:
                 item = run.snapshot()
                 collected[run.id] = {key: item.get(key) for key in HISTORY_FIELDS}
                 collected[run.id]["backend"] = (item.get("conditions") or {}).get("backend")
+                collected[run.id]["resume"] = resume_summary(
+                    self.harness.state_dir, run.id, item.get("status")
+                )
         return sorted(
             collected.values(), key=lambda item: item["created_at"], reverse=True
         )[:20]
@@ -818,6 +858,15 @@ def make_handler(app):
                             run.render_acknowledged = True
                             run.save(app.harness.state_dir / "traces")
                     self.send(200, {"recorded": True})
+                elif self.path.startswith("/api/runs/") and self.path.endswith(
+                    "/resume"
+                ):
+                    resumed = app.resume(
+                        self.path.split("/")[3],
+                        payload.get("extra_model_calls", 0),
+                        bool(payload.get("step")),
+                    )
+                    self.send(201, {"id": resumed.id})
                 elif self.path.startswith("/api/runs/") and self.path.endswith(
                     "/control"
                 ):

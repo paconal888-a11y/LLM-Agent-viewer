@@ -199,6 +199,9 @@ class Run:
         self.plan = []
         self.conditions = {}
         self.settings = {}
+        self.checkpoint = None
+        self.resumed_from = None
+        self.turn_message_offset = 0
         self.implementation = None
         self.paused_seconds = 0.0
         self.pause_started = None
@@ -442,6 +445,7 @@ class Run:
                     "effective_prompt": self.effective_prompt,
                     "conditions": self.conditions,
                     "settings": self.settings,
+                    "resumed_from": self.resumed_from,
                     "implementation": self.implementation,
                     "step_mode": self.step_mode,
                     "answer": self.answer,
