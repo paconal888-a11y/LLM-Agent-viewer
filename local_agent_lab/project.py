@@ -47,6 +47,26 @@ READABLE_CODE = EDITABLE_CODE | {
 }
 
 
+def current_manifest(root=ROOT, workspace=None):
+    """지금 디스크의 편집 가능 모듈 버전과 작업 공간 서명. 과거 실행의 implementation·conditions와 대조한다."""
+    from .features import workspace_signature
+
+    root = Path(root).resolve()
+    manifest = [
+        {
+            "path": f"local_agent_lab/{name}.py",
+            "sha256": sha(
+                (root / "local_agent_lab" / f"{name}.py").read_text(encoding="utf-8")
+            ),
+        }
+        for name in MODULES
+    ]
+    result = {"version": sha(json.dumps(manifest, sort_keys=True)), "files": manifest}
+    if workspace is not None:
+        result["workspace"] = workspace_signature(Path(workspace))
+    return result
+
+
 def sha(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 

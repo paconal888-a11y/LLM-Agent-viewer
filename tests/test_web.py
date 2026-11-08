@@ -133,6 +133,18 @@ class WebTests(unittest.TestCase):
         self.assertNotIn("share", raw)
         self.assertNotEqual(raw["source_snapshots"], shared["source_snapshots"])
 
+    def test_project_manifest_matches_the_version_recorded_on_a_run(self):
+        from local_agent_lab.project import HarnessFactory
+
+        manifest = self.request("/api/project/manifest")
+        self.assertEqual(len(manifest["files"]), 7)
+        self.assertEqual(len(manifest["version"]), 64)
+        self.assertIn("sha256", manifest["workspace"])
+        self.assertTrue(any(f["path"] == "AGENTS.md" for f in manifest["workspace"]["files"]))
+        _, version = HarnessFactory(state_dir=self.root / ".runs").prepare(self.app.harness)
+        self.assertEqual(version["version"], manifest["version"])
+        self.assertEqual(version["files"], manifest["files"])
+
     def test_project_edit_is_blocked_during_active_run(self):
         run = Run("paused", "web-test")
         run.status = "paused"

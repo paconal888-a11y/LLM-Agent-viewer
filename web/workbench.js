@@ -198,6 +198,55 @@
       return null;
     }
   }
+  // 생성 설정 컨트롤. 실행 요청의 engine 필드와 1:1로 대응하며 저장·복원 모두 이 표를 쓴다.
+  const engineFields = {
+    use_kv: ["useKv", "checkbox", "생성 중 KV"],
+    cache_prompt: ["prefixCache", "checkbox", "요청 간 접두부 재사용"],
+    stream: ["stream", "checkbox", "HTTP 스트리밍"],
+    max_tokens: ["maxTokens", "number", "최대 출력 토큰"],
+    temperature: ["temperature", "number", "Temperature"],
+    capture_layer: ["captureLayer", "number", "관찰할 레이어"],
+    seed: ["seed", "number", "Seed"],
+    top_k: ["topK", "number", "top_k"],
+    top_p: ["topP", "number", "top_p"],
+  };
+  // ENGINE_RESTORE_START
+  function applyEngine(values) {
+    // 저장된 값을 컨트롤에 넣고, 그대로 적용하지 못한 항목을 돌려준다. 값을 조용히 바꾸지 않는다.
+    const issues = [];
+    if (!values || typeof values !== "object") return issues;
+    for (const [key, [id, kind, label]] of Object.entries(engineFields)) {
+      if (!(key in values)) {
+        issues.push(`${label}: 기록에 없음 (현재 값 유지)`);
+        continue;
+      }
+      const control = $(id),
+        value = values[key];
+      if (kind === "checkbox") {
+        if (typeof value !== "boolean") {
+          issues.push(`${label}: 값 형식이 달라 유지`);
+          continue;
+        }
+        control.checked = value;
+        if (control.disabled && control.checked !== value)
+          issues.push(`${label}: 현재 실행기에서 바꿀 수 없음`);
+      } else {
+        if (typeof value !== "number" || !Number.isFinite(value)) {
+          issues.push(`${label}: 값 형식이 달라 유지`);
+          continue;
+        }
+        control.value = String(value);
+        const min = Number(control.min),
+          max = Number(control.max);
+        if ((control.min !== "" && value < min) || (control.max !== "" && value > max))
+          issues.push(
+            `${label}: 기록 ${value}는 현재 실행기 범위(${control.min || "−∞"}–${control.max || "∞"}) 밖 (실행 시 서버가 거부하거나 조정할 수 있음)`,
+          );
+      }
+    }
+    return issues;
+  }
+  // ENGINE_RESTORE_END
   function saveDraft() {
     if (!state.ready) return;
     store("draft", {
@@ -207,6 +256,8 @@
       features: { ...features },
       requirements: $("requirements").value,
       step: $("stepMode").checked,
+      engine: engine(),
+      backend: $("backend").value,
     });
   }
   function restoreDraft() {
@@ -225,6 +276,28 @@
     if (typeof draft.requirements === "string")
       $("requirements").value = draft.requirements;
     $("stepMode").checked = draft.step === true;
+    if (["reference", "llama"].includes(draft.backend)) {
+      // 새로고침 뒤 health()가 서버의 실행기로 선택을 맞춘다. 같은 실행기면 저장한 토큰 한도를 유지한다.
+      $("backend").value = draft.backend;
+      state.configBackend = draft.backend;
+      state.draftBackend = draft.backend;
+    }
+    if (draft.engine) {
+      const issues = applyEngine(draft.engine);
+      restoreNote(
+        "새로고침 전 생성 설정을 복원했습니다.",
+        issues.filter((text) => !text.includes("기록에 없음")),
+      );
+    }
+  }
+  function restoreNote(headline, issues = []) {
+    const note = $("restoreNote");
+    note.classList.remove("hidden");
+    note.innerHTML =
+      `<strong>${esc(headline)}</strong>` +
+      (issues.length
+        ? `<br>달라진 조건: ${issues.map(esc).join(" · ")}`
+        : "");
   }
   function applyActivity(activity) {
     state.activity = activity;
@@ -330,9 +403,9 @@
       max_tokens: Number($("maxTokens").value),
       temperature: Number($("temperature").value),
       capture_layer: Number($("captureLayer").value),
-      seed: 42,
-      top_k: 40,
-      top_p: 0.95,
+      seed: Number($("seed").value),
+      top_k: Number($("topK").value),
+      top_p: Number($("topP").value),
     };
   }
   function updateBackend() {
@@ -362,7 +435,15 @@
     $("connection").title = state.health.error || state.health.base_url || "";
     $("run").disabled = !state.health.connected || busy();
     if (!busy()) {
-      $("backend").value = state.health.backend || "llama";
+      const serverBackend = state.health.backend || "llama";
+      if (state.draftBackend && state.draftBackend !== serverBackend) {
+        restoreNote(
+          "저장된 설정의 실행기(" + state.draftBackend + ")와 현재 서버의 실행기(" + serverBackend + ")가 다릅니다.",
+          ["토큰 한도·KV·레이어 설정은 현재 실행기 기본값으로 바뀝니다"],
+        );
+      }
+      state.draftBackend = null;
+      $("backend").value = serverBackend;
       updateBackend();
     }
     $("startCompare").disabled = !state.health.connected || busy();
@@ -2547,24 +2628,77 @@
     $("journeyView").classList.remove("focus");
     saveDraft();
   };
-  $("editPrompt").onclick = () => {
-    if (state.run?.prompt) {
-      $("agentMode").value = state.run.mode || "single";
-      modeUI();
-      $("prompt").value = state.run.prompt;
-      $("requirements").value = JSON.stringify(
-        state.run.requirements || [],
-        null,
-        2,
+  // RUN_IMPORT_START
+  async function importRunSettings(run) {
+    // 과거 실행의 입력·모드·하네스 구성·완료 조건·생성 설정·세션을 입력란에 복원한다.
+    // 복원하지 못했거나 지금 조건과 다른 항목은 숨기지 않고 restoreNote에 적는다.
+    const issues = [],
+      restored = [];
+    $("agentMode").value = run.mode || "single";
+    modeUI();
+    restored.push("작업 방식");
+    $("prompt").value = run.prompt || "";
+    restored.push("요청");
+    $("requirements").value = JSON.stringify(run.requirements || [], null, 2);
+    restored.push("완료 조건 " + (run.requirements || []).length + "개");
+    Object.keys(features).forEach(
+      (key) => (features[key] = run.features?.[key] ?? false),
+    );
+    restored.push("하네스 구성");
+    $("stepMode").checked = run.step_mode === true;
+    restored.push("단계 정지");
+    if (run.sample) issues.push("세션: 재생 기록의 대화 상태는 이 PC에 없어 현재 세션 유지");
+    else if (typeof run.session_id === "string" && /^[a-zA-Z0-9_-]{1,64}$/.test(run.session_id)) {
+      state.session = run.session_id;
+      restored.push("세션 " + run.session_id);
+    } else issues.push("세션: 기록에 없어 현재 세션 유지");
+    const recordedBackend = run.conditions?.backend,
+      currentBackend = $("backend").value;
+    if (recordedBackend && recordedBackend !== currentBackend)
+      issues.push(
+        `실행기: 기록은 ${recordedBackend}(${run.conditions?.model || "?"}), 현재는 ${currentBackend} — 모델·토큰 한도·텐서 관찰 범위가 다릅니다`,
       );
-      Object.keys(features).forEach(
-        (key) => (features[key] = state.run.features?.[key] ?? false),
-      );
-      featureUI();
+    else if (recordedBackend) restored.push("실행기 " + recordedBackend);
+    if (run.engine) {
+      issues.push(...applyEngine(run.engine).filter((text) => !text.includes("기록에 없음")));
+      restored.push("생성 설정 " + Object.keys(engineFields).filter((k) => k in run.engine).length + "/" + Object.keys(engineFields).length + "개");
+    } else issues.push("생성 설정: 기록에 없음 (현재 값 유지)");
+    if (run.sample)
+      issues.push("재생 기록입니다. 설정은 복원했지만 당시 모델·실행기·작업 공간 파일을 지금 환경이 그대로 재현하지는 않습니다");
+    try {
+      const current = await api("/api/project/manifest");
+      if (run.implementation?.version && current.version !== run.implementation.version) {
+        const changed = (run.implementation.files || [])
+          .filter((f) => current.files?.find((c) => c.path === f.path)?.sha256 !== f.sha256)
+          .map((f) => f.path.replace("local_agent_lab/", ""));
+        issues.push("하네스 코드가 당시와 다릅니다: " + (changed.join(", ") || "버전 불일치"));
+      } else if (run.implementation?.version) restored.push("하네스 코드 동일");
+      const recordedWorkspace = run.conditions?.workspace?.sha256;
+      if (recordedWorkspace && current.workspace?.sha256 && recordedWorkspace !== current.workspace.sha256) {
+        const before = new Map((run.conditions.workspace.files || []).map((f) => [f.path, f.sha256]));
+        const changedFiles = (current.workspace.files || [])
+          .filter((f) => before.get(f.path) !== f.sha256)
+          .map((f) => f.path)
+          .concat([...before.keys()].filter((p) => !current.workspace.files?.some((f) => f.path === p)));
+        issues.push("작업 공간 파일이 당시와 다릅니다: " + (changedFiles.slice(0, 6).join(", ") || "내용 변경") + (changedFiles.length > 6 ? ` 외 ${changedFiles.length - 6}개` : ""));
+      } else if (recordedWorkspace) restored.push("작업 공간 파일 동일");
+    } catch (error) {
+      issues.push("현재 코드·작업 공간과의 비교 실패: " + error.message);
     }
+    featureUI();
+    $("configuration").open = true;
+    restoreNote(
+      "실행 " + (run.id || "") + "의 설정을 가져왔습니다: " + restored.join(", ") + ".",
+      issues,
+    );
+    return { restored, issues };
+  }
+  // RUN_IMPORT_END
+  $("editPrompt").onclick = action(async () => {
+    if (state.run?.prompt) await importRunSettings(state.run);
     $("journeyView").classList.remove("focus");
     $("prompt").focus();
-  };
+  });
   function modeUI() {
     const mode = $("agentMode").value;
     if (mode === "team") {

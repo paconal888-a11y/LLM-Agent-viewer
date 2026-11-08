@@ -86,8 +86,8 @@
           <div id="requestSummary" class="requestsummary hidden">
             <header>
               <span>현재 요청</span
-              ><button id="editPrompt" class="quiet">
-                입력 · 설정 편집 ↗
+              ><button id="editPrompt" class="quiet" title="이 실행의 요청·모드·하네스 구성·완료 조건·생성 설정을 입력란에 복원합니다">
+                이 실행의 입력 · 설정 가져오기 ↗
               </button>
             </header>
             <p id="summaryPrompt"></p>
@@ -217,8 +217,33 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
                   ><label class="check"
                     ><input type="checkbox" id="stream" checked />HTTP 스트리밍
                     (빠른 실행기)</label
+                  ><label class="field"
+                    >Seed<input
+                      type="number"
+                      id="seed"
+                      min="0"
+                      max="4294967295"
+                      step="1"
+                      value="42" /></label
+                  ><label class="field"
+                    >top_k<input
+                      type="number"
+                      id="topK"
+                      min="0"
+                      max="1000"
+                      step="1"
+                      value="40" /></label
+                  ><label class="field"
+                    >top_p<input
+                      type="number"
+                      id="topP"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value="0.95" /></label
                   >
                 </div>
+                <p id="restoreNote" class="note hidden"></p>
               </div>
             </details>
           </div>

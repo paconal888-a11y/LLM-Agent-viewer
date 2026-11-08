@@ -455,6 +455,16 @@ def make_handler(app):
                     )
                 elif path == "/api/project":
                     self.send(200, {"files": app.project.list()})
+                elif path == "/api/project/manifest":
+                    from .project import current_manifest
+
+                    self.send(
+                        200,
+                        current_manifest(
+                            app.factory.root if app.factory else ROOT,
+                            workspace=app.harness.workspace,
+                        ),
+                    )
                 elif path == "/api/project/file":
                     self.send(
                         200,
