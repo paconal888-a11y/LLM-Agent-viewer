@@ -169,7 +169,8 @@ def summary_source(messages, view, start, end):
     if view["summary"]:
         lines.append("[이전 요약]\n" + view["summary"])
     for index in range(start, end):
-        message = view["pruned"].get(str(index)) or messages[index]
+        # 생략 자리표시자가 아니라 원본을 읽는다. 자리표시자를 요약하면 그 사실이 영구히 사라진다.
+        message = messages[index]
         body = message.get("content") or json.dumps(
             message.get("tool_calls", []), ensure_ascii=False
         )

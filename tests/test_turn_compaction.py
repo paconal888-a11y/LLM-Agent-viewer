@@ -118,6 +118,18 @@ class CompactionLoopTests(unittest.TestCase):
             [None, None, "compaction", None],
         )
 
+    def test_summary_reads_the_original_tool_result_not_the_placeholder(self):
+        # 실제 모델 기록에서 찾은 결함: 생략 자리표시자를 요약해 파일 내용이 영구히 사라졌다.
+        self.settings(compact_at_tokens=200, keep_recent_messages=2, prune_tool_characters=200)
+        run, runtime = self.execute(
+            self.read(), self.add(), reply({"content": "요약"}), reply({"content": "끝"})
+        )
+        self.assertEqual(run.status, "completed", run.error)
+        self.assertTrue(self.kinds(run, "context.prune"))
+        source = completions(runtime)[2]["messages"][1]["content"]
+        self.assertIn("큰 문서 큰 문서", source)
+        self.assertNotIn("omitted_by_harness", source)
+
     def test_segments_describe_the_request_that_was_actually_sent(self):
         self.settings(compact_at_tokens=200, keep_recent_messages=2, prune_tool_characters=200)
         run, _ = self.execute(self.read(), self.add(), reply({"content": "요약"}), reply({"content": "끝"}))
