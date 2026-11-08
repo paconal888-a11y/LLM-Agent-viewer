@@ -748,7 +748,7 @@
       });
     if (parts[0] === "lessons") return { name: "lessons" };
     if (parts[0] === "view" && ["learn", "feedback", "memory"].includes(parts[1]))
-      return { name: "view", view: parts[1] };
+      return parts[2] ? { name: "view", view: parts[1], run: parts[2] } : { name: "view", view: parts[1] };
     if (parts[0] === "lesson" && byId(parts[1])) {
       const steps = byId(parts[1]).steps.length,
         number = Number(parts[2]);

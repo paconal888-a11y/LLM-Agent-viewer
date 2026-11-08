@@ -91,6 +91,7 @@ test("routes parse lessons and runs and reject malformed step numbers", () => {
   assert.equal(course.parseRoute("#/lesson/none/1"), null);
   assert.deepEqual(course.parseRoute("#/run/sample-team/12/input"), { name: "run", id: "sample-team", event: 12, tab: "input" });
   assert.deepEqual(course.parseRoute("#/view/memory"), { name: "view", view: "memory" });
+  assert.deepEqual(course.parseRoute("#/view/memory/sample-compaction"), { name: "view", view: "memory", run: "sample-compaction" });
   assert.equal(course.parseRoute("#/view/secret"), null);
   assert.equal(course.parseRoute(""), null);
   assert.equal(course.parseRoute("#/unknown"), null);

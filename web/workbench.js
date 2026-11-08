@@ -1027,7 +1027,10 @@
     const target = AgentLessons.parseRoute(location.hash);
     if (!target) return false;
     if (target.name === "lessons") view("lessons");
-    else if (target.name === "view") view(target.view);
+    else if (target.name === "view") {
+      if (target.run) await loadRun(target.run);
+      view(target.view);
+    }
     else if (target.name === "lesson") await openLesson(target.id, target.step);
     else {
       endLesson();
