@@ -513,8 +513,25 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
                 <option value="agent_team">
                   한 에이전트 ↔ 하위 에이전트 위임
                 </option>
+                <option value="custom">
+                  내 요청 · 스위치 하나만 바꾸기
+                </option>
               </select></label
             >
+            <div class="experimentoptions">
+              <label class="field hidden" id="experimentSwitchField"
+                >B에서 바꿀 스위치<select id="experimentSwitch"></select
+              ></label>
+              <label class="field"
+                >조건별 반복 횟수<input
+                  id="experimentRepeats"
+                  type="number"
+                  min="1"
+                  max="10"
+                  step="1"
+                  value="1"
+              /></label>
+            </div>
             <p id="experimentDescription" class="note"></p>
             <button id="startCompare" disabled class="primary">비교 실행</button
             ><button id="stopCompare" class="quiet hidden">비교 중지</button>

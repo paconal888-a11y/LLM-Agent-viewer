@@ -3,11 +3,14 @@
 import json
 import threading
 import uuid
+from collections import Counter
 
+from .diagnosis import diagnose
 from .features import (
     BASELINE_FEATURES,
     DEFAULT_FEATURES,
     normalize_features,
+    normalize_requirements,
     run_metrics,
 )
 from .inference import engine_options
@@ -171,11 +174,77 @@ def sampling_only(config):
     return {k: v for k, v in (config or {}).items() if k not in TRANSPORT_KEYS}
 
 
+def verified_result(evaluation, requirements, status):
+    """코드로 확인한 통과 여부. 확인할 기준이 없으면 None이며 실패로 세지 않는다."""
+    if evaluation.get("available"):
+        return evaluation["passed"] == evaluation["total"]
+    if requirements:
+        return status == "completed"
+    return None
+
+
+def trial_row(result, round_number, seed):
+    metrics = result["metrics"]
+    return {
+        "round": round_number,
+        "run_id": result["run_id"],
+        "status": result["status"],
+        "seed": seed,
+        "verified": result["verified"],
+        "focus": result["diagnosis"]["focus"],
+        "workspace": (result["conditions"].get("workspace") or {}).get("sha256"),
+        **{
+            key: metrics.get(key)
+            for key in (
+                "model_calls",
+                "tool_calls",
+                "prompt_tokens",
+                "completion_tokens",
+                "active_seconds",
+            )
+        },
+    }
+
+
+def aggregate(rows):
+    """회차별 관측값의 집계. 통과는 코드로 확인한 기준이 있는 회차만 센다."""
+
+    def mean(key):
+        values = [
+            row[key]
+            for row in rows
+            if isinstance(row[key], (int, float)) and not isinstance(row[key], bool)
+        ]
+        return round(sum(values) / len(values), 2) if values else None
+
+    checked = [row["verified"] for row in rows if row["verified"] is not None]
+    return {
+        "runs": len(rows),
+        "statuses": dict(Counter(row["status"] for row in rows)),
+        "verified": {"passed": sum(checked), "total": len(checked)} if checked else None,
+        "failure_layers": dict(
+            Counter(row["focus"] or "unknown" for row in rows if row["status"] == "failed")
+        ),
+        "mean": {
+            key: mean(key)
+            for key in (
+                "model_calls",
+                "tool_calls",
+                "prompt_tokens",
+                "completion_tokens",
+                "active_seconds",
+            )
+        },
+    }
+
+
 def summarize(run, case_id):
     snapshot = run.snapshot()
     counts = {}
     for event in snapshot["events"]:
         counts[event["category"]] = counts.get(event["category"], 0) + 1
+    evaluation = evaluate(snapshot, case_id)
+    diagnosis = diagnose(snapshot)
     return {
         "run_id": run.id,
         "status": run.status,
@@ -191,7 +260,15 @@ def summarize(run, case_id):
         "agents": snapshot.get("agents", []),
         "conditions": snapshot["conditions"],
         "metrics": run_metrics(snapshot),
-        "evaluation": evaluate(snapshot, case_id),
+        "evaluation": evaluation,
+        "verified": verified_result(
+            evaluation, snapshot.get("requirements") or [], run.status
+        ),
+        "diagnosis": {
+            "focus": diagnosis["focus"],
+            "focus_label": diagnosis["focus_label"],
+            "headline": diagnosis["headline"],
+        },
         "event_categories": counts,
     }
 
@@ -212,9 +289,14 @@ class ExperimentService:
         right_engine=None,
         left_mode="single",
         right_mode="single",
+        repeats=1,
+        requirements=None,
     ):
         from .orchestration import normalize_mode
 
+        if type(repeats) is not int or not 1 <= repeats <= 10:
+            raise ValueError("반복 횟수는 1~10 정수입니다.")
+        requirements = normalize_requirements(requirements)
         if case_id in {"agent_deep", "agent_team"}:
             left_mode, right_mode = (
                 "single",
@@ -241,6 +323,8 @@ class ExperimentService:
                 features_a = normalize_features({**DEFAULT_FEATURES, flag: False})
             if right is None:
                 features_b = normalize_features({**DEFAULT_FEATURES, flag: True})
+        if requirements and not (features_a["tools"] and features_b["tools"]):
+            raise ValueError("완료 조건을 쓰려면 A와 B 모두 도구를 켜야 합니다.")
         engine_a = engine_options(
             {"cache_prompt": False}
             if case_id == "kv_cache" and left_engine is None
@@ -264,38 +348,86 @@ class ExperimentService:
                 "profiles": {"A": features_a, "B": features_b},
                 "engines": {"A": engine_a, "B": engine_b},
                 "modes": modes,
+                "repeats": repeats,
+                "round": 1,
+                "requirements": requirements,
                 "results": {},
+                "trials": {"A": [], "B": []},
             }
             self.items[experiment_id] = item
             self.app.experiment_active = experiment_id
         threading.Thread(target=self.execute, args=(item,), daemon=True).start()
         return experiment_id
 
+    def capture_workspace(self):
+        root = self.app.harness.workspace
+        return {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
+
+    def restore_workspace(self, saved):
+        """쓰기를 허용한 회차가 만든 변경을 되돌려 다음 회차가 같은 파일에서 시작하게 한다."""
+        root = self.app.harness.workspace
+        for path in [p for p in root.rglob("*") if p.is_file() and p not in saved]:
+            path.unlink()
+        for path, data in saved.items():
+            if not path.is_file() or path.read_bytes() != data:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+
+    def run_trial(self, item, label, round_index):
+        item["phase"] = label
+        item["round"] = round_index + 1
+        engine = dict(item["engines"][label])
+        session = f"experiment-{item['id']}-{label}"
+        if item["repeats"] > 1:
+            # seed가 고정이면 같은 출력이 되풀이되어 표본이 늘지 않는다. 같은 회차의 A·B는 같은 seed를 쓴다.
+            engine["seed"] = (engine["seed"] + round_index) % (2**32)
+            session += f"-{round_index + 1}"
+        saved = (
+            self.capture_workspace() if item["profiles"][label].get("writes") else None
+        )
+        try:
+            run = self.app.start(
+                item["prompt"],
+                session,
+                False,
+                features=item["profiles"][label],
+                internal=True,
+                engine=engine,
+                requirements=item["requirements"],
+                mode=item["modes"][label],
+            )
+            item["current_run"] = run.id
+            with run.condition:
+                run.condition.wait_for(
+                    lambda: run.status in {"completed", "failed", "stopped"},
+                    timeout=1800,
+                )
+            if run.status not in {"completed", "failed", "stopped"}:
+                run.control("stop")
+                raise ValueError("비교 실행의 제한 시간을 초과했습니다.")
+        finally:
+            if saved is not None:
+                item["workspace_restored"] = True
+                self.restore_workspace(saved)
+        result = summarize(run, item["case_id"])
+        item["results"][label] = result
+        item["trials"][label].append(
+            trial_row(result, round_index + 1, engine["seed"])
+        )
+
     def execute(self, item):
         try:
-            for label in ("A", "B"):
+            for round_index in range(item["repeats"]):
+                # 회차마다 순서를 바꿔 캐시·실행 순서의 영향이 한쪽에만 쌓이지 않게 한다.
+                for label in ("A", "B") if round_index % 2 == 0 else ("B", "A"):
+                    if item.get("stop_requested"):
+                        break
+                    self.run_trial(item, label, round_index)
                 if item.get("stop_requested"):
                     break
-                item["phase"] = label
-                run = self.app.start(
-                    item["prompt"],
-                    f"experiment-{item['id']}-{label}",
-                    False,
-                    features=item["profiles"][label],
-                    internal=True,
-                    engine=item["engines"][label],
-                    mode=item["modes"][label],
-                )
-                item["current_run"] = run.id
-                with run.condition:
-                    run.condition.wait_for(
-                        lambda: run.status in {"completed", "failed", "stopped"},
-                        timeout=1800,
-                    )
-                if run.status not in {"completed", "failed", "stopped"}:
-                    run.control("stop")
-                    raise ValueError("비교 실행의 제한 시간을 초과했습니다.")
-                item["results"][label] = summarize(run, item["case_id"])
+            item["summary"] = {
+                label: aggregate(rows) for label, rows in item["trials"].items()
+            }
             if item.get("stop_requested"):
                 item["status"] = "stopped"
                 item["phase"] = "stopped"
@@ -326,6 +458,10 @@ class ExperimentService:
                 "same_workspace": a.get("workspace", {}).get("sha256")
                 == b.get("workspace", {}).get("sha256"),
                 "isolated_sessions": True,
+                "same_workspace_all_trials": len(
+                    {row["workspace"] for rows in item["trials"].values() for row in rows}
+                )
+                == 1,
             }
             item["generation_diff"] = {
                 key: {
@@ -352,6 +488,12 @@ class ExperimentService:
                 item["note"] = (
                     "A는 생성 중 KV 없이 전체 접두부를 재계산하고 B는 KV를 사용합니다. 요청 간 접두부 재사용은 둘 다 껐습니다. A→B를 한 번씩 측정한 값이며 관찰 기록 비용도 포함됩니다."
                 )
+            if item["repeats"] > 1:
+                item["note"] = (
+                    f"조건마다 {item['repeats']}회 실행했습니다. 회차마다 A·B 순서를 번갈아 바꾸고 seed를 1씩 늘렸으며, 같은 회차의 A·B는 같은 seed를 씁니다. 통과율은 이 요청·이 조건의 관측값이고 일반적인 모델 성능이 아닙니다. 회차가 적으면 차이가 우연일 수 있습니다. temperature가 0이면 seed를 바꿔도 같은 출력이 나올 수 있습니다."
+                )
+            if item.get("workspace_restored"):
+                item["note"] += " 파일 쓰기를 허용한 회차가 끝날 때마다 작업 공간을 실행 전 상태로 되돌렸습니다."
         except Exception as exc:
             item["status"] = "failed"
             item["error"] = str(exc)

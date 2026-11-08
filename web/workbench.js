@@ -2435,7 +2435,52 @@
       "두 실행의 메시지는 같습니다. A는 접두부 재사용을 끄고 B는 켭니다. 생성 중 KV는 둘 다 사용합니다.",
     decode_kv:
       "교육용 실행기에서 같은 입력을 실행합니다. A는 매 토큰마다 전체를 다시 계산하고 B는 KV를 사용합니다. CPU에서 시간이 걸릴 수 있습니다.",
+    custom:
+      "입력란의 요청과 완료 조건을 그대로 쓰고, A는 현재 스위치, B는 고른 스위치 하나만 뒤집습니다. 통과 여부는 완료 조건을 실제 도구 결과로 코드가 확인한 값입니다. 조건이 없으면 완료 상태만 셉니다.",
   };
+  const layerNames = {
+    runtime: "실행기·설정",
+    harness: "도구·하네스",
+    information: "모델 입력",
+    model: "모델의 선택",
+    unknown: "미분류",
+  };
+  function compareSummary(item) {
+    const s = item.summary;
+    if (!s || item.repeats < 2) return "";
+    const count = (map) =>
+      Object.entries(map)
+        .map(([key, n]) => `${layerNames[key] || key} ${n}`)
+        .join(", ") || "—";
+    const rows = [
+      ["실행 수", (v) => v.runs],
+      ["코드로 확인한 통과", (v) => (v.verified ? `${v.verified.passed} / ${v.verified.total}` : "기준 없음")],
+      ["완료 상태", (v) => `${v.statuses.completed || 0} / ${v.runs}`],
+      ["실패 층", (v) => count(v.failure_layers)],
+      ["평균 모델 호출", (v) => num(v.mean.model_calls)],
+      ["평균 도구 호출", (v) => num(v.mean.tool_calls)],
+      ["평균 입력 토큰", (v) => num(v.mean.prompt_tokens)],
+      ["평균 출력 토큰", (v) => num(v.mean.completion_tokens)],
+      ["평균 실행 초", (v) => num(v.mean.active_seconds)],
+    ];
+    const trials = ["A", "B"]
+      .flatMap((label) =>
+        item.trials[label].map(
+          (row) =>
+            `<button class="quiet" data-run="${esc(row.run_id)}">${label} ${row.round}회차 · ${row.verified == null ? esc(row.status) : row.verified ? "통과" : "미통과"} · seed ${row.seed}</button>`,
+        ),
+      )
+      .join("");
+    return (
+      `<table class="trialtable"><thead><tr><th></th><th>A</th><th>B</th></tr></thead><tbody>${rows
+        .map(
+          ([name, value]) =>
+            `<tr><th>${name}</th><td>${esc(String(value(s.A)))}</td><td>${esc(String(value(s.B)))}</td></tr>`,
+        )
+        .join("")}</tbody></table>` +
+      `<details class="diagraw"><summary>회차별 실행 ${item.trials.A.length + item.trials.B.length}개</summary><div class="learninglinks">${trials}</div></details>`
+    );
+  }
   async function startCompare() {
     $("startCompare").disabled = true;
     $("compareResult").innerHTML =
@@ -2447,8 +2492,29 @@
     const base = Object.fromEntries(
       Object.keys(features).map((k) => [k, false]),
     );
+    const repeats = Number($("experimentRepeats").value);
+    if (!Number.isInteger(repeats) || repeats < 1 || repeats > 10) {
+      $("startCompare").disabled = false;
+      throw Error("반복 횟수는 1~10 정수로 입력하세요.");
+    }
+    if (id === "custom") {
+      if (!$("prompt").value.trim()) {
+        $("startCompare").disabled = false;
+        throw Error("입력란에 비교할 요청을 먼저 적으세요.");
+      }
+    }
+    const flipped = $("experimentSwitch").value;
     const payload =
-      id === "decode_kv"
+      id === "custom"
+        ? {
+            prompt: $("prompt").value.trim(),
+            left: { ...features },
+            right: { ...features, [flipped]: !features[flipped] },
+            left_engine: { ...engine(), cache_prompt: false },
+            right_engine: { ...engine(), cache_prompt: false },
+            requirements: JSON.parse($("requirements").value),
+          }
+        : id === "decode_kv"
         ? {
             case_id: id,
             prompt: "한국어로 안녕이라고만 답해.",
@@ -2479,6 +2545,7 @@
       payload.left = base;
       payload.right = base;
     }
+    payload.repeats = repeats;
     const r = await api("/api/experiments", payload);
     state.experiment = r.id;
     $("stopCompare").classList.remove("hidden");
@@ -2491,14 +2558,15 @@
       results = item.results || {};
     $("compareResult").innerHTML =
       (item.status === "running"
-        ? `<p class="compareprogress">${item.phase} 실행 중 · ${num(item.progress?.events)}단계 관측</p>`
+        ? `<p class="compareprogress">${item.phase} 실행 중${item.repeats > 1 ? ` · ${item.round}/${item.repeats}회차` : ""} · ${num(item.progress?.events)}단계 관측</p>`
         : "") +
+      compareSummary(item) +
       `<div class="comparison">${["A", "B"]
         .map((label) => {
           const r = results[label];
-          return `<div><h3>${label} · ${r ? r.status : "대기"}</h3>${
+          return `<div><h3>${label}${item.repeats > 1 ? " · 마지막 회차" : ""} · ${r ? r.status : "대기"}</h3>${
             r
-              ? `<p>${esc(r.error || r.answer)}</p><dl>${[
+              ? `<p>${esc(r.error || r.answer)}</p><p class="note">${esc(r.diagnosis?.headline || "")}</p><dl>${[
                   ["전체 모델 호출", r.metrics.model_calls],
                   ["하위 에이전트", r.metrics.subagents],
                   ["계산 차례 대기 ms", r.metrics.model_queue_ms],
@@ -2528,7 +2596,7 @@
         ? `<div class="checks">${Object.entries(item.controls)
             .map(
               ([k, v]) =>
-                `${v ? "✓" : "×"} ${esc({ same_prompt: "같은 요청", same_model: "같은 모델", same_generation: "같은 생성 설정", same_workspace: "같은 작업 파일", isolated_sessions: "분리한 대화 이력", same_model_input: "동일한 모델 입력" }[k] || k)}`,
+                `${v ? "✓" : "×"} ${esc({ same_prompt: "같은 요청", same_model: "같은 모델", same_generation: "같은 생성 설정", same_sampling: "같은 샘플링 설정", same_harness_code: "같은 하네스 코드", same_workspace: "같은 작업 파일", same_workspace_all_trials: "모든 회차의 시작 파일 동일", isolated_sessions: "분리한 대화 이력", same_model_input: "동일한 모델 입력" }[k] || k)}`,
             )
             .join(
               " · ",
@@ -3407,9 +3475,17 @@
   $("showDiff").onclick = diff;
   $("saveFile").onclick = action(saveFile);
   $("undoFile").onclick = action(undoFile);
-  $("experimentCase").onchange = () =>
-    ($("experimentDescription").textContent =
-      experimentNotes[$("experimentCase").value]);
+  $("experimentSwitch").innerHTML = Object.keys(features)
+    .map((key) => `<option value="${key}">${esc(labels[key])}</option>`)
+    .join("");
+  $("experimentCase").onchange = () => {
+    $("experimentDescription").textContent =
+      experimentNotes[$("experimentCase").value];
+    $("experimentSwitchField").classList.toggle(
+      "hidden",
+      $("experimentCase").value !== "custom",
+    );
+  };
   $("loadFeedback").onclick = action(loadFeedback);
   $("feedbackRun").onchange = action(loadFeedback);
   $("startCompare").onclick = action(startCompare);

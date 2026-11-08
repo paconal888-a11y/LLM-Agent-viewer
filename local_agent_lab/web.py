@@ -745,6 +745,8 @@ def make_handler(app):
                         payload.get("right_engine"),
                         payload.get("left_mode", "single"),
                         payload.get("right_mode", "single"),
+                        payload.get("repeats", 1),
+                        payload.get("requirements"),
                     )
                     self.send(201, {"id": experiment_id})
                 elif self.path == "/api/backend":

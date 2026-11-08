@@ -911,6 +911,33 @@ p {
   font-weight: 550;
   overflow-wrap: anywhere;
 }
+.experimentoptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.experimentoptions .field {
+  flex: 1 1 200px;
+}
+.trialtable {
+  width: 100%;
+  margin: 10px 0;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.trialtable th,
+.trialtable td {
+  padding: 6px 9px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-weight: 400;
+}
+.trialtable thead th {
+  font-weight: 600;
+}
+.trialtable tbody th {
+  color: #5b6778;
+}
 .diagheadline {
   font-size: 13px;
   font-weight: 600;
