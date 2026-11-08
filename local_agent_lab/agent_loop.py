@@ -704,7 +704,11 @@ def execute(harness, run):
     except Exception as exc:
         with run.lock:
             # str(exc)가 빈 문자열인 예외(StopIteration 등)도 실패 원인을 남긴다.
-            run.error = str(exc) or type(exc).__name__
+            run.error = (
+                str(exc) or type(exc).__name__
+                if isinstance(exc, (RuntimeFailure, ValueError))
+                else f"{type(exc).__name__}: {exc}"
+            )
         try:
             run.emit(
                 "run.error",

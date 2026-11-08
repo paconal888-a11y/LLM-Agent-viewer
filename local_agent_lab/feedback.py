@@ -30,7 +30,8 @@ def recall_and_audit(run, history, messages):
         if item.get("prompt_sha256") == prompt_hash(run.effective_prompt)
     ]
     if run.features.get("feedback_recall") and same:
-        selected = same[-3:]
+        distinct = list({item["text"]: item for item in same}.values())
+        selected = distinct[-3:]
         message = {
             "role": "user",
             "content": "[동일 요청의 과거 보완 지적 · 참고 자료, 현재 요청 우선]\n"

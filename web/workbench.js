@@ -1071,6 +1071,7 @@
     "context.compact.start": "작업 중간 요약 시작",
     "context.compact.result": "작업 요약으로 입력 교체",
     "context.compact.failed": "작업 중간 요약 실패",
+    "memory.compaction.failed": "이전 대화 요약 실패",
     "checkpoint.save": "이어갈 상태 저장",
     "checkpoint.failed": "상태 저장 실패",
     "run.resume": "저장 상태에서 이어서 실행",
@@ -1312,9 +1313,8 @@
         `<strong>실제 저장 기록 재생 · ${esc(data.sample.title)}</strong><p>${esc(data.sample.description)}</p><small>지금 모델을 계산하는 화면이 아닙니다. ${esc(data.sample.redaction)}</small>`;
     $("requestSummary").classList.remove("hidden");
     $("summaryPrompt").textContent = data.prompt;
-    const promptTokens = data.totals?.prompt_tokens ?? data.usage?.prompt_tokens,
-      completionTokens =
-        data.totals?.completion_tokens ?? data.usage?.completion_tokens;
+    const promptTokens = tokenTotal(data, "prompt_tokens"),
+      completionTokens = tokenTotal(data, "completion_tokens");
     $("summaryMeta").textContent =
       `${data.sample ? "저장 기록 재생 · 새 계산 아님 · " : ""}${data.resumed_from ? "중단된 실행에서 이어감 · " : ""}${data.conditions?.model || "로컬 모델"} · 주 모델 ${data.model_calls}회 · 주 도구 ${data.tool_calls}회${data.agents?.length ? " · 하위 " + data.agents.length + "개 / 전체 모델 " + data.totals.model_calls + "회" : ""} · 입력 ${num(promptTokens)} / 출력 ${num(completionTokens)} 토큰(실행기 보고${data.totals?.usage_missing_calls ? ", 미수집 호출 " + data.totals.usage_missing_calls + "회" : ""}) · 활동 ${num(data.active_seconds)}초${data.implementation ? " · 하네스 " + data.implementation.version.slice(0, 10) : ""}`;
     // 구조도 화면(focus)에서는 한 줄로 잘리므로 전체 문구를 title 로도 둔다.
@@ -1364,14 +1364,17 @@
     $("metrics").innerHTML = [
       `전체 모델 ${data.totals?.model_calls ?? data.model_calls}회`,
       `전체 도구 ${data.totals?.tool_calls ?? data.tool_calls}회`,
-      `입력 ${num(data.totals?.prompt_tokens ?? data.usage?.prompt_tokens)}토큰`,
-      `출력 ${num(data.totals?.completion_tokens ?? data.usage?.completion_tokens)}토큰`,
+      `입력 ${num(promptTokens)}토큰`,
+      `출력 ${num(completionTokens)}토큰`,
       `활동 ${num(data.active_seconds)}초`,
     ]
       .map((s) => `<span>${s}</span>`)
       .join("");
     // 학습 흐름 탭은 실행 상태(검사 결과·완료 판정)를 함께 보여 주므로 새 기록이 오면 다시 그린다.
     if (state.tab === "learn" && !state.live) renderDetail();
+  }
+  function tokenTotal(data, key) {
+    return data.totals && key in data.totals ? data.totals[key] : data.usage?.[key];
   }
   function resumeUI(data) {
     // 저장 상태가 남아 있는 실행에만 이어가기를 보여 준다. 샘플 재생에는 저장 상태가 없다.
@@ -2034,7 +2037,16 @@
           ["선택 토큰 ID", o.id],
           ["선택 방식", o.strategy],
         ]) +
-        `<h3>실제 후보 분포 · 상위 ${o.candidates?.length || 0}개</h3>` +
+        (o.raw_top?.length
+          ? `<h3>샘플러 적용 전 분포 · 상위 ${o.raw_top.length}개</h3>` +
+            bars(
+              o.raw_top.map((c) => ({
+                label: piece(c.piece) + " · " + c.id,
+                value: c.raw_prob,
+              })),
+            )
+          : "") +
+        `<h3>${o.raw_top?.length ? "샘플러 적용 후(재정규화)" : "실제 후보 분포"} · 상위 ${o.candidates?.length || 0}개</h3>` +
         bars(
           (o.candidates || []).map((c) => ({
             label: piece(c.piece) + " · " + c.id,
@@ -3789,13 +3801,14 @@
     restored.push("작업 방식");
     $("prompt").value = run.prompt || "";
     restored.push("요청");
-    $("requirements").value = JSON.stringify(run.requirements || [], null, 2);
-    restored.push("완료 조건 " + (run.requirements || []).length + "개");
+    const asked = run.request || run;
+    $("requirements").value = JSON.stringify(asked.requirements || [], null, 2);
+    restored.push("완료 조건 " + (asked.requirements || []).length + "개");
     Object.keys(features).forEach(
-      (key) => (features[key] = run.features?.[key] ?? false),
+      (key) => (features[key] = asked.features?.[key] ?? false),
     );
     restored.push("하네스 구성");
-    $("stepMode").checked = run.step_mode === true;
+    $("stepMode").checked = (run.request ? run.request.step : run.step_mode) === true;
     restored.push("단계 정지");
     if (run.sample) issues.push("세션: 재생 기록의 대화 상태는 이 PC에 없어 현재 세션 유지");
     else if (typeof run.session_id === "string" && /^[a-zA-Z0-9_-]{1,64}$/.test(run.session_id)) {

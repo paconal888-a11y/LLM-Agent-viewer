@@ -184,6 +184,8 @@ class HarnessFactory:
                         ),
                         module.__dict__,
                     )
+                    # code 객체는 줄 번호·주석이 같으면 같다고 판정되어 이전 소스 문자열이 재사용된다.
+                    code_source.cache_clear()
                     for value in list(module.__dict__.values()):
                         if getattr(value, "__module__", None) != module_name:
                             continue

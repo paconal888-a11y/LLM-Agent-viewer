@@ -89,6 +89,19 @@ class WebTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             app.start("hello", "sample", False)
 
+    def test_changing_backend_keeps_the_server_given_at_startup(self):
+        class Reference(FixtureRuntime):
+            backend = "reference"
+
+        app = Application(
+            Harness(self.app.harness.workspace, self.app.harness.state_dir, runtime=Reference()),
+            llama_url="http://127.0.0.1:1234",
+            llama_model="custom-model",
+        )
+        app.select_backend("llama")
+        self.assertEqual(app.harness.runtime.base_url, "http://127.0.0.1:1234")
+        self.assertEqual(app.harness.model, "custom-model")
+
     def test_status_identifies_the_app_instance_for_launcher_and_stop_scripts(self):
         import os
 

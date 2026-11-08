@@ -118,15 +118,28 @@ class ContextMemoryTests(unittest.TestCase):
             any(e["kind"] == "memory.compaction.start" for e in run.events)
         )
 
-    def test_truncated_summary_is_not_committed_and_original_is_unchanged(self):
+    def test_truncated_summary_is_not_committed_and_the_answer_continues(self):
         cut = response({"content": "cut"})
         cut["choices"][0]["finish_reason"] = "length"
-        harness = self.seed(FixtureRuntime(cut))
+        harness = self.seed(FixtureRuntime(cut, response({"content": "답변"})))
         original = archive_path(harness, "chat").read_bytes()
         run = self.run_chat(harness)
-        self.assertEqual(run.status, "failed")
-        self.assertEqual(archive_path(harness, "chat").read_bytes(), original)
+        self.assertEqual(run.status, "completed", run.error)
+        self.assertTrue(archive_path(harness, "chat").read_bytes().startswith(original))
         self.assertEqual(inspect(harness, "chat")["summary"]["text"], "")
+        failed = [e for e in run.events if e["kind"] == "memory.compaction.failed"]
+        self.assertEqual(failed[0]["status"], "warning")
+
+    def test_a_torn_last_line_does_not_swallow_the_next_record(self):
+        harness = self.seed(FixtureRuntime(response({"content": "요약"}), response({"content": "답변"})))
+        path = archive_path(harness, "chat")
+        with path.open("ab") as handle:
+            handle.write(b'{"run_id": "torn"')
+        run = self.run_chat(harness)
+        self.assertEqual(run.status, "completed", run.error)
+        lines = path.read_bytes().splitlines()
+        self.assertEqual(lines[-2], b'{"run_id": "torn"')
+        self.assertEqual(json.loads(lines[-1])["run_id"], run.id)
 
     def test_memory_disabled_never_calls_summarizer(self):
         harness = self.seed(FixtureRuntime(response({"content": "done"})))

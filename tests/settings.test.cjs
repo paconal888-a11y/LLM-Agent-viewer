@@ -101,6 +101,20 @@ test("importing a past run restores every generation setting, not only prompt an
   assert.ok(report.restored.includes("작업 공간 파일 동일"));
 });
 
+test("importing restores what was requested, not what the mode changed it to", async () => {
+  const { $, features, sandbox } = setup();
+  await sandbox.importRunSettings({
+    ...recordedRun,
+    requirements: [{ tool: "delegate_tasks" }],
+    features: { ...recordedRun.features, writes: false },
+    step_mode: false,
+    request: { step: true, requirements: [], features: { ...recordedRun.features, writes: true }, mode: "team", engine: recordedRun.engine },
+  });
+  assert.equal($("requirements").value, "[]");
+  assert.equal(features.writes, true);
+  assert.equal($("stepMode").checked, true);
+});
+
 test("conditions that cannot be reproduced are reported instead of silently adjusted", async () => {
   const { $, sandbox } = setup({
     manifest: {

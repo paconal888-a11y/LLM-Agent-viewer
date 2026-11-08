@@ -231,7 +231,7 @@ def summarize(harness, run, messages, view, end):
             response = generate(run, harness.runtime, payload, 0)
         run.model_calls += 1
         run.add_usage(response.get("usage"))
-        run.conditions.setdefault("model_input_sha256", []).append(input_fingerprint(payload))
+        run.conditions.setdefault("compaction_input_sha256", []).append(input_fingerprint(payload))
         run.emit(
             "model.response",
             "작업 중간 요약 모델 응답",

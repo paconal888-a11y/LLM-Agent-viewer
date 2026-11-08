@@ -174,7 +174,9 @@ def preview_input(run, runtime, payload, iteration):
         first = prompt_bytes.find(requested) if requested else -1
         ambiguous = first >= 0 and prompt_bytes.find(requested, first + 1) >= 0
         position = first if not ambiguous else -1
-        previous = run.token_previews[-1]["tokens"] if run.token_previews else []
+        # 요약 호출(call 0)은 답변 입력과 접두부가 달라 비교 대상에서 뺀다.
+        answers = [item for item in run.token_previews if item.get("call") != 0]
+        previous = answers[-1]["tokens"] if answers else []
         ids = lambda items: [
             item.get("id") if isinstance(item, dict) else item for item in items
         ]

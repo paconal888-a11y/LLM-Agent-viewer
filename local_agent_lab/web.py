@@ -67,8 +67,18 @@ class WorkInProgress(ValueError):
 
 
 class Application:
-    def __init__(self, harness=None, *, hot_reload=False, samples_only=False):
+    def __init__(
+        self,
+        harness=None,
+        *,
+        hot_reload=False,
+        samples_only=False,
+        llama_url="http://127.0.0.1:8088",
+        llama_model="qwen3-4b",
+    ):
         self.samples_only = samples_only
+        self.llama_url = llama_url
+        self.llama_model = llama_model
         self.harness = harness or Harness()
         self.runs = {}
         self.lock = threading.Lock()
@@ -380,11 +390,9 @@ class Application:
                 else:
                     from .runtime import LocalRuntime
 
-                    self.backends[name] = LocalRuntime(
-                        "http://127.0.0.1:8088", timeout=180
-                    )
+                    self.backends[name] = LocalRuntime(self.llama_url, timeout=180)
             self.harness.runtime = self.backends[name]
-            self.harness.model = "Qwen3-0.6B" if name == "reference" else "qwen3-4b"
+            self.harness.model = "Qwen3-0.6B" if name == "reference" else self.llama_model
             self.health_cache = (0, {})
         return self.health()
 
@@ -466,7 +474,7 @@ class Application:
 
 def make_handler(app):
     class Handler(BaseHTTPRequestHandler):
-        server_version = "AgentLens/0.5"
+        server_version = "AgentLens/" + app_version()
 
         def local_host(self):
             try:
@@ -712,6 +720,8 @@ def make_handler(app):
                 raw = self.rfile.read(length)
                 decoded = raw.decode("utf-8")
                 payload = json.loads(decoded)
+                if not isinstance(payload, dict):
+                    raise ValueError("요청 본문은 JSON 객체여야 합니다.")
                 if self.path == "/api/runs":
                     client = payload.get("client_trace", {})
                     if not isinstance(client, dict) or len(json.dumps(client)) > 2000:
@@ -804,7 +814,7 @@ def make_handler(app):
                         raise ValueError("샘플 보기 모드에서는 파일을 저장하지 않습니다. 실제 실행 모드로 시작하세요.")
                     with app.lock:
                         if app.busy():
-                            raise ValueError(
+                            raise WorkInProgress(
                                 "실행을 완료하거나 중지한 뒤 저장하세요. 편집 중인 내용은 화면에 유지됩니다."
                             )
                         self.send(
@@ -820,7 +830,7 @@ def make_handler(app):
                         raise ValueError("샘플 보기 모드에서는 파일을 되돌리지 않습니다.")
                     with app.lock:
                         if app.busy():
-                            raise ValueError("실행을 완료하거나 중지한 뒤 되돌리세요.")
+                            raise WorkInProgress("실행을 완료하거나 중지한 뒤 되돌리세요.")
                         self.send(
                             200,
                             app.project.restore(
@@ -922,7 +932,11 @@ def main():
     else:
         harness = Harness(base_url=args.model_url, model=args.model)
     app = Application(
-        harness, hot_reload=not args.samples_only, samples_only=args.samples_only
+        harness,
+        hot_reload=not args.samples_only,
+        samples_only=args.samples_only,
+        llama_url=args.model_url,
+        llama_model=args.model,
     )
     server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(app))
     print(f"Agent Lens: http://127.0.0.1:{args.port}", flush=True)

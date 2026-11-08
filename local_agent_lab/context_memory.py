@@ -153,6 +153,12 @@ def append_archive(harness, run, previous, turn):
         }
     )
     payload = "".join(archive_line(record) for record in records)
+    if path.is_file() and path.stat().st_size:
+        with path.open("rb") as handle:
+            handle.seek(-1, os.SEEK_END)
+            if handle.read(1) != b"\n":
+                # 쓰다가 끊긴 줄에 이어 쓰면 새 기록까지 해석할 수 없게 된다.
+                payload = "\n" + payload
     encoded = payload.encode("utf-8")
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8", newline="") as handle:
@@ -401,6 +407,7 @@ def prepare(harness, run, history):
             },
         )
         run.model_purpose = "compaction"
+        failure = None
         try:
             for index, chunk in enumerate(chunks):
                 payload = {
@@ -447,7 +454,7 @@ def prepare(harness, run, history):
                     response = generate(run, harness.runtime, payload, 0)
                 run.model_calls += 1
                 run.add_usage(response.get("usage"))
-                run.conditions.setdefault("model_input_sha256", []).append(
+                run.conditions.setdefault("compaction_input_sha256", []).append(
                     input_fingerprint(payload)
                 )
                 run.emit(
@@ -469,47 +476,62 @@ def prepare(harness, run, history):
                 summary = choice["message"].get("content", "").strip()
                 if not summary:
                     raise RuntimeFailure("모델이 빈 요약을 반환했습니다.")
+        except RuntimeFailure as error:
+            failure = error
         finally:
             run.model_purpose = "answer"
-        through += len(candidates)
-        summary_file = (
-            harness.state_dir / "summaries" / run.session_id / (run.id + ".json")
-        )
-        record = {
-            "summary": summary,
-            "source_run_ids": [r["run_id"] for r in records[:through]],
-            "summary_through": through,
-            "method": "local_model",
-            "model": harness.model,
-            "before_characters": len(before),
-            "before_json_characters": len(before),
-            "after_characters": len(summary),
-            "unit_note": "before_json_characters는 요약 입력(JSON 직렬화)의 길이, after_characters는 요약 문자열 길이",
-        }
-        write_state(summary_file, record)
-        checkpoint = {
-            **history,
-            "summary": summary,
-            "summary_through": through,
-            "summary_source_run_ids": record["source_run_ids"],
-            "summary_path": str(summary_file),
-            "archive_turn_count": len(records),
-        }
-        write_state(harness.history_path(run.session_id), checkpoint)
-        run.emit(
-            "memory.compaction.result",
-            "요약과 원본 범위 저장",
-            "원본 대화는 삭제하지 않습니다. 요약 문장에 모든 사실이 보존됐다고 보증하지 않으며, 원본과 대조할 수 있습니다.",
-            category="memory",
-            input={"before_text": before},
-            output={
-                **record,
-                "path": str(summary_file),
-                "checkpoint_path": str(harness.history_path(run.session_id)),
-            },
-        )
-        remaining = records[through:]
-        history = checkpoint
+        if failure is not None:
+            summary = history.get("summary", "")
+            run.emit(
+                "memory.compaction.failed",
+                "이전 대화 요약 실패 · 원문으로 계속",
+                "잘린 요약을 저장하지 않습니다. 이번 요청은 기존 요약과 최근 원문으로 진행하고 다음 요청에서 다시 시도합니다.",
+                category="memory",
+                status="warning",
+                output={"error": str(failure)},
+            )
+        else:
+            through += len(candidates)
+            summary_file = (
+                harness.state_dir / "summaries" / run.session_id / (run.id + ".json")
+            )
+            record = {
+                "summary": summary,
+                "source_run_ids": [r["run_id"] for r in records[:through]],
+                "summary_through": through,
+                "method": "local_model",
+                "model": harness.model,
+                "before_characters": len(before),
+                "before_json_characters": len(before),
+                "after_characters": len(summary),
+                "unit_note": "before_json_characters는 요약 입력(JSON 직렬화)의 길이, after_characters는 요약 문자열 길이",
+            }
+            write_state(summary_file, record)
+            checkpoint = {
+                **history,
+                "summary": summary,
+                "summary_through": through,
+                "summary_source_run_ids": record["source_run_ids"],
+                "summary_path": str(summary_file),
+                "archive_turn_count": len(records),
+            }
+            write_state(harness.history_path(run.session_id), checkpoint)
+            run.model_purpose = "compaction"
+            run.emit(
+                "memory.compaction.result",
+                "요약과 원본 범위 저장",
+                "원본 대화는 삭제하지 않습니다. 요약 문장에 모든 사실이 보존됐다고 보증하지 않으며, 원본과 대조할 수 있습니다.",
+                category="memory",
+                input={"before_text": before},
+                output={
+                    **record,
+                    "path": str(summary_file),
+                    "checkpoint_path": str(harness.history_path(run.session_id)),
+                },
+            )
+            run.model_purpose = "answer"
+            remaining = records[through:]
+            history = checkpoint
     run.model_purpose = "answer"
     # 요약 모드에서도 원문 입력에 상한을 둔다. 오래된 레코드부터 제외하고 제외한 run_id를 남긴다.
     kept = list(remaining)
