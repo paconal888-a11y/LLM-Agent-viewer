@@ -239,16 +239,30 @@ def build_context(run, workspace, history):
         else ""
     )
     previous_turns = history.get("turns", [])
+    turn_origins = history.get("turn_origins") or []
+    turn_origins = [None] * (len(previous_turns) - len(turn_origins)) + list(turn_origins)
     selected_turns = (
         previous_turns if run.features.get("compaction") else previous_turns[-2:]
     )
+    selected_origins = (
+        turn_origins if run.features.get("compaction") else turn_origins[-2:]
+    )
     recent = [message for turn in selected_turns for message in turn]
+    recent_origins = []
+    for turn, origins in zip(selected_turns, selected_origins):
+        lookup = {o.get("index"): o for o in (origins or []) if isinstance(o, dict)}
+        recent_origins.extend(lookup.get(i) for i in range(len(turn)))
+    budget = history.get("state_budget") or {}
     run.emit(
         "memory.select",
         "최근 대화와 이전 결과 선택",
         "요약이 꺼져 있으면 최근 두 묶음을 사용합니다. 켜져 있으면 요약 정책이 고른 원문 묶음과 별도의 모델 요약을 사용합니다. 직전 응답 발췌는 요약과 구분합니다.",
         category="memory",
-        input={"total_completed_turns": len(previous_turns)},
+        input={
+            "total_completed_turns": len(previous_turns),
+            "archive_turn_count": history.get("archive_turn_count"),
+            "omitted_recent_turns_in_state": budget.get("omitted_recent_turns", 0),
+        },
         output={
             "included_turns": len(selected_turns),
             "omitted_turns": max(0, len(previous_turns) - len(selected_turns)),
@@ -366,12 +380,19 @@ def build_context(run, workspace, history):
         text = messages[index].get("content") or json.dumps(
             messages[index].get("tool_calls", []), ensure_ascii=False
         )
+        recorded = recent_origins[index - history_start] if index - history_start < len(recent_origins) else None
+        origin = (recorded or {}).get("origin") or "unknown"
         segments.append(
             {
                 "kind": "memory",
-                "label": "최근 대화",
-                "origin": "unknown",
-                "reason": "이전 대화에서 복원; 최초 작성 주체는 이 세션 상태에 미기록",
+                "label": "최근 대화 · 하네스 지시" if origin == "harness" else "최근 대화",
+                "origin": origin,
+                "reason": (
+                    "이전 대화에서 복원 · 당시 작성 주체: " + str((recorded or {}).get("reason") or origin)
+                    if origin != "unknown"
+                    else "이전 대화에서 복원; 최초 작성 주체는 이 세션 상태에 미기록"
+                ),
+                "restored_from_turn": True,
                 "message_index": index,
                 "role": messages[index]["role"],
                 "characters": len(text),

@@ -97,6 +97,7 @@ def execute(harness, run):
         prepare_integrations(run, harness.workspace)
         messages, catalog = build_context(run, harness.workspace, history)
         initial_count = len(messages) - 1
+        run.turn_message_offset = initial_count
         recall_and_audit(run, history, messages)
         active_skills = set()
         dirty = set()

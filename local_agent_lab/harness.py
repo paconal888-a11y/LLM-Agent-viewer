@@ -19,6 +19,7 @@ from .policy import validate_tool_call
 from .feedback import collect_feedback
 from .context_memory import (
     append_archive,
+    message_origins,
     write_state,
     bounded_state,
     STATE_LIMIT,
@@ -124,6 +125,16 @@ class Harness:
             max_bytes=8 * 1024 * 1024,
         )
         history = json.loads(raw)
+        budget = history.get("state_budget") or {}
+        if budget.get("omitted_recent_turns"):
+            run.emit(
+                "memory.state.omitted",
+                "활성 세션에서 제외된 큰 대화",
+                "이전 저장 때 활성 상태 예산(512 KiB)을 넘어 최근 대화 일부가 활성 상태에서 빠졌습니다. 원문은 대화 원본 저장소에 있으며 이번 모델 입력에는 들어가지 않습니다.",
+                category="memory",
+                status="warning",
+                output={**budget, "archive_turn_count": history.get("archive_turn_count")},
+            )
         if len(raw.encode("utf-8")) > STATE_LIMIT:
             archive = archive_path(self, run.session_id)
             if not archive.exists():
@@ -179,11 +190,17 @@ class Harness:
             previous = json.loads(raw)
         archive_count = append_archive(self, run, previous, turn)
         turns = (previous.get("turns", []) + [turn])[-2:]
+        previous_origins = previous.get("turn_origins") or []
+        previous_origins = [None] * (
+            len(previous.get("turns", [])) - len(previous_origins)
+        ) + previous_origins
         data = {
             "turns": turns,
+            "turn_origins": (previous_origins + [message_origins(run, turn)])[-2:],
             "archive_turn_count": archive_count,
             "summary": previous.get("summary", ""),
             "summary_through": previous.get("summary_through", 0),
+            "summary_source_run_ids": previous.get("summary_source_run_ids"),
             "summary_path": previous.get("summary_path"),
             "excerpt": run.answer[:1000],
             "excerpt_method": "first_1000_characters_of_last_answer",
