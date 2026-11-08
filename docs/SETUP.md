@@ -69,7 +69,7 @@ uv run --extra integrations python -m local_agent_lab.web --backend llama --mode
 
 | 경로 | 내용 |
 | --- | --- |
-| `%LOCALAPPDATA%\AgentLens` | 모델과 Windows 추론 엔진 |
+| `%LOCALAPPDATA%\AgentLens` | 모델과 Windows 추론 엔진 (`AGENT_LENS_HOME`을 지정하면 그 경로) |
 | `.runs/traces` | 실행 기록과 소스 스냅샷 참조 |
 | `.runs/conversations` | 완료한 대화 원문 JSONL |
 | `.runs/sessions` | 최근 대화, 요약, 지적 목록 등 세션 상태 |
@@ -79,3 +79,5 @@ uv run --extra integrations python -m local_agent_lab.web --backend llama --mode
 | `.local` | 앱 로그와 프로세스 정보 |
 
 `.runs`, `.local`, 가상환경과 모델 파일은 Git에서 제외합니다. 실행 기록을 내보내 공유할 때는 프롬프트·파일 원문·로컬 경로를 확인하세요.
+
+MSIX로 설치된 앱(예: Codex 앱) 안에서 런처를 처음 실행했다면 `%LOCALAPPDATA%` 쓰기가 앱별 저장소(`%LOCALAPPDATA%\Packages\<앱>\LocalCache\Local\AgentLens`)로 가상화되어 일반 콘솔에서는 파일이 없는 것처럼 보입니다. 런처는 기본 위치에 파일이 없으면 이 저장소에서 필요한 파일을 찾아 복사·이동·삭제 없이 그대로 쓰고 사용한 경로를 출력합니다. 그 앱을 제거하면 저장소도 사라지므로 계속 쓰려면 파일을 기본 위치로 복사하거나 `AGENT_LENS_HOME`을 지정하세요.

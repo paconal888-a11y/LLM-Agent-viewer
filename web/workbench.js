@@ -2475,7 +2475,7 @@
     decode_kv:
       "교육용 실행기에서 같은 입력을 실행합니다. A는 매 토큰마다 전체를 다시 계산하고 B는 KV를 사용합니다. CPU에서 시간이 걸릴 수 있습니다.",
     custom:
-      "입력란의 요청과 완료 조건을 그대로 쓰고, A는 현재 스위치, B는 고른 스위치 하나만 뒤집습니다. 통과 여부는 완료 조건을 실제 도구 결과로 코드가 확인한 값입니다. 조건이 없으면 완료 상태만 셉니다.",
+      "입력란의 요청과 완료 조건을 그대로 쓰고, A는 현재 스위치, B는 고른 스위치 하나만 뒤집습니다. 통과 여부는 완료 조건을 실제 도구 결과로 코드가 확인한 값입니다. 조건이 없으면 완료 상태만 셉니다. 하네스 코드를 고칠 때는 ‘바꾸지 않음’으로 수정 전후 기준선을 각각 측정해 비교하세요.",
   };
   const layerNames = {
     runtime: "실행기·설정",
@@ -2548,7 +2548,9 @@
         ? {
             prompt: $("prompt").value.trim(),
             left: { ...features },
-            right: { ...features, [flipped]: !features[flipped] },
+            right: flipped
+              ? { ...features, [flipped]: !features[flipped] }
+              : { ...features },
             left_engine: { ...engine(), cache_prompt: false },
             right_engine: { ...engine(), cache_prompt: false },
             requirements: JSON.parse($("requirements").value),
@@ -3539,9 +3541,12 @@
   $("showDiff").onclick = diff;
   $("saveFile").onclick = action(saveFile);
   $("undoFile").onclick = action(undoFile);
-  $("experimentSwitch").innerHTML = Object.keys(features)
-    .map((key) => `<option value="${key}">${esc(labels[key])}</option>`)
-    .join("");
+  $("experimentSwitch").innerHTML =
+    '<option value="">바꾸지 않음 · 기준선 측정</option>' +
+    Object.keys(features)
+      .map((key) => `<option value="${key}">${esc(labels[key])}</option>`)
+      .join("");
+  $("experimentSwitch").value = "rules";
   $("experimentCase").onchange = () => {
     $("experimentDescription").textContent =
       experimentNotes[$("experimentCase").value];
