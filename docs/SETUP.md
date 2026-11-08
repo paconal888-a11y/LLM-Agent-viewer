@@ -7,7 +7,7 @@ Windows x64, Git, [uv](https://docs.astral.sh/uv/getting-started/installation/)�
 ```powershell
 git clone https://github.com/paconal888-a11y/LLM-Agent-viewer.git
 cd LLM-Agent-viewer
-.\Start-AgentLens.ps1 -SamplesOnly
+.\Start-AgentLens.cmd -SamplesOnly
 ```
 
 브라우저에서 [http://127.0.0.1:8765](http://127.0.0.1:8765)를 엽니다. `-SamplesOnly`는 모델을 다운로드하거나 실행하지 않고 [포함된 기록](../samples/README.md)을 재생합니다.
@@ -16,8 +16,8 @@ cd LLM-Agent-viewer
 
 | 실행기 | 모델 | 실행 명령 | 특징 |
 | --- | --- | --- | --- |
-| Python | Qwen3-0.6B | `.\Start-AgentLens.ps1` | CPU, 토큰별 forward·샘플링·KV·텐서 표본 기록 |
-| llama.cpp | Qwen3-4B Q4_K_M | `.\Start-AgentLens.ps1 -Backend llama` | Vulkan, HTTP/SSE 응답과 캐시 통계 기록 |
+| Python | Qwen3-0.6B | `.\Start-AgentLens.cmd` | CPU, 토큰별 forward·샘플링·KV·텐서 표본 기록 |
+| llama.cpp | Qwen3-4B Q4_K_M | `.\Start-AgentLens.cmd -Backend llama` | Vulkan, HTTP/SSE 응답과 캐시 통계 기록 |
 
 첫 실행에는 인터넷 연결과 수 GB의 저장 공간이 필요합니다. 작은 모델은 복잡한 도구 요청을 놓칠 수 있습니다. 하네스와 파일 작업은 4B 모델로, 신경망 연산은 Python 실행기로 확인할 수 있습니다.
 
@@ -28,13 +28,15 @@ llama.cpp는 Windows용 Vulkan 배포본을 사용합니다. 드라이버·메�
 `-NoBrowser`는 브라우저를 열지 않고 앱을 시작하고, `-Port`는 앱 포트(기본 8765)를 바꿉니다. 종료 스크립트는 이 프로젝트가 시작한 프로세스를 정리합니다.
 
 ```powershell
-.\Start-AgentLens.ps1 -NoBrowser
-.\Stop-AgentLens.ps1
+.\Start-AgentLens.cmd -NoBrowser
+.\Stop-AgentLens.cmd
 ```
 
-모델을 읽는 동안 실행 버튼이 비활성화됩니다. **실제 실행을 단계마다 멈추기**를 켜면 관찰 지점에서 작업이 정지합니다. 새로고침 뒤에도 화면 위의 **다음 단계·계속·중지**로 작업을 제어할 수 있습니다. 작성 중인 프롬프트와 설정, 선택한 기록 위치는 같은 브라우저에서 복원됩니다. 앱이 종료된 뒤 남은 기록은 재생만 가능합니다.
+모델을 읽는 동안 실행 버튼이 비활성화됩니다. **실제 실행을 단계마다 멈추기**를 켜면 관찰 지점에서 작업이 정지합니다. 새로고침 뒤에도 화면 위의 **다음 단계·계속·중지**로 작업을 제어할 수 있습니다. 작성 중인 프롬프트와 설정, 선택한 기록 위치는 같은 브라우저에서 복원됩니다. 앱이 종료된 뒤에도 저장 상태가 남아 있는 실행은 이어서 실행할 수 있고, 나머지 기록은 재생만 가능합니다.
 
-실행 정책 오류가 나면 `Start-AgentLens.cmd -SamplesOnly`처럼 `.cmd` 진입점을 쓰세요. 이 파일은 PC의 실행 정책을 바꾸지 않고 해당 호출에만 `-ExecutionPolicy Bypass`를 적용합니다. 브라우저로 내려받은 ZIP을 푼 경우에는 `Unblock-File -Path .\*.ps1, .\scripts\*.ps1`로 다운로드 표식을 지워도 됩니다. uv는 `--system-certs`를 지원하는 최근 버전(0.6 이상)이 필요하고, `-SamplesOnly`도 Python 3.12가 없으면 uv가 내려받으므로 첫 실행에는 네트워크가 필요합니다.
+`.cmd` 파일은 PC의 실행 정책을 바꾸지 않고 해당 호출에만 `-ExecutionPolicy Bypass`를 적용합니다. 실행 정책이 허용되어 있으면 같은 이름의 `.ps1`을 직접 실행해도 됩니다. 브라우저로 내려받은 ZIP을 푼 경우에는 `Unblock-File -Path .\*.ps1, .\scripts\*.ps1`로 다운로드 표식을 지워도 됩니다. uv는 0.11.18에서 확인했으며 최근 버전을 권장합니다. `-SamplesOnly`도 Python 3.12가 없으면 uv가 내려받으므로 첫 실행에는 네트워크가 필요합니다. 설치 없이 보려면 [웹 데모](https://paconal888-a11y.github.io/LLM-Agent-viewer/)를 여세요.
+
+**문제 해결.** 시작할 때 DLL 오류가 나면 Microsoft Visual C++ 재배포 패키지를 설치해 보세요(이 조합은 깨끗한 PC에서 따로 확인하지 못했습니다). 폴더 경로가 아주 길면 Windows의 긴 경로 사용을 켜거나 짧은 경로에 복제하세요. 엔진이 바로 끝나면 시작 스크립트가 로그의 마지막 부분을 보여 줍니다.
 
 시작 스크립트는 포트에 떠 있는 것이 무엇인지 먼저 식별합니다. `/api/status`가 보고하는 프로젝트 경로·버전·모드가 이 폴더의 것과 같으면 그 앱을 그대로 사용하고, 이 폴더의 `.local/processes.json`에 기록된 프로세스(PID·실행 파일·시작 시각이 모두 일치)면 종료한 뒤 다시 시작합니다. 다른 프로젝트의 Agent Lens나 기록에 없는 프로세스, 다른 프로그램이 포트를 쓰고 있으면 종료하지 않고 PID와 이름을 표시한 뒤 멈춥니다. 그때는 `-Port 8766`처럼 다른 포트를 지정하거나 해당 프로그램을 직접 종료하세요. 새 앱은 `/api/status`가 이 프로젝트의 것으로 응답할 때까지 최대 90초 기다리며, 그 전에 종료되거나 응답이 없으면 `.local/app.stderr.log`의 마지막 20줄과 함께 실패를 알립니다. 모델 로딩은 응답 이후에도 계속될 수 있습니다.
 

@@ -37,10 +37,10 @@
 ```powershell
 git clone https://github.com/paconal888-a11y/LLM-Agent-viewer.git
 cd LLM-Agent-viewer
-.\Start-AgentLens.ps1 -SamplesOnly
+.\Start-AgentLens.cmd -SamplesOnly
 ```
 
-실행 정책 때문에 `.ps1`이 막히면 `.\Start-AgentLens.cmd -SamplesOnly`를 쓰세요. [http://127.0.0.1:8765](http://127.0.0.1:8765)가 열리면 **배우기**에서 1강을 시작하세요. 모델을 설치하지 않아도 16개의 실제 실행 기록과 14개 강의를 볼 수 있습니다.
+[http://127.0.0.1:8765](http://127.0.0.1:8765)가 열리면 **배우기**에서 1강을 시작하세요. 모델을 설치하지 않아도 16개의 실제 실행 기록과 14개 강의를 볼 수 있습니다.
 
 ### 로컬 모델로 직접 실행
 
@@ -48,10 +48,10 @@ cd LLM-Agent-viewer
 
 | 실행기 | 명령 | 용도 |
 | --- | --- | --- |
-| Python · Qwen3-0.6B | `.\Start-AgentLens.ps1` | CPU에서 토큰별 연산과 텐서 관찰 |
-| llama.cpp · Qwen3-4B | `.\Start-AgentLens.ps1 -Backend llama` | 파일 작업과 도구 호출, Vulkan 가속 |
+| Python · Qwen3-0.6B | `.\Start-AgentLens.cmd` | CPU에서 토큰별 연산과 텐서 관찰 |
+| llama.cpp · Qwen3-4B | `.\Start-AgentLens.cmd -Backend llama` | 파일 작업과 도구 호출, Vulkan 가속 |
 
-종료는 `.\Stop-AgentLens.ps1`입니다. 설치 옵션과 Linux/macOS 수동 실행은 [설치 안내](docs/SETUP.md)를 참고하세요.
+종료는 `.\Stop-AgentLens.cmd`입니다. 설치 옵션과 Linux/macOS 수동 실행은 [설치 안내](docs/SETUP.md)를 참고하세요.
 
 ## 배울 수 있는 것
 

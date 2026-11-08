@@ -19,8 +19,9 @@ To run your own prompts on Windows x64 with Git and [uv](https://docs.astral.sh/
 ```powershell
 git clone https://github.com/paconal888-a11y/LLM-Agent-viewer.git
 cd LLM-Agent-viewer
-.\Start-AgentLens.ps1 -SamplesOnly          # replay only, no model
-.\Start-AgentLens.ps1 -Backend llama        # Qwen3-4B on llama.cpp, downloaded on first run
+.\Start-AgentLens.cmd -SamplesOnly          # replay only, no model
+.\Start-AgentLens.cmd -Backend llama        # Qwen3-4B on llama.cpp, downloaded on first run
+.\Stop-AgentLens.cmd                        # stop what the launcher started
 ```
 
 Inference stays on your machine. There is no fallback to a cloud API. Linux and macOS need [manual setup](docs/SETUP.md).
