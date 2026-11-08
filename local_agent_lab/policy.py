@@ -75,12 +75,16 @@ def validate_tool_call(run, workspace, allowed, call, parent):
     if selected is None:
         raise ValueError("현재 구성에서 공개하지 않은 도구입니다.")
     if (
-        run.mode == "plan"
-        and name.startswith("mcp_")
+        name.startswith("mcp_")
+        and not run.features.get("writes")
         and name not in getattr(run, "mcp_read_only_tools", set())
     ):
+        # 공개 목록(tools_for)과 별개로 실행 경계에서 다시 검사한다. 계획 모드는 쓰기 권한이 꺼진
+        # 실행의 한 경우이며, 서버의 readOnlyHint가 아니라 호스트의 read_only_tools가 기준이다.
         raise ValueError(
             "계획 모드에서는 호스트가 읽기·계산 전용으로 분류한 MCP 도구만 실행합니다."
+            if run.mode == "plan"
+            else "쓰기 권한이 꺼진 실행에서는 호스트가 읽기·계산 전용으로 분류한 MCP 도구만 실행합니다."
         )
     schema = selected["function"]["parameters"]
     if not isinstance(args, dict):

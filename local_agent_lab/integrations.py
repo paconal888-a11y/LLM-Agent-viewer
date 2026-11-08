@@ -112,20 +112,45 @@ def prepare_mcp(run, config):
         or not all(isinstance(name, str) for name in allowed)
     ):
         raise ValueError("allow_tools는 서버 도구 이름의 목록이어야 합니다.")
+    policy = "allow_tools"
+    if allowed is None:
+        # 허용 목록이 없으면 서버가 광고한 도구를 자동으로 공개하지 않는다(기본 거부).
+        # 서버 쪽 도구 목록이 늘어나도 호스트가 명시하지 않은 도구는 모델에 보이지 않는다.
+        policy = "deny_without_allow_tools"
+        allowed = []
+        run.emit(
+            "mcp.policy",
+            "MCP 허용 목록 없음 · 기본 거부",
+            "integrations.json의 mcp 프로필에 allow_tools가 없습니다. 서버가 광고한 도구를 자동으로 공개하지 않습니다. 공개할 원본 도구 이름을 allow_tools에 적고, 쓰기 권한이 꺼진 실행에서도 쓰려면 read_only_tools에도 적으세요.",
+            category="integrations",
+            actor="validator",
+            input={"server": prefix, "advertised": [t.get("name") for t in response.get("tools", [])]},
+            output={"policy": policy, "exposed": []},
+        )
+    writes_allowed = bool(run.features.get("writes"))
     for tool in response.get("tools", []):
         remote = tool.get("name", "")
-        if run.mode == "plan" and remote not in read_only:
+        if not writes_allowed and remote not in read_only:
+            # 계획 모드는 쓰기 권한을 끈다. 쓰기 권한이 꺼진 다른 모드에서도 같은 기준을 적용해
+            # 내장 write_file만 숨기고 외부 쓰기 도구는 노출하는 불일치를 막는다.
+            reason = (
+                "plan_requires_host_read_only"
+                if run.mode == "plan"
+                else "writes_off_requires_host_read_only"
+            )
             run.emit(
                 "mcp.tool.filtered",
-                "계획 모드에서 외부 도구 제외",
-                "호스트 설정의 read_only_tools에 없는 외부 도구입니다. 서버의 readOnlyHint만으로 권한을 부여하지 않습니다.",
+                "계획 모드에서 외부 도구 제외"
+                if run.mode == "plan"
+                else "쓰기 권한이 꺼진 실행에서 외부 도구 제외",
+                "호스트 설정의 read_only_tools에 없는 외부 도구입니다. 서버의 readOnlyHint만으로 권한을 부여하지 않습니다. 쓰기 권한을 켜거나 서버 구현을 확인한 뒤 read_only_tools에 등록하세요.",
                 category="integrations",
                 actor="validator",
                 input=tool,
-                output={"exposed": False, "reason": "plan_requires_host_read_only"},
+                output={"exposed": False, "reason": reason},
             )
             continue
-        if allowed is not None and remote not in allowed:
+        if remote not in allowed:
             run.emit(
                 "mcp.tool.filtered",
                 "MCP 도구 공개 범위에서 제외",
@@ -183,6 +208,9 @@ def prepare_mcp(run, config):
             if getattr(client, "legacy_mcp", False)
             else MCP_VERSION,
             "tools": exposed,
+            "policy": policy,
+            "allow_tools": list(allowed),
+            "read_only_tools": list(read_only),
             "discovery": info,
         }
     )

@@ -117,6 +117,116 @@ class IntegrationTests(unittest.TestCase):
             )
         )
 
+    def write_external_server(self, tools):
+        script = self.workspace / "server.py"
+        script.write_text(
+            "import json, sys\n"
+            "from pathlib import Path\n"
+            "TOOLS = " + json.dumps(tools) + "\n"
+            "for line in sys.stdin:\n"
+            "    m = json.loads(line)\n"
+            "    method = m['method']\n"
+            "    if method == 'server/discover':\n"
+            "        result = {'supportedVersions': ['2026-07-28']}\n"
+            "    elif method == 'tools/list':\n"
+            "        result = {'tools': TOOLS}\n"
+            "    else:\n"
+            "        Path(__file__).with_name('marker.txt').write_text(m['params']['name'])\n"
+            "        result = {'structuredContent': {'written': True}}\n"
+            "    print(json.dumps({'jsonrpc': '2.0', 'id': m['id'], 'result': result}), flush=True)\n",
+            encoding="utf-8",
+        )
+        return script
+
+    def write_external_config(self, script, **profile):
+        (self.workspace / "integrations.json").write_text(
+            json.dumps(
+                {
+                    "mcp": {
+                        "name": "external",
+                        "command": "{python}",
+                        "args": ["-u", str(script)],
+                        **profile,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    def test_missing_allow_tools_exposes_nothing_and_records_the_policy(self):
+        script = self.write_external_server(
+            [
+                {"name": "write_marker", "inputSchema": {"type": "object", "properties": {}}},
+                {"name": "read_marker", "inputSchema": {"type": "object", "properties": {}}},
+            ]
+        )
+        self.write_external_config(script, read_only_tools=["read_marker"])
+        run = Run("no allowlist", "mcp-missing-allowlist", features={"mcp": True, "writes": True})
+        prepare(run, self.workspace)
+        self.assertEqual(run.extra_tools, [])
+        self.assertFalse(
+            any(n.startswith("mcp_") for n in (t["function"]["name"] for t in tools_for(run)))
+        )
+        policy = next(e for e in run.events if e["kind"] == "mcp.policy")
+        self.assertEqual(policy["output"]["policy"], "deny_without_allow_tools")
+        self.assertEqual(
+            sorted(policy["input"]["advertised"]), ["read_marker", "write_marker"]
+        )
+        filtered = [e["output"]["reason"] for e in run.events if e["kind"] == "mcp.tool.filtered"]
+        self.assertEqual(filtered, ["allow_tools", "allow_tools"])
+        self.assertEqual(run.integration_info[0]["policy"], "deny_without_allow_tools")
+        self.assertEqual(run.integration_info[0]["allow_tools"], [])
+        for name in ("mcp_external_write_marker", "mcp_external_read_marker"):
+            self.assertFalse(self.call(run, name)["executed_successfully"])
+        self.assertFalse((self.workspace / "marker.txt").exists())
+
+    def test_writes_off_hides_external_tools_not_declared_read_only(self):
+        script = self.write_external_server(
+            [
+                {"name": "write_marker", "inputSchema": {"type": "object", "properties": {}}},
+                {"name": "read_marker", "inputSchema": {"type": "object", "properties": {}}},
+            ]
+        )
+        self.write_external_config(
+            script,
+            allow_tools=["write_marker", "read_marker"],
+            read_only_tools=["read_marker"],
+        )
+        run = Run("single, writes off", "mcp-writes-off", features={"mcp": True, "writes": False})
+        prepare(run, self.workspace)
+        names = [t["function"]["name"] for t in tools_for(run)]
+        self.assertIn("mcp_external_read_marker", names)
+        self.assertNotIn("mcp_external_write_marker", names)
+        self.assertNotIn("write_file", names)
+        reasons = {
+            e["input"]["name"]: e["output"]["reason"]
+            for e in run.events
+            if e["kind"] == "mcp.tool.filtered"
+        }
+        self.assertEqual(reasons, {"write_marker": "writes_off_requires_host_read_only"})
+        # 공개 목록이 우회돼도 실행 경계에서 같은 기준을 다시 적용한다.
+        run.extra_tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": "mcp_external_write_marker",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            }
+        )
+        result = self.call(run, "mcp_external_write_marker")
+        self.assertFalse(result["executed_successfully"])
+        self.assertFalse((self.workspace / "marker.txt").exists())
+        close_all()
+        # 쓰기 권한을 켜면 허용 목록의 쓰기 도구가 공개되고 실제로 실행된다.
+        run = Run("single, writes on", "mcp-writes-on", features={"mcp": True, "writes": True})
+        prepare(run, self.workspace)
+        names = [t["function"]["name"] for t in tools_for(run)]
+        self.assertIn("mcp_external_write_marker", names)
+        self.assertIn("write_file", names)
+        self.assertTrue(self.call(run, "mcp_external_write_marker")["data"]["written"])
+        self.assertEqual((self.workspace / "marker.txt").read_text(), "write_marker")
+
     def test_plan_rejects_external_write_despite_server_read_only_hint(self):
         script = self.workspace / "server.py"
         script.write_text(
