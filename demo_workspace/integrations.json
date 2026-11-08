@@ -1,0 +1,13 @@
+{
+  "mcp": {
+    "name": "math",
+    "allow_tools": ["add"],
+    "command": "{python}",
+    "args": ["-u", "-m", "local_agent_lab.demo_mcp_server"]
+  },
+  "lsp": {
+    "name": "python-lsp-server",
+    "command": "{python}",
+    "args": ["-u", "-m", "pylsp"]
+  }
+}

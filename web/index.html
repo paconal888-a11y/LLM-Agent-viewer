@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#f4f5f7" />
+    <title>Agent Lens</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/workbench.css" />
+    <link rel="stylesheet" href="/diagram.css" />
+    <script src="/architecture.js" defer></script>
+    <script src="/workbench.js" defer></script>
+  </head>
+  <body>
+    <header class="appbar">
+      <button id="menu" class="icon mobile" aria-label="프로젝트 열기">
+        ☰</button
+      ><a href="/" class="brand"
+        ><span class="brandmark">a</span> Agent Lens <small>실행 분석</small></a
+      >
+      <div class="connection">
+        <i id="statusDot"></i><span id="connection">모델 확인 중</span>
+      </div>
+      <button id="help" class="quiet">사용 안내</button>
+    </header>
+    <div id="activityBar" class="activitybar hidden" role="status"></div>
+    <div class="layout diagram-layout">
+      <aside class="project" id="project">
+        <div class="project-title">
+          <strong>프로젝트</strong
+          ><button
+            id="closeProject"
+            class="icon mobile"
+            aria-label="프로젝트 닫기"
+          >
+            ×
+          </button>
+        </div>
+        <nav class="mainnav">
+          <button data-view="journey" class="active">
+            ◉ <span>구조 · 실행</span></button
+          ><button data-view="learn">▦ <span>구성 · 비교</span></button>
+          <button data-view="feedback">↺ <span>오류 · 기억</span></button>
+          <button data-view="memory">▤ <span>대화 저장소</span></button>
+        </nav>
+        <div class="treeheading">
+          파일
+          <button id="reloadFiles" class="icon" aria-label="파일 목록 새로고침">
+            ↻
+          </button>
+        </div>
+        <div id="fileTree" class="filetree"></div>
+        <details class="registeredtools">
+          <summary>등록된 도구 <span id="toolCount">0</span></summary>
+          <div id="toolList"></div>
+        </details>
+        <div class="treeheading">
+          최근 실행
+          <button
+            id="refreshHistory"
+            class="icon"
+            aria-label="실행 기록 새로고침"
+          >
+            ↻
+          </button>
+        </div>
+        <div id="history" class="history"></div>
+        <div class="treeheading">예제 기록</div>
+        <div id="samples" class="history"></div>
+        <footer>
+          모델과 기록은 이 PC에 저장됩니다.<br />외부 API로 자동 전환하지
+          않습니다.
+        </footer>
+      </aside>
+      <main class="main">
+        <div class="workspacebar">
+          <div class="breadcrumbs">
+            로컬 프로젝트 <span>/</span>
+            <strong id="pageName">구조 · 실행</strong>
+          </div>
+          <button id="newSession" class="quiet">＋ 새 대화</button>
+        </div>
+        <section id="journeyView" class="view">
+          <div id="sampleBanner" class="samplebanner hidden"></div>
+          <div id="requestSummary" class="requestsummary hidden">
+            <header>
+              <span>현재 요청</span
+              ><button id="editPrompt" class="quiet">
+                입력 · 설정 편집 ↗
+              </button>
+            </header>
+            <p id="summaryPrompt"></p>
+            <small id="summaryMeta"></small>
+          </div>
+          <div class="pageintro">
+            <div>
+              <h1>에이전트 구조</h1>
+              <p>단계를 이동하면 실행 위치와 데이터가 구조도에 표시됩니다.</p>
+            </div>
+          </div>
+          <form id="promptForm" class="composer">
+            <div class="modebar">
+              <label for="agentMode">작업 방식</label
+              ><select id="agentMode">
+                <option value="single">한 에이전트</option>
+                <option value="plan">계획만 · 파일 수정 금지</option>
+                <option value="deep">한 에이전트 · 집중 점검</option>
+                <option value="team">주 에이전트 + 하위 에이전트</option>
+              </select>
+            </div>
+            <p id="modeNote" class="note">
+              한 대화에서 모델과 도구를 반복 호출합니다. 최대 8회 호출합니다.
+            </p>
+            <label for="prompt">요청</label
+            ><textarea
+              id="prompt"
+              rows="3"
+              maxlength="6000"
+              placeholder="에이전트에게 시킬 일을 입력하세요."
+            >
+add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</textarea
+            >
+            <div id="draftInfo" class="draftinfo">
+              입력한 문자열은 실행할 때 JSON 요청에 담깁니다.
+            </div>
+            <div class="composer-bottom">
+              <label class="check"
+                ><input id="stepMode" type="checkbox" />실제 실행을 단계마다
+                멈추기</label
+              ><button type="submit" class="primary" id="run" disabled>
+                ▶ 실행 <kbd>Ctrl ↵</kbd>
+              </button>
+            </div>
+          </form>
+          <div class="run-options">
+            <details class="examples">
+              <summary>예제</summary>
+              <div class="examplebuttons">
+                <button data-example="tool">계산 도구</button
+                ><button data-example="rules">규칙 읽기</button
+                ><button data-example="skill">스킬 · 파일 읽기</button
+                ><button data-example="command">/명령어</button
+                ><button data-example="write">파일 수정 · 검사</button>
+                <button data-example="mcp">MCP 계산</button
+                ><button data-example="lsp">LSP 진단</button
+                ><button data-example="plan">계획 · 문서 검색</button>
+                <button data-example="team">하위 작업</button>
+              </div>
+            </details>
+            <details class="configuration" id="configuration">
+              <summary>
+                <span>실행 설정</span
+                ><span id="configSummary">Python 실행기 · 하네스</span>
+              </summary>
+              <div class="configbody">
+                <label class="field"
+                  >모델 실행기<select id="backend">
+                    <option value="reference">
+                      교육용 · Python / Qwen3 0.6B
+                    </option>
+                    <option value="llama">
+                      빠른 실행 · llama.cpp / Qwen3 4B
+                    </option>
+                  </select></label
+                >
+                <p id="backendNote" class="note"></p>
+                <div class="configline">
+                  <strong>하네스</strong
+                  ><button id="baseline" class="quiet">모델만</button
+                  ><button id="full" class="quiet">모두 연결</button>
+                </div>
+                <div id="features" class="switches"></div>
+                <label class="field"
+                  >완료 조건 · 실제 도구 결과와 대조하는 JSON<textarea
+                    id="requirements"
+                    rows="3"
+                    spellcheck="false"
+                  >
+[{"tool":"add_numbers","arguments":{"a":137,"b":248}}]</textarea
+                  >
+                </label>
+                <p class="note">
+                  예제는 필요한 도구 조건을 함께 설정합니다. 요청을 직접 고치면
+                  이전 예제 조건이 해제됩니다. []는 별도 조건 없음이며, 모델의
+                  말만으로 실제 작업 성공을 보증하지 않습니다.
+                </p>
+                <div class="configgrid">
+                  <label class="check"
+                    ><input type="checkbox" id="useKv" checked />생성 중 KV
+                    사용</label
+                  ><label class="check"
+                    ><input type="checkbox" id="prefixCache" checked />요청 간
+                    접두부 재사용</label
+                  ><label class="field"
+                    >최대 출력 토큰<input
+                      type="number"
+                      id="maxTokens"
+                      min="1"
+                      max="1024"
+                      value="256" /></label
+                  ><label class="field"
+                    >Temperature<input
+                      type="number"
+                      id="temperature"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value="0.2" /></label
+                  ><label class="field"
+                    >관찰할 레이어 (0–27)<input
+                      type="number"
+                      id="captureLayer"
+                      min="0"
+                      max="27"
+                      value="0" /></label
+                  ><label class="check"
+                    ><input type="checkbox" id="stream" checked />HTTP 스트리밍
+                    (빠른 실행기)</label
+                  >
+                </div>
+              </div>
+            </details>
+          </div>
+          <section class="execution" aria-label="전체 실행 과정">
+            <div class="sectionbar">
+              <h2>전체 구조 <span id="runStatus" class="status">대기</span></h2>
+              <div>
+                <button id="zoomOut" class="quiet" aria-label="구조도 축소">
+                  −</button
+                ><button id="zoomFit" class="quiet">전체 보기</button
+                ><button id="zoomIn" class="quiet" aria-label="구조도 확대">
+                  ＋
+                </button>
+                <button id="toggleRecords" class="quiet">기록</button>
+                <button id="showAnswer" class="quiet" disabled>답변</button>
+                <button id="export" class="quiet" disabled>내보내기</button
+                ><button id="openDetail" class="quiet">코드 · 데이터</button>
+              </div>
+            </div>
+            <div class="diagram-caption">
+              <span id="diagramLocation"
+                >구성 요소를 선택하면 역할과 코드를 볼 수 있습니다.</span
+              ><select
+                id="agentFocus"
+                class="hidden"
+                aria-label="관찰할 에이전트"
+              ></select
+              ><span>● 현재 위치 <i>— 연결 구조</i></span>
+            </div>
+            <div id="architecture" class="architecture"></div>
+            <div id="currentStep" class="currentstep">
+              <strong>실행 대기</strong
+              ><span>요청을 실행하거나 왼쪽 예제 기록을 선택하세요.</span>
+            </div>
+            <div class="route" id="route"></div>
+            <div id="connections" class="connections hidden"></div>
+            <div id="agentPanel" class="agentpanel hidden"></div>
+            <div id="controls" class="controls hidden">
+              <span id="controlState"></span>
+              <div>
+                <button id="next" class="secondary">다음 단계 →</button
+                ><button id="continue" class="secondary">계속 실행</button
+                ><button id="stop" class="quiet danger">중지</button>
+              </div>
+            </div>
+            <div class="replay">
+              <button id="first" aria-label="첫 단계">|‹</button
+              ><button id="prev" aria-label="이전 단계">‹</button
+              ><button id="play" aria-label="기록 재생">▶</button
+              ><button id="nextEvent" aria-label="다음 기록">›</button
+              ><input
+                id="scrubber"
+                type="range"
+                min="0"
+                max="0"
+                value="0"
+                aria-label="기록 위치"
+              /><span id="position">0 / 0</span><button id="live">최신</button>
+            </div>
+            <div id="contextComposition" class="composition hidden"></div>
+            <div id="planPanel" class="planpanel hidden"></div>
+            <div class="eventtoolbar">
+              <input
+                id="eventSearch"
+                type="search"
+                placeholder="단계 이름 · 파일 · 도구 찾기"
+                aria-label="단계 검색"
+              /><span id="eventCount">기록 없음</span>
+            </div>
+            <div id="timeline" class="timeline">
+              <div class="empty">
+                <span class="emptyglyph">→</span>
+                <h3>위에서 요청을 실행하세요.</h3>
+                <p>
+                  입력 수신 → 파일 읽기 → 메시지 조립 → 모델 계산 → 도구 실행 →
+                  완료 검사.<br />실제로 거친 단계만 기록됩니다.
+                </p>
+              </div>
+            </div>
+          </section>
+          <section id="answerPanel" class="answer hidden">
+            <div class="sectionbar">
+              <h2>최종 응답</h2>
+              <span id="answerMeta"></span>
+            </div>
+            <div id="answer"></div>
+            <div id="metrics" class="metrics"></div>
+          </section>
+        </section>
+        <section id="memoryView" class="view hidden">
+          <div class="pageintro">
+            <div>
+              <h1>대화 저장소</h1>
+              <p>디스크 원본, 요약, 모델에 보낸 입력을 대조합니다.</p>
+            </div>
+            <button id="reloadMemory" class="secondary">새로 읽기</button>
+          </div>
+          <div id="memoryStorage"></div>
+        </section>
+        <section id="editorView" class="view hidden">
+          <div class="pageintro">
+            <div>
+              <p class="eyebrow" id="editorKind">PROJECT FILE</p>
+              <h1 id="editorTitle">파일 편집</h1>
+            </div>
+            <button class="secondary" data-view="journey">구조도로</button>
+          </div>
+          <div id="fileDescription" class="filedescription"></div>
+          <div class="editbar">
+            <span id="editState"></span>
+            <div>
+              <button id="checkFile" class="secondary">구문 검사</button
+              ><button id="showDiff" class="secondary">변경 확인</button
+              ><button id="saveFile" class="primary">저장</button
+              ><button id="undoFile" class="quiet" disabled>
+                직전 저장 되돌리기
+              </button>
+            </div>
+          </div>
+          <div class="codeeditor">
+            <div id="lineNumbers" aria-hidden="true"></div>
+            <textarea
+              id="codeEditor"
+              spellcheck="false"
+              aria-label="파일 내용"
+            ></textarea>
+          </div>
+          <div id="editMessage" class="notice" role="status"></div>
+          <div id="diff" class="diff hidden"></div>
+          <p class="note">
+            Python 변경은 다음 실행에 적용됩니다. 실행 기록에는 당시의 코드가
+            보존됩니다. 구문 검사는 동작의 정확성까지 보장하지 않습니다.
+          </p>
+        </section>
+        <section id="feedbackView" class="view hidden">
+          <div class="pageintro">
+            <div>
+              <p class="eyebrow">ERROR → FEEDBACK → NEXT CALL</p>
+              <h1>오류와 기억</h1>
+              <p>틀린 답변, 추가한 메시지, 실제 후속 행동을 대조합니다.</p>
+            </div>
+          </div>
+          <div class="feedbackcontrols">
+            <label class="field"
+              >살펴볼 실행<select id="feedbackRun"></select></label
+            ><button id="loadFeedback" class="secondary">불러오기</button>
+          </div>
+          <div id="feedbackReport">
+            <p class="note">
+              실행 기록을 선택하세요. 보완 지적이 없었던 실행도 그대로
+              표시합니다.
+            </p>
+          </div>
+          <div class="learning-path">
+            <strong>시간이 지나면 왜 반복할까?</strong>
+            <p>
+              이 하네스는 최근 두 대화 묶음을 다시 넣습니다. 지적이 오래된
+              대화와 함께 빠질 수 있습니다. 저장된 지적과 실제 messages의 일치를
+              위에서 확인하세요. ‘동일 요청 지적 재포함’을 켜면 같은 요청의
+              저장된 지적을 다시 전달합니다. 포함 여부와 실제 행동은 별도로
+              확인해야 합니다.
+            </p>
+            <p>
+              이 실행 경로에는 모델을 재학습하는 단계가 없습니다. 지적이 입력에
+              있어도 지시 충돌·모델 능력·출력 설정 등에 따라 실수할 수 있으며,
+              한 번 성공했다고 지속적인 학습이 일어났다고 판단하지 않습니다.
+            </p>
+          </div>
+        </section>
+        <section id="learnView" class="view hidden">
+          <div class="pageintro">
+            <div>
+              <p class="eyebrow">READ · CHANGE · RUN</p>
+              <h1>구성 설명</h1>
+              <p>
+                각 요소의 역할을 읽고, 파일을 바꾼 뒤 실행 기록으로 확인하세요.
+              </p>
+            </div>
+          </div>
+          <div class="learning-path">
+            <strong>처음이라면</strong>
+            <p>
+              ① 계산 도구 실행 → ② 도구 결과가 다음 모델 입력에 들어가는 지점
+              확인 → ③ AGENTS.md 수정 → ④ KV 비교 순서로 살펴보세요.
+            </p>
+          </div>
+          <div id="componentCards" class="componentcards"></div>
+          <section class="compare">
+            <div class="sectionbar">
+              <h2>실습 문제</h2>
+            </div>
+            <details>
+              <summary>AGENTS.md를 실제로 여는 주체는 누구일까?</summary>
+              <p class="note">
+                규칙 로더를 작성한 하네스입니다. file.open → file.read →
+                rules.wrap → context.assemble의 코드와 messages를 확인하세요.
+              </p>
+            </details>
+            <details>
+              <summary>
+                모델이 “도구를 썼다”고 답하면 실제로 실행한 것일까?
+              </summary>
+              <p class="note">
+                tool.dispatch는 요청이고 tool.result가 실제 함수 결과입니다.
+                답변 문장·계획 체크·검증 게이트를 각각 대조하세요.
+              </p>
+            </details>
+            <details>
+              <summary>지적을 저장했다면 다음에도 항상 알고 있을까?</summary>
+              <p class="note">
+                저장 파일과 현재 모델 입력은 별개입니다. 오류·지적·기억 화면의
+                입력 포함 여부와 실제 후속 행동을 따로 확인하세요.
+              </p>
+            </details>
+            <details>
+              <summary>
+                구문 검사가 통과하면 정의되지 않은 이름도 없을까?
+              </summary>
+              <p class="note">
+                lsp_demo.py로 직접 비교하세요. compile은 통과하지만 언어 서버의
+                pyflakes 진단은 missing_amount를 찾습니다.
+              </p>
+            </details>
+          </section>
+          <section class="compare">
+            <div class="sectionbar">
+              <h2>같은 요청으로 비교</h2>
+              <span>두 번의 실제 실행</span>
+            </div>
+            <label class="field"
+              >확인할 차이<select id="experimentCase">
+                <option value="arithmetic">
+                  도구 없는 모델 ↔ 하네스 연결
+                </option>
+                <option value="grounding">
+                  파일 근거 없이 ↔ 파일을 읽고 답변
+                </option>
+                <option value="kv_cache">
+                  동일 입력 · 접두부 재사용 끄기 ↔ 켜기
+                </option>
+                <option value="decode_kv">
+                  생성 중 KV 끄기 ↔ 켜기 (교육용)
+                </option>
+                <option value="mcp_tools">MCP 도구 연결 전 ↔ 후</option>
+                <option value="lsp_diagnostics">LSP 진단 연결 전 ↔ 후</option>
+                <option value="agent_deep">한 에이전트 ↔ 집중 점검</option>
+                <option value="agent_team">
+                  한 에이전트 ↔ 하위 에이전트 위임
+                </option>
+              </select></label
+            >
+            <p id="experimentDescription" class="note"></p>
+            <button id="startCompare" disabled class="primary">비교 실행</button
+            ><button id="stopCompare" class="quiet hidden">비교 중지</button>
+            <div id="compareResult"></div>
+          </section>
+        </section>
+      </main>
+      <aside class="inspector" id="inspector">
+        <div class="inspectbar">
+          <strong>단계 상세</strong><span id="detailIndex"></span
+          ><button id="closeDetail" class="icon" aria-label="단계 상세 닫기">
+            ×
+          </button>
+        </div>
+        <div id="detailEmpty" class="inspectempty">
+          <span>⌖</span>
+          <h3>실행 기록을 선택하세요.</h3>
+          <p>
+            이 단계에서 바뀐 데이터와 실제 실행한 코드 줄을 함께 보여줍니다.
+          </p>
+          <div class="actorlegend">
+            <p><b>H</b> 하네스 · 입력 구성과 실행 제어</p>
+            <p><b>M</b> 모델 · 토큰과 행동 요청 생성</p>
+            <p><b>T</b> 도구 · 실제 작업 수행</p>
+          </div>
+        </div>
+        <div id="detailBody" class="hidden">
+          <div class="detailhead">
+            <span id="detailActor" class="pill"></span>
+            <h2 id="detailTitle"></h2>
+            <code id="detailKind"></code>
+            <code id="detailPath" class="storage-path hidden"></code>
+            <p id="detailExplanation"></p>
+          </div>
+          <div id="componentNavigator" class="componentnav hidden"></div>
+          <nav class="detailtabs">
+            <button data-detail="change" class="active">데이터 변화</button
+            ><button data-detail="code">실행 코드</button
+            ><button data-detail="values">전체 값</button>
+          </nav>
+          <div id="sourcePeek" class="sourcepeek hidden"></div>
+          <div id="detailContent" class="detailcontent"></div>
+        </div>
+      </aside>
+    </div>
+    <dialog id="guide">
+      <div class="dialogbar">
+        <h2>사용 안내</h2>
+        <button id="closeGuide" class="icon" aria-label="안내 닫기">×</button>
+      </div>
+      <p>
+        이 앱은 프롬프트가 실제 행동으로 이어지는 과정을 기록합니다. 모델의
+        숨겨진 생각을 읽는 기능은 아닙니다.
+      </p>
+      <ol>
+        <li>
+          <strong>기록부터 보기</strong> — 왼쪽 실제 실행 샘플은 모델 설치
+          없이도 재생할 수 있습니다. 저장 기록과 지금 실행하는 계산을 구분해
+          표시합니다.
+        </li>
+        <li>
+          <strong>실행</strong> — 예제를 선택하고 실행하세요. 하네스가 실제
+          파일을 읽고 로컬 모델을 호출합니다.
+        </li>
+        <li>
+          <strong>따라가기</strong> — 단계나 재생 막대를 선택하세요.
+          데이터·파일·코드가 같은 시점을 가리킵니다.
+        </li>
+        <li>
+          <strong>멈추기</strong> — 실행 전에 단계 정지를 켜세요. 교육용은 실제
+          forward 내부 관찰 지점에서도 멈춥니다. 빠른 실행기는 하네스 쪽에서
+          멈춥니다.
+        </li>
+        <li>
+          <strong>바꾸기</strong> — 왼쪽 파일을 열어 수정·검사·저장하세요. 다음
+          실행에서 변경을 확인할 수 있습니다.
+        </li>
+        <li>
+          <strong>비교</strong> — 구성 설명의 비교 실험에서 실제 호출 수·입력
+          토큰·계산 시간을 확인하세요.
+        </li>
+        <li>
+          <strong>모드</strong> — 작업 방식을 바꿔 지침·권한·예산·대화 분리의
+          차이를 확인하세요. 구조도 위 에이전트 선택은 해당 대화의 마지막
+          기록으로 이동합니다.
+        </li>
+      </ol>
+      <p class="note">
+        텐서는 선택한 레이어·head·위치의 표본입니다. 전체 값의 범위와 실제 캐시
+        측정치는 각 단계에 표시됩니다. 기록에는 입력과 파일 내용이 포함되므로
+        공유 전에 확인하세요.
+      </p>
+    </dialog>
+    <div id="toast" role="status" class="toast hidden"></div>
+  </body>
+</html>

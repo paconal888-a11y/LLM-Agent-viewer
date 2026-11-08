@@ -1,0 +1,1019 @@
+/* 구조도가 중심인 작업 화면. 기록과 상세 패널은 필요할 때 연다. */
+:root {
+  --bg: #edf0f4;
+  --ink: #202d3b;
+  --muted: #637080;
+  font-size: 14px;
+}
+body {
+  overflow: hidden;
+}
+.appbar {
+  height: 49px;
+  padding: 0 17px;
+  background: #fff;
+}
+.brand {
+  font-size: 16px;
+}
+.brandmark {
+  width: 25px;
+  height: 25px;
+  font-size: 21px;
+  border-radius: 5px;
+}
+.layout {
+  height: calc(100dvh - 49px);
+  grid-template-columns: 204px minmax(0, 1fr) !important;
+  max-width: none;
+  align-items: stretch;
+}
+.has-activity .layout {
+  height: calc(100dvh - 91px);
+}
+.project {
+  position: relative;
+  top: 0;
+  height: 100%;
+  width: auto;
+  padding: 14px 10px;
+  background: #f7f9fc;
+}
+.main {
+  min-width: 0;
+  height: 100%;
+  overflow: auto;
+  padding: 0 18px 24px;
+  max-width: none !important;
+}
+.workspacebar {
+  height: 35px;
+  min-height: 35px;
+  margin: 0;
+  padding: 0;
+}
+.breadcrumbs {
+  font-size: 11px;
+}
+.eyebrow {
+  display: none;
+}
+.pageintro h1 {
+  font-size: 23px;
+  letter-spacing: -0.6px;
+}
+.pageintro p:not(.eyebrow) {
+  font-size: 13px;
+}
+.mainnav button {
+  font-size: 12px;
+}
+.treeheading {
+  font-size: 11px;
+}
+.filetree button {
+  font-size: 11px;
+}
+.history button {
+  font-size: 11px;
+}
+.quiet,
+.secondary,
+.primary {
+  font-size: 12px;
+}
+.inspector {
+  display: none;
+  position: fixed;
+  top: 49px;
+  right: 0;
+  width: min(460px, 48vw);
+  height: calc(100dvh - 49px);
+  z-index: 40;
+  background: #fff;
+  border-left: 1px solid #c9d1dd;
+  box-shadow: -10px 0 30px #20304012;
+}
+.inspector.open {
+  display: block !important;
+}
+.has-activity .inspector {
+  top: 91px;
+  height: calc(100dvh - 91px);
+}
+#closeDetail {
+  display: inline-grid !important;
+}
+.detailhead h2 {
+  font-size: 18px;
+}
+.detailhead p {
+  font-size: 12px;
+  line-height: 1.75;
+}
+.detailtabs button {
+  font-size: 12px;
+}
+.datalabel {
+  font-size: 11px;
+}
+.databox pre {
+  font-size: 11px;
+}
+.codeline {
+  font-size: 11px;
+}
+.sourcepeek {
+  font-size: 11px;
+}
+.activitybar {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+  background: #fff4d9;
+  color: #714e13;
+  border-bottom: 1px solid #e8d6aa;
+  font-size: 12px;
+}
+.activitybar strong {
+  white-space: nowrap;
+}
+.activitybar button {
+  background: #fff;
+  border: 1px solid #d8c7a0;
+  border-radius: 4px;
+  padding: 4px 11px;
+  white-space: nowrap;
+}
+.activity-prompt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.activity-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #a17b2c;
+}
+.diagram-layout .main {
+  overflow: hidden;
+  padding: 0 14px 10px;
+}
+#journeyView {
+  height: calc(100% - 35px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+#journeyView .pageintro {
+  display: none;
+}
+#journeyView .samplebanner {
+  padding: 7px 12px;
+  margin: 0;
+  min-height: 29px;
+  font-size: 11px;
+  border-radius: 4px;
+}
+#journeyView .samplebanner p,
+#journeyView .samplebanner small {
+  display: none;
+}
+#journeyView .requestsummary {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: none;
+}
+#journeyView .requestsummary p {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 2px 0;
+  line-height: 1.6;
+}
+#journeyView .requestsummary header {
+  margin: 0;
+}
+#journeyView .requestsummary small {
+  font-size: 10px;
+  margin-top: 0;
+}
+#journeyView.focus .execution > .sectionbar {
+  margin-bottom: 0;
+}
+#journeyView.focus .requestsummary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 20px 16px;
+  padding: 6px 12px;
+}
+#journeyView.focus .requestsummary header {
+  display: contents;
+}
+#journeyView.focus .requestsummary header > span {
+  display: none;
+}
+#journeyView.focus .requestsummary button {
+  grid-column: 2;
+  grid-row: 1 / 3;
+}
+#journeyView.focus .requestsummary p {
+  grid-column: 1;
+  grid-row: 1;
+  margin: 0;
+}
+#journeyView.focus .requestsummary small {
+  grid-column: 1;
+  grid-row: 2;
+}
+.has-activity .execution .controls {
+  display: none;
+}
+#journeyView .composer {
+  padding: 10px 12px;
+  border-radius: 5px;
+  box-shadow: none;
+}
+#journeyView .composer textarea {
+  font-size: 13px;
+  min-height: 45px;
+  height: 45px;
+  padding: 5px 0;
+  resize: none;
+}
+#journeyView .modebar {
+  margin: 0;
+  float: right;
+  gap: 8px;
+}
+#journeyView .modebar select {
+  padding: 4px 6px;
+  font-size: 12px;
+}
+#journeyView #modeNote {
+  display: none;
+}
+#journeyView .draftinfo {
+  position: absolute;
+  left: 14px;
+  bottom: 0;
+  margin: 0;
+}
+#journeyView .composer-bottom {
+  padding-top: 6px;
+  border: 0;
+}
+#journeyView .examples {
+  padding: 0;
+  margin: 0;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+#journeyView .examples button {
+  padding: 4px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+#journeyView .configuration {
+  margin: 0;
+  border-radius: 4px;
+}
+#journeyView .configuration summary {
+  padding: 7px 11px;
+}
+#journeyView .configuration[open] {
+  position: absolute;
+  top: 40px;
+  right: 12px;
+  width: min(570px, 95%);
+  max-height: 75vh;
+  overflow: auto;
+  z-index: 25;
+  background: #fff;
+  border: 1px solid #bbc8db;
+  box-shadow: 0 12px 38px #22354d22;
+}
+.configbody p,
+.configbody .check {
+  font-size: 12px;
+}
+.configbody .field {
+  font-size: 12px;
+}
+#journeyView .execution {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: 0;
+}
+.execution > .sectionbar {
+  min-height: 33px;
+  height: 33px;
+  margin: 0;
+  padding: 0 2px;
+}
+.execution .sectionbar h2 {
+  font-size: 13px;
+}
+.execution .sectionbar > div {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.execution .sectionbar button {
+  padding: 4px 7px;
+  font-size: 11px;
+}
+#showAnswer.ready {
+  color: #187554;
+  background: #e6f3ed;
+  border-radius: 4px;
+}
+.diagram-caption {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+  padding: 1px 7px 5px;
+  font-size: 11px;
+  color: #456ba7;
+}
+.diagram-caption > span:first-child {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.diagram-caption select {
+  max-width: 180px;
+  padding: 2px 5px;
+  font-size: 11px;
+  border: 1px solid #d1dbe7;
+  border-radius: 3px;
+}
+.componentnav {
+  margin: 0 20px 8px;
+  display: grid;
+  gap: 5px;
+}
+.componentnav label {
+  font-size: 11px;
+  color: #65758a;
+}
+.componentnav select {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #d2dae6;
+  border-radius: 4px;
+  font-size: 12px;
+  background: #f8faff;
+  color: #2e4e7c;
+}
+.diagram-caption > span:last-child {
+  white-space: nowrap;
+  color: #5277bd;
+  font-size: 10px;
+}
+.diagram-caption i {
+  font-style: normal;
+  color: #7e8997;
+  padding-left: 10px;
+}
+.architecture {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #ced6e0;
+  border-radius: 6px 6px 0 0;
+  background: #fff;
+}
+.architecture > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+}
+.arch-group rect {
+  fill: #f7f9fc;
+  stroke: #dbe2eb;
+  stroke-width: 1;
+}
+.group-title {
+  font-size: 16px;
+  font-weight: 650;
+  fill: #47586c;
+}
+.group-sub {
+  font-size: 12px;
+  fill: #7b8795;
+}
+.arch-edges path {
+  stroke: #c0ccda;
+  stroke-width: 1.3;
+}
+#arch-arrow path {
+  fill: #b5c2d2;
+}
+#arch-hot-arrow path {
+  fill: #326cd4;
+}
+.arch-edges path.current {
+  stroke: #326cd4;
+  stroke-width: 2.5;
+}
+.arch-node {
+  cursor: pointer;
+  outline: none;
+}
+.arch-node rect {
+  fill: #fff;
+  stroke: #cbd5e1;
+  stroke-width: 1;
+  transition:
+    fill 0.15s,
+    stroke 0.15s;
+}
+.arch-node:hover rect,
+.arch-node:focus-visible rect {
+  fill: #f2f6fd;
+  stroke: #7995c2;
+}
+.arch-node.related rect {
+  stroke: #6688cb;
+  fill: #edf3ff;
+  stroke-width: 1.7;
+}
+.arch-node .node-title {
+  font-size: 16px;
+  font-weight: 600;
+  fill: #253951;
+}
+.arch-node .node-meta {
+  font-size: 11.5px;
+  fill: #687a90;
+}
+.arch-node .node-dot {
+  fill: #d8e0ea;
+}
+.arch-node.visited .node-dot {
+  fill: #89a7c3;
+}
+.arch-node.current rect {
+  fill: #edf4ff;
+  stroke: #326cd4;
+  stroke-width: 2;
+}
+.arch-node.current .node-dot {
+  fill: #326cd4;
+}
+.arch-node.current .node-meta {
+  fill: #2c5fae;
+  font-weight: 600;
+}
+.arch-node.unavailable rect {
+  fill: #f6f7f9;
+  stroke: #dce1e8;
+  stroke-dasharray: 3 3;
+}
+.arch-node.unavailable .node-title {
+  fill: #8a94a0;
+}
+.arch-node.unavailable .node-meta {
+  fill: #8a94a0;
+}
+.model-stage {
+  font-size: 11px;
+  fill: #8a96a6;
+}
+.arch-pulse {
+  pointer-events: none;
+}
+.arch-pulse circle {
+  fill: #326cd4;
+  stroke: #fff;
+  stroke-width: 2;
+}
+.currentstep {
+  background: #fff;
+  border: 1px solid #ced6e0;
+  border-top: 0;
+  border-radius: 0 0 5px 5px;
+  min-height: 72px;
+  padding: 7px 12px;
+}
+.stepheading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 23px;
+}
+.stepheading strong {
+  font-size: 12px;
+}
+.stepheading .quiet {
+  margin-left: auto;
+  font-size: 11px;
+}
+.stepnumber {
+  font: 11px var(--mono);
+  color: #6f7e91;
+}
+.steptransfer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 11px;
+  align-items: center;
+}
+.steptransfer > div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.steptransfer small {
+  color: #7c8c9f;
+  flex-shrink: 0;
+  font-size: 10px;
+}
+.steptransfer span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  color: #405574;
+}
+.steptransfer b {
+  color: #6c8abc;
+  font-weight: 400;
+}
+.execution .replay {
+  min-height: 37px;
+  margin: 0;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+}
+.replay > button {
+  font-size: 12px;
+}
+.execution .controls {
+  margin: 5px 0 0;
+  padding: 5px 10px;
+  min-height: 34px;
+  background: #eaf1fc;
+  border-radius: 4px;
+}
+.controls button {
+  padding: 4px 9px;
+  font-size: 11px;
+}
+.diagram-layout #route,
+.diagram-layout #connections,
+.diagram-layout #agentPanel,
+.diagram-layout #contextComposition,
+.diagram-layout #planPanel,
+.diagram-layout #answerPanel {
+  display: none !important;
+}
+.recordtray {
+  display: none;
+  height: 190px;
+  flex-shrink: 0;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #cfd7e2;
+  border-radius: 5px;
+  margin-top: 4px;
+}
+.records-open .recordtray {
+  display: block;
+}
+.recordtray .eventtoolbar {
+  margin: 0;
+  padding: 7px 10px;
+  background: #f7f9fc;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.recordtray .event {
+  min-height: 42px;
+}
+.recordtray .eventtitle {
+  font-size: 12px;
+}
+.recordtray .eventsub,
+.recordtray .eventid {
+  font-size: 10px;
+}
+.recordtray .chapter > summary {
+  font-size: 12px;
+}
+.recordtray #timeline {
+  max-height: none;
+  padding: 0 8px 8px;
+}
+.answer-readout {
+  white-space: pre-wrap;
+  line-height: 1.8;
+  font-size: 13px;
+}
+@media (min-width: 1700px) {
+  .layout {
+    grid-template-columns: 220px minmax(0, 1fr) !important;
+  }
+  .diagram-layout .main {
+    padding: 0 24px 12px;
+  }
+  .inspector {
+    width: 490px;
+  }
+}
+@media (min-width: 1000px) {
+  .layout:has(.inspector.open) {
+    grid-template-columns: minmax(0, 1fr) 420px !important;
+  }
+  .layout:has(.inspector.open) > .project {
+    display: none;
+  }
+  .layout > .inspector.open {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: auto;
+    height: 100%;
+    box-shadow: none;
+  }
+}
+@media (max-width: 800px) {
+  .layout {
+    display: block !important;
+  }
+  .project {
+    display: none;
+    position: fixed;
+    left: 0;
+    top: 49px;
+    width: 245px;
+    height: calc(100dvh - 49px);
+    z-index: 45;
+  }
+  .has-activity .project {
+    top: 91px;
+    height: calc(100dvh - 91px);
+  }
+  .project.open {
+    display: flex;
+  }
+  .main {
+    width: 100%;
+    padding: 0 10px 12px;
+  }
+  .diagram-layout .main {
+    padding: 0 7px 7px;
+  }
+  .inspector {
+    width: min(460px, 95vw);
+  }
+  .diagram-caption > span:last-child {
+    display: none;
+  }
+  .activitybar {
+    gap: 7px;
+    padding: 0 9px;
+  }
+  .activitybar .activity-prompt {
+    display: none;
+  }
+  .activitybar strong {
+    flex: 1;
+  }
+  .activitybar button {
+    padding: 4px 7px;
+    font-size: 11px;
+  }
+  .execution .sectionbar button {
+    font-size: 10px;
+    padding: 4px;
+  }
+  .execution .sectionbar h2 {
+    font-size: 12px;
+  }
+  .steptransfer {
+    gap: 5px;
+  }
+  .requestsummary small {
+    display: none;
+  }
+}
+.memory-session {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 4px 0 9px;
+  font-size: 12px;
+}
+#memoryView .pageintro {
+  margin: 4px 0 12px;
+}
+#memoryView .pageintro h1 {
+  margin: 0;
+  font-size: 22px;
+}
+#memoryView .pageintro p {
+  margin: 5px 0;
+}
+.memory-session > span {
+  color: #6d7b8e;
+  flex: 1;
+}
+.memory-session code {
+  font-size: 11px;
+}
+.memory-check {
+  background: #fff;
+  border: 1px solid #d4dce6;
+  border-radius: 5px;
+  padding: 8px 12px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.memory-check input {
+  width: 290px;
+  max-width: 100%;
+  padding: 7px 9px;
+  border: 1px solid #c6d2e0;
+  border-radius: 4px;
+}
+#memoryCheckResult {
+  color: #536987;
+  font-size: 11px;
+}
+.storage-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.storecard {
+  min-width: 0;
+  border: 1px solid #d4dce6;
+  background: #fff;
+  border-radius: 6px;
+  padding: 13px;
+}
+.storecard header {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.storecard h2 {
+  font-size: 15px;
+  margin: 0;
+}
+.storecard header span {
+  font-size: 10px;
+  color: #7b8899;
+}
+.storage-path {
+  display: block;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  color: #69809d;
+  line-height: 1.8;
+  margin-bottom: 8px;
+}
+.stored-turn {
+  border-top: 1px solid #e0e6ee;
+}
+.stored-turn summary {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  cursor: pointer;
+  padding: 7px 0;
+  font-size: 12px;
+}
+.stored-turn summary b {
+  color: #69809d;
+  font: 11px var(--mono);
+}
+.stored-turn summary span {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.stored-turn summary code {
+  max-width: 80px;
+  overflow: hidden;
+  font-size: 10px;
+  color: #8190a4;
+}
+.storecard pre {
+  font: 11px/1.8 var(--mono);
+  padding: 10px;
+  background: #f5f7fb;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow: auto;
+  border-radius: 3px;
+}
+.storecard details > summary {
+  font-size: 12px;
+  cursor: pointer;
+  margin: 10px 0;
+}
+.storecard dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  font-size: 12px;
+  line-height: 2;
+}
+.storecard dt {
+  color: #748399;
+}
+.storecard dd {
+  margin: 0;
+  text-align: right;
+}
+.stored-summary {
+  font-size: 13px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  margin: 12px 0 17px;
+}
+@media (max-width: 800px) {
+  .storage-grid {
+    grid-template-columns: 1fr;
+  }
+  .memory-session {
+    flex-wrap: wrap;
+  }
+  .memory-session > span {
+    flex-basis: 100%;
+  }
+  .storecard {
+    padding: 13px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .arch-pulse:not(.hidden) {
+    animation: packet-arrival 0.75s ease-out both;
+  }
+  @keyframes packet-arrival {
+    0% {
+      opacity: 0;
+    }
+    25% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+}
+#journeyView .composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 235px 118px;
+  grid-template-rows: 23px 36px;
+  gap: 2px 12px;
+}
+#journeyView .composer > label {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+}
+#journeyView .composer textarea {
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 35px;
+  height: 35px;
+  padding: 3px 0;
+}
+#journeyView .composer .modebar {
+  grid-column: 2;
+  grid-row: 1;
+  float: none;
+  font-size: 11px;
+}
+#journeyView .composer .modebar label {
+  font-size: 10px;
+}
+#journeyView .composer .modebar select {
+  max-width: 190px;
+}
+#journeyView .composer-bottom {
+  display: contents;
+}
+#journeyView .composer-bottom .check {
+  grid-column: 2;
+  grid-row: 2;
+  font-size: 11px;
+}
+#journeyView .composer-bottom .primary {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  align-self: stretch;
+}
+#journeyView .draftinfo {
+  display: none;
+}
+.run-options {
+  display: flex;
+  gap: 8px;
+  min-height: 28px;
+  position: relative;
+}
+#journeyView.focus .run-options,
+#journeyView.focus .composer {
+  display: none;
+}
+#journeyView .run-options .configuration {
+  flex: 1;
+}
+#journeyView .run-options .configuration[open] {
+  top: 30px;
+}
+#journeyView .examples {
+  display: block;
+  position: relative;
+}
+#journeyView .examples summary {
+  padding: 6px 12px;
+  background: #fff;
+  border: 1px solid #d3dbe5;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.examplebuttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  position: absolute;
+  left: 0;
+  top: 32px;
+  padding: 9px;
+  width: 330px;
+  background: #fff;
+  z-index: 30;
+  border: 1px solid #c6d2e1;
+  box-shadow: 0 8px 25px #263c5420;
+  border-radius: 5px;
+}
+.examplebuttons button {
+  text-align: left;
+  background: #f4f7fb;
+  border: 1px solid #e1e7ee;
+}
+@media (max-width: 800px) {
+  #journeyView .composer {
+    grid-template-columns: minmax(0, 1fr) 96px;
+    grid-template-rows: 27px 38px 28px;
+  }
+  #journeyView .composer .modebar {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  #journeyView .composer textarea {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  #journeyView .composer-bottom .check {
+    grid-column: 1;
+    grid-row: 3;
+    font-size: 10px;
+  }
+  #journeyView .composer-bottom .primary {
+    grid-column: 2;
+    grid-row: 1 / 4;
+  }
+  .examplebuttons {
+    width: 270px;
+  }
+}
