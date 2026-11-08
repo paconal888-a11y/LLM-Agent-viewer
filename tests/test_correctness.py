@@ -93,7 +93,9 @@ class CorrectnessTests(unittest.TestCase):
         )
 
     def test_model_configuration_hash_is_checked_before_loading(self):
-        path = self.root / "config.json"
+        model_dir = self.root / "model"
+        model_dir.mkdir()
+        path = model_dir / "config.json"
         path.write_bytes(b'{"model_type":"qwen3"}')
         files = {
             "config.json": (
@@ -101,10 +103,20 @@ class CorrectnessTests(unittest.TestCase):
                 hashlib.sha256(path.read_bytes()).hexdigest(),
             )
         }
-        verify_snapshot(self.root, files)
+        verify_snapshot(model_dir, files)
         path.write_bytes(b'{"model_type":"other"}')
         with self.assertRaisesRegex(ValueError, "config.json"):
-            verify_snapshot(self.root, files)
+            verify_snapshot(model_dir, files)
+        # D-07: 목록 밖 파일(로더가 적용하는 chat_template.jinja 등)이 있으면 해시가 다 맞아도 거부한다.
+        path.write_bytes(b'{"model_type":"qwen3"}')
+        (model_dir / "chat_template.jinja").write_text("{{ messages }}", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "chat_template.jinja"):
+            verify_snapshot(model_dir, files)
+        (model_dir / "chat_template.jinja").unlink()
+        (model_dir / "agent-lens-model.json").write_text("{}", encoding="utf-8")
+        (model_dir / "model.safetensors.part").write_bytes(b"x")
+        report = verify_snapshot(model_dir, files)
+        self.assertEqual(report["extra_files"], [])
 
     def test_ab_comparison_detects_top_k_and_top_p_changes(self):
         app = Application(

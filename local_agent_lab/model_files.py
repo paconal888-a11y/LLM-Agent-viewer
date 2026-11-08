@@ -48,8 +48,24 @@ def digest(path):
     return result.hexdigest()
 
 
+# 검증 목록 밖에 있어도 허용하는 파일. 그 외의 파일이 모델 폴더에 있으면 로드를 거부한다.
+ALLOWED_EXTRA = {"agent-lens-model.json"}
+# Transformers가 발견하면 적용하는 설정 파일들. 목록에 없는 이름이 있으면 입력 템플릿·특수 토큰이
+# 고정 snapshot과 달라질 수 있으므로 "검증 통과"라고 말할 수 없다.
+LOADER_SENSITIVE = {
+    "chat_template.jinja",
+    "chat_template.json",
+    "special_tokens_map.json",
+    "added_tokens.json",
+    "tokenizer.model",
+    "model.safetensors.index.json",
+    "additional_chat_templates",
+}
+
+
 def verify_snapshot(directory, files=None):
-    for name, (size, expected) in (FILES if files is None else files).items():
+    expected_files = FILES if files is None else files
+    for name, (size, expected) in expected_files.items():
         path = directory / name
         if (
             not path.is_file()
@@ -61,3 +77,23 @@ def verify_snapshot(directory, files=None):
                 + name
                 + ". scripts/setup_reference.py로 다시 준비하세요."
             )
+    extra = sorted(
+        entry.name
+        for entry in directory.iterdir()
+        if entry.name not in expected_files
+        and entry.name not in ALLOWED_EXTRA
+        and not entry.name.endswith(".part")
+    )
+    if extra:
+        raise ValueError(
+            "고정 모델 폴더에 검증 목록 밖의 파일이 있습니다: "
+            + ", ".join(extra)
+            + ". 로더가 이런 파일(예: "
+            + ", ".join(sorted(LOADER_SENSITIVE)[:3])
+            + ")을 적용하면 입력이 고정 snapshot과 달라질 수 있어 불러오지 않습니다. 파일을 치우거나 scripts/setup_reference.py로 다시 준비하세요."
+        )
+    return {
+        "verified_files": sorted(expected_files),
+        "allowed_extra": sorted(ALLOWED_EXTRA),
+        "extra_files": extra,
+    }

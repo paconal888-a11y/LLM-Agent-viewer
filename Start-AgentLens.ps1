@@ -91,6 +91,17 @@ try {
     }
     $engineReady = $false
     try { $engineReady = (Invoke-RestMethod -Uri 'http://127.0.0.1:8088/health' -TimeoutSec 2).status -eq 'ok' } catch { }
+    if (-not $SamplesOnly -and $Backend -eq 'llama' -and -not $engineReady -and (Test-OwnedProcess $owned.engine)) {
+        # 이 프로젝트가 띄운 엔진이 아직 모델을 읽는 중(/health 503)이면 두 번째 엔진을 띄우지 않고 기다린다.
+        Write-Host '이 프로젝트가 시작한 llama.cpp 엔진이 준비될 때까지 기다립니다 (최대 120초).'
+        $engineDeadline = (Get-Date).AddSeconds(120)
+        while ((Get-Date) -lt $engineDeadline -and -not $engineReady) {
+            Start-Sleep -Seconds 2
+            try { $engineReady = (Invoke-RestMethod -Uri 'http://127.0.0.1:8088/health' -TimeoutSec 2).status -eq 'ok' } catch { }
+            if (-not (Test-OwnedProcess $owned.engine)) { break }
+        }
+        if (-not $engineReady) { throw ('기록된 엔진(pid {0})이 120초 안에 준비되지 않았습니다. 로그: {1}' -f (Get-Prop $owned.engine 'pid' '?'), (Join-Path $agentLensRoot 'logs\engine.stderr.log')) }
+    }
     if (-not $SamplesOnly -and $Backend -eq 'llama' -and -not $engineReady) {
         $arguments = @('-m', ('"' + $modelFile + '"'), '--host', '127.0.0.1', '--port', '8088', '--alias', 'qwen3-4b', '-c', '12288', '-np', '1', '-ngl', '99', '-t', '6', '--jinja', '--reasoning', 'off', '--no-webui', '--cors-origins', 'localhost')
         $engine = Start-Process -FilePath $runtimeExe -ArgumentList $arguments -WorkingDirectory $agentLensRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $agentLensRoot 'logs\engine.stdout.log') -RedirectStandardError (Join-Path $agentLensRoot 'logs\engine.stderr.log') -PassThru
