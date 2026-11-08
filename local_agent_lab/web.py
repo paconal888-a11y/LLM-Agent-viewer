@@ -540,6 +540,13 @@ def make_handler(app):
                             "content": file_path.read_text(encoding="utf-8-sig"),
                         },
                     )
+                elif path.startswith("/api/runs/") and path.endswith("/diagnosis"):
+                    from .diagnosis import diagnose
+
+                    self.send(
+                        200,
+                        diagnose(app.get_run(path.split("/")[3], 0, compact=True)),
+                    )
                 elif path.startswith("/api/runs/") and path.endswith("/search"):
                     from .search import search
 

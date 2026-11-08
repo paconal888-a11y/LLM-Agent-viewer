@@ -1547,7 +1547,10 @@
     ].join("");
     return (
       `<h3>이 실행의 기록으로 본 실패 경로</h3><div class="diagnosis">${rows}</div>` +
-      `<p class="note">위 값은 모두 이 기록에서 센 것입니다. 모델이 왜 그렇게 행동했는지는 기록이 말해 주지 않으며, 같은 조건으로 다시 실행해도 결과가 같다는 보장은 없습니다.</p>`
+      `<p class="note">위 값은 모두 이 기록에서 센 것입니다. 모델이 왜 그렇게 행동했는지는 기록이 말해 주지 않으며, 같은 조건으로 다시 실행해도 결과가 같다는 보장은 없습니다.</p>` +
+      (state.tab === "learn"
+        ? ""
+        : '<button class="secondary" data-learning="diagnosis">층별 원인 정리 보기 →</button>')
     );
   }
   function specialized(e) {
@@ -2998,6 +3001,61 @@
   function learningPrediction() {
     return stored("prediction." + (state.run?.id || "")) || "";
   }
+  function diagnosisFor(run) {
+    // 서버가 저장 기록만으로 계산한다. 같은 기록을 반복 요청하지 않도록 실행·상태·기록 수로 캐시한다.
+    const key = run.id + ":" + run.status + ":" + state.events.length;
+    if (state.diagnosis?.key === key) return state.diagnosis.data;
+    if (state.diagnosisPending !== key) {
+      state.diagnosisPending = key;
+      api("/api/runs/" + encodeURIComponent(run.id) + "/diagnosis")
+        .then((data) => {
+          if (state.diagnosisPending !== key) return;
+          state.diagnosis = { key, data };
+          if (state.tab === "learn") renderDetail();
+        })
+        .catch(() => {
+          if (state.diagnosisPending === key)
+            state.diagnosis = { key, data: null };
+        });
+    }
+    return null;
+  }
+  function diagnosisHtml(report) {
+    const marks = { pass: "✓", fail: "×", warn: "!" };
+    const words = {
+      issue: "문제 기록 있음",
+      attention: "주의",
+      clear: "기록상 문제 없음",
+      unknown: "판단할 기록 없음",
+    };
+    const layers = report.layers
+      .map(
+        (layer) =>
+          `<details class="diaglayer" data-status="${esc(layer.status)}" ${layer.status === "issue" ? "open" : ""}><summary><b>${esc(layer.label)}</b>${layer.id === report.focus ? '<em>먼저 볼 곳</em>' : ""}<span>${esc(words[layer.status] || layer.status)}</span></summary>${
+            layer.checks.length
+              ? layer.checks
+                  .map(
+                    (check) =>
+                      `<div class="diagrow" data-result="${esc(check.result)}"><span>${marks[check.result] || "?"} ${esc(check.question)}</span><strong>${esc(check.detail)}</strong>${check.event_id != null ? `<button class="quiet" data-event="${check.event_id}">#${check.event_id} →</button>` : ""}</div>`,
+                  )
+                  .join("")
+              : '<p class="note">이 층을 판단할 기록이 없습니다.</p>'
+          }</details>`,
+      )
+      .join("");
+    const scope = report.verification;
+    return (
+      `<p class="diagheadline">${esc(report.headline)}</p><div class="diagnosis">${layers}</div>` +
+      (scope.by_code.length
+        ? `<p class="diagscope"><b>코드가 확인한 것</b>${scope.by_code.map(esc).join(" · ")}</p>`
+        : "") +
+      `<p class="diagscope"><b>코드가 확인하지 않은 것</b>${scope.not_checked.map(esc).join(" · ")}</p>` +
+      (report.next_step
+        ? `<p class="diagscope"><b>다음에 해 볼 것</b>${esc(report.next_step)}</p>`
+        : "") +
+      `<p class="note">${esc(report.note)}</p>`
+    );
+  }
   function renderLearningFlow(body) {
     // 단계 상세의 '학습 흐름' 탭. body는 #detailContent.
     const run = state.run,
@@ -3077,12 +3135,19 @@
                 : item.status;
       return `<div class="diagrow"><span>${esc(eventName(item))}</span><strong>${esc(verdict)}</strong><button class="quiet" data-event="${item.id}">#${item.id} →</button></div>`;
     };
+    const recordedChecks = errorEvent
+      ? errorDiagnosis(errorEvent)
+      : checks.length
+        ? `<p>이 실행의 검사 기록입니다. 검사는 정책 코드가 도구 결과·실행 상태를 대조한 결과이며, 모델이 왜 그렇게 행동했는지는 기록이 말해 주지 않습니다.</p><div class="diagnosis">${checks.map(checkRow).join("")}</div>${run.status === "completed" ? `<p class="note">${esc(answerScope(run))}</p>` : ""}`
+        : `<p class="note">${terminal ? "이 실행에는 검사 기록이 없습니다." : "실행이 끝나면 완료 조건·수정 파일 검사 결과가 여기에 표시됩니다."}</p>`;
+    const report = terminal ? diagnosisFor(run) : null;
     const step3 = `<section class="learningstep" data-step="3"><h3><span>3</span>원인 설명</h3>${
-      errorEvent
-        ? errorDiagnosis(errorEvent)
-        : checks.length
-          ? `<p>이 실행의 검사 기록입니다. 검사는 정책 코드가 도구 결과·실행 상태를 대조한 결과이며, 모델이 왜 그렇게 행동했는지는 기록이 말해 주지 않습니다.</p><div class="diagnosis">${checks.map(checkRow).join("")}</div>${run.status === "completed" ? `<p class="note">${esc(answerScope(run))}</p>` : ""}`
-          : `<p class="note">${terminal ? "이 실행에는 검사 기록이 없습니다." : "실행이 끝나면 완료 조건·수정 파일 검사 결과가 여기에 표시됩니다."}</p>`
+      report
+        ? diagnosisHtml(report) +
+          `<details class="diagraw"><summary>검사 기록 원본</summary>${recordedChecks}</details>`
+        : (terminal
+            ? '<p class="note">기록을 층별로 정리하는 중입니다.</p>'
+            : "") + recordedChecks
     }</section>`;
     // 4단계: 한 조건 수정 — 코드 · 작업 공간 파일 · 하네스 스위치 · 완료 조건 중 하나
     const codeFile = event?.source?.file?.replaceAll("\\", "/");
@@ -3147,7 +3212,11 @@
     action(async (e) => {
       const b = e.target.closest("[data-learning]");
       if (!b) return;
-      if (b.dataset.learning === "features") {
+      if (b.dataset.learning === "diagnosis") {
+        state.tab = "learn";
+        renderDetail();
+        $("inspector").classList.add("open");
+      } else if (b.dataset.learning === "features") {
         $("journeyView").classList.remove("focus");
         $("configuration").open = true;
         $("features").scrollIntoView({ behavior: "smooth", block: "center" });

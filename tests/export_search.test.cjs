@@ -1,6 +1,48 @@
 // 내보내기 미리보기(EXPORT_PREVIEW)와 본문 검색(BODY_SEARCH) 화면 조각을 DOM 없이 검사한다.
 // 서버 API 응답은 고정 입력이며(모의), 실제 기록의 값이 아니다. 화면이 응답을 어떻게 표시하고 어디로 이동시키는지만 본다.
 const test = require("node:test");
+const { Script, createContext } = require("node:vm");
+const { readFileSync } = require("node:fs");
+
+// 층별 원인 정리 화면. 서버 응답은 모의 데이터다.
+function diagnosisScope() {
+  const source = readFileSync(require.resolve("../web/workbench.js"), "utf8");
+  const start = source.indexOf("  function diagnosisHtml(report) {");
+  const end = source.indexOf("  function renderLearningFlow(body) {");
+  const context = createContext({
+    esc: (value) => String(value).replace(/</g, "&lt;"),
+  });
+  new Script(source.slice(start, end)).runInContext(context);
+  return context;
+}
+
+test("diagnosis shows the focused layer, its evidence links and the unverified scope", () => {
+  const html = diagnosisScope().diagnosisHtml({
+    headline: "기록은 ‘모델의 선택’ 층을 먼저 살펴보라고 가리킵니다.",
+    focus: "model",
+    next_step: "반복 측정",
+    note: "증명하지 않습니다",
+    verification: { by_code: [], not_checked: ["최종 답변 문장의 사실 여부"] },
+    layers: [
+      { id: "runtime", label: "실행기·설정", status: "clear", checks: [] },
+      {
+        id: "model",
+        label: "모델의 선택",
+        status: "issue",
+        checks: [
+          { id: "x", question: "호출했는가", result: "fail", detail: "호출 0회: <add>", event_id: 12 },
+        ],
+      },
+    ],
+  });
+  require("node:assert/strict").match(html, /먼저 볼 곳/);
+  require("node:assert/strict").match(html, /data-event="12"/);
+  require("node:assert/strict").match(html, /호출 0회: &lt;add>/);
+  require("node:assert/strict").match(html, /코드가 확인하지 않은 것/);
+  require("node:assert/strict").doesNotMatch(html, /코드가 확인한 것/);
+  require("node:assert/strict").match(html, /판단할 기록 없음|기록상 문제 없음/);
+});
+
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");

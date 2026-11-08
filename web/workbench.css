@@ -911,6 +911,78 @@ p {
   font-weight: 550;
   overflow-wrap: anywhere;
 }
+.diagheadline {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+  margin: 2px 0 8px;
+}
+.diaglayer {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fff;
+}
+.diaglayer > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 9px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.diaglayer > summary em {
+  font-style: normal;
+  font-size: 11px;
+  color: #fff;
+  background: #2f55c7;
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+.diaglayer > summary span {
+  margin-left: auto;
+  font-size: 11px;
+  color: #5b6778;
+}
+.diaglayer[data-status="issue"] {
+  border-color: #c98a8a;
+}
+.diaglayer[data-status="issue"] > summary span {
+  color: #a32d2d;
+  font-weight: 600;
+}
+.diaglayer[data-status="attention"] > summary span {
+  color: #7a5620;
+}
+.diaglayer[data-status="clear"] > summary span {
+  color: #2f6b58;
+}
+.diaglayer .diagrow {
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+.diaglayer .diagrow[data-result="fail"] span {
+  color: #a32d2d;
+}
+.diaglayer .diagrow[data-result="warn"] span {
+  color: #7a5620;
+}
+.diagscope {
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 6px 0;
+}
+.diagscope b {
+  margin-right: 8px;
+}
+.diagraw {
+  margin-top: 8px;
+  font-size: 12px;
+}
+.diagraw > summary {
+  cursor: pointer;
+  color: #5b6778;
+}
 .tokenstep {
   margin: 5px 0;
   background: #fff;
