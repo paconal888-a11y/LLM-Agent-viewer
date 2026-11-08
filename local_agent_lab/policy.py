@@ -163,6 +163,19 @@ def final_gate(run, dirty, checked, finish_reason):
     return outstanding
 
 
+def same_scalar(actual, expected):
+    """JSON의 숫자는 한 종류다. 3과 3.0은 같고, 1과 True, 1과 "1"은 다르다."""
+    numbers = (int, float)
+    if (
+        isinstance(actual, numbers)
+        and isinstance(expected, numbers)
+        and not isinstance(actual, bool)
+        and not isinstance(expected, bool)
+    ):
+        return actual == expected
+    return type(actual) is type(expected) and actual == expected
+
+
 def contains_value(actual, expected):
     """예상 객체의 키·값을 실제 결과에서 확인한다. 숫자 1과 True도 구분한다."""
     if isinstance(expected, dict):
@@ -176,7 +189,7 @@ def contains_value(actual, expected):
             and len(actual) == len(expected)
             and all(contains_value(a, b) for a, b in zip(actual, expected))
         )
-    return type(actual) is type(expected) and actual == expected
+    return same_scalar(actual, expected)
 
 
 PATH_TOOLS = {
@@ -209,11 +222,13 @@ def same_argument(tool, key, actual, expected):
         left, right = normalized(actual), normalized(expected)
         return left is not None and right is not None and left == right
     # 인자는 전체 값이 같아야 한다. 결과 객체의 부분 포함 검사와 구분한다.
-    return (
-        type(actual) is type(expected)
-        and actual == expected
-        and contains_value(actual, expected)
-    )
+    if isinstance(expected, (dict, list)):
+        return (
+            type(actual) is type(expected)
+            and actual == expected
+            and contains_value(actual, expected)
+        )
+    return same_scalar(actual, expected)
 
 
 def requirement_gate(run, successful):

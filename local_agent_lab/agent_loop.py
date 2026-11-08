@@ -2,6 +2,8 @@
 
 import json
 import time
+import traceback
+from pathlib import Path
 from .trace import RunStopped
 from .runtime import RuntimeFailure
 from .features import workspace_signature
@@ -30,6 +32,21 @@ from .inference import (
     audit_response,
     input_fingerprint,
 )
+
+
+def unexpected_location(exc):
+    """예상한 실행 실패가 아닌 예외의 종류와 마지막 코드 위치. 편집한 하네스 코드의 버그를 찾는 근거다."""
+    if isinstance(exc, RuntimeFailure):
+        return {}
+    frames = traceback.extract_tb(exc.__traceback__)
+    location = {"type": type(exc).__name__}
+    if frames:
+        location.update(
+            file=Path(frames[-1].filename).name,
+            line=frames[-1].lineno,
+            function=frames[-1].name,
+        )
+    return location
 
 
 def execute(harness, run):
@@ -444,7 +461,8 @@ def execute(harness, run):
             run.status = "stopped"
     except Exception as exc:
         with run.lock:
-            run.error = str(exc)
+            # str(exc)가 빈 문자열인 예외(StopIteration 등)도 실패 원인을 남긴다.
+            run.error = str(exc) or type(exc).__name__
         try:
             run.emit(
                 "run.error",
@@ -452,7 +470,7 @@ def execute(harness, run):
                 "실제 오류를 기록하고 중단합니다. 성공한 응답으로 대체하지 않습니다.",
                 category="output",
                 status="error",
-                output={"error": str(exc)},
+                output={"error": run.error, **unexpected_location(exc)},
                 pause=False,
             )
         except RunStopped:

@@ -188,6 +188,17 @@ class LayerOrderTests(unittest.TestCase):
         self.assertEqual(check(result, "tool_execution")["detail"], "디스크 오류")
         self.assertEqual(result["focus"], "harness")
 
+    def test_unexpected_exception_points_to_the_harness_with_its_location(self):
+        crashed = {
+            "id": 3,
+            "kind": "run.error",
+            "input": {},
+            "output": {"error": "'missing'", "type": "KeyError", "file": "toolkit.py", "line": 12},
+        }
+        result = diagnose(snapshot([request(1), response(2), crashed], requirements=[]))
+        self.assertEqual(result["focus"], "harness")
+        self.assertEqual(check(result, "unexpected_exception")["detail"], "KeyError · toolkit.py:12")
+
     def test_unknown_failure_does_not_invent_a_layer(self):
         result = diagnose(snapshot([], requirements=[]))
         self.assertIsNone(result["focus"])
@@ -268,6 +279,8 @@ class SampleRecordTests(unittest.TestCase):
         self.assertIn("코드가 확인한 완료 조건은 없습니다", results["tensors"]["headline"])
         # 이 샘플을 기록한 버전은 완료 조건을 모델 입력에 넣지 않았다.
         self.assertEqual(check(results["feedback"], "requirements_in_input")["result"], "fail")
+        # 주 에이전트의 요약은 코드가 대조하지 않는다는 사실을 드러낸다.
+        self.assertEqual(check(results["team"], "subagent_summary")["result"], "warn")
 
 
 if __name__ == "__main__":

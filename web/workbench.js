@@ -434,6 +434,10 @@
         : "모델 연결 필요";
     $("connection").title = state.health.error || state.health.base_url || "";
     $("run").disabled = !state.health.connected || busy();
+    $("run").title =
+      state.health.mode === "sample"
+        ? "저장 기록 재생 모드에서는 실행할 수 없습니다. 실제 실행은 Start-AgentLens.ps1로 시작하세요."
+        : "";
     if (!busy()) {
       const serverBackend = state.health.backend || "llama";
       if (state.draftBackend && state.draftBackend !== serverBackend) {
@@ -787,11 +791,20 @@
       })),
     ];
     $("agentFocus").classList.toggle("hidden", mode !== "team");
+    // 선택 목록은 재생 위치와 무관하게 이 실행의 모든 에이전트를 보여 준다(카드 내용은 위치까지만).
+    const options = [
+      { id: rootAgentId(), name: "주 에이전트" },
+      ...state.events
+        .filter((e) => e.kind === "agent.spawn")
+        .map((e) => ({ id: e.output.child_id, name: e.output.agent_name })),
+    ];
     $("agentFocus").innerHTML =
       '<option value="all">전체 에이전트</option>' +
-      nodes
+      options
         .map((n) => `<option value="${esc(n.id)}">${esc(n.name)}</option>`)
         .join("");
+    if (!options.some((n) => n.id === state.agentFilter))
+      state.agentFilter = "all";
     $("agentFocus").value = state.agentFilter;
     const card = (n) => {
       const events = past.filter((e) => (e.agent_id || rootAgentId()) === n.id),
@@ -2875,10 +2888,23 @@
       state.live = true;
       await poll(state.run.id);
     });
+  function nearestForAgent(index) {
+    // 에이전트를 골라 둔 동안에는 그 에이전트의 기록으로만 움직여 상세와 필터가 어긋나지 않게 한다.
+    if (state.agentFilter === "all") return index;
+    const owned = (i) =>
+      i >= 0 &&
+      i < state.events.length &&
+      (state.events[i].agent_id || rootAgentId()) === state.agentFilter;
+    for (let distance = 0; distance < state.events.length; distance++) {
+      if (owned(index + distance)) return index + distance;
+      if (owned(index - distance)) return index - distance;
+    }
+    return index;
+  }
   $("scrubber").oninput = () => {
     state.live = false;
     stopPlay();
-    select(Number($("scrubber").value));
+    select(nearestForAgent(Number($("scrubber").value)));
   };
   $("first").onclick = () => {
     state.live = false;

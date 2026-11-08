@@ -13,6 +13,18 @@ jobs:
         with:
           node-version: '22'
       - run: node --test tests/architecture.test.cjs tests/inspection.test.cjs tests/editor.test.cjs tests/settings.test.cjs tests/export_search.test.cjs
+  windows:
+    # 공식 설치 경로(Windows 런처)와 CRLF 체크아웃을 검증한다. test_launcher는 실제 Windows PowerShell을 실행한다.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --python 3.12 --extra integrations --locked
+      - run: uv run --extra integrations --offline python -m unittest discover -s tests -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/architecture.test.cjs tests/inspection.test.cjs tests/editor.test.cjs tests/settings.test.cjs tests/export_search.test.cjs
   reference:
     runs-on: ubuntu-latest
     steps:

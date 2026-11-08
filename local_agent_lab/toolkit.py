@@ -87,6 +87,10 @@ class ToolContext:
     parent: int
     name: str
 
+    def __post_init__(self):
+        # 도구마다 다른 기준으로 비교하지 않도록 작업 공간을 한 번만 해석한다.
+        self.workspace = Path(self.workspace).resolve()
+
     def read(self, path, category="tools", required=True):
         return read_traced(
             self.run,

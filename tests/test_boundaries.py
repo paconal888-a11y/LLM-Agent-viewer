@@ -7,10 +7,88 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from local_agent_lab.agent_loop import unexpected_location
+from local_agent_lab.features import normalize_requirements
 from local_agent_lab.harness import Harness, tools_for
 from local_agent_lab.integrations import prepare as prepare_integrations, close_all
+from local_agent_lab.policy import contains_value, same_argument, validate_tool_call
+from local_agent_lab.runtime import RuntimeFailure
+from local_agent_lab.toolkit import ToolContext
 from local_agent_lab.trace import ROOT, Run
 from test_harness import FixtureRuntime, response, tool_call
+
+
+class CompletionValueTests(unittest.TestCase):
+    def test_integer_valued_float_requirement_matches_an_integer_argument(self):
+        normalized = normalize_requirements(
+            [{"tool": "add_numbers", "arguments": {"a": 137.0, "b": 0.5, "c": True}}]
+        )[0]["arguments"]
+        self.assertEqual(normalized, {"a": 137, "b": 0.5, "c": True})
+        self.assertIs(type(normalized["a"]), int)
+        self.assertIs(type(normalized["c"]), bool)
+
+    def test_json_numbers_compare_by_value_but_never_across_types(self):
+        for actual, expected, same in (
+            (3, 3.0, True),
+            (3.0, 3, True),
+            (1e2, 100, True),
+            (1, True, False),
+            (True, 1, False),
+            (0, False, False),
+            ("1", 1, False),
+            (0.1 + 0.2, 0.3, False),
+        ):
+            with self.subTest(actual=actual, expected=expected):
+                self.assertEqual(contains_value(actual, expected), same)
+                self.assertEqual(same_argument("mcp_x", "value", actual, expected), same)
+
+    def test_nested_results_still_compare_type_and_order(self):
+        self.assertTrue(contains_value({"a": [1, {"b": 2.0}]}, {"a": [1.0, {"b": 2}]}))
+        self.assertFalse(contains_value({"a": [1, 2]}, {"a": [2, 1]}))
+        self.assertFalse(contains_value({"a": True}, {"a": 1}))
+
+    def test_tool_context_resolves_the_workspace_once(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            (base / "real").mkdir()
+            link = base / "link"
+            try:
+                os.symlink(base / "real", link, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                link = base / "real" / ".." / "real"
+            context = ToolContext(None, link, [], set(), 0, "x")
+            self.assertEqual(context.workspace, (base / "real").resolve())
+
+    def test_path_named_arguments_of_mcp_tools_stay_inside_the_workspace(self):
+        # 이름이 path인 인자만 작업 공간 검사를 받는다. 다른 이름은 서버가 직접 제한해야 한다(EXTENDING.md).
+        with tempfile.TemporaryDirectory() as folder:
+            run = Run("x", "s", features={"writes": True})
+            tool = {
+                "function": {
+                    "name": "mcp_demo_stat",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"path": {"type": "string"}, "file": {"type": "string"}},
+                    },
+                }
+            }
+            call = lambda **args: {  # noqa: E731
+                "function": {"name": "mcp_demo_stat", "arguments": json.dumps(args)}
+            }
+            with self.assertRaises(ValueError):
+                validate_tool_call(run, Path(folder), [tool], call(path="../outside"), None)
+            _, args = validate_tool_call(run, Path(folder), [tool], call(file="../outside"), None)
+            self.assertEqual(args, {"file": "../outside"})
+
+    def test_unexpected_exception_records_type_and_location(self):
+        try:
+            {}["missing"]
+        except KeyError as error:
+            location = unexpected_location(error)
+        self.assertEqual(location["type"], "KeyError")
+        self.assertEqual(location["file"], "test_boundaries.py")
+        self.assertEqual(location["function"], "test_unexpected_exception_records_type_and_location")
+        self.assertEqual(unexpected_location(RuntimeFailure("모델 호출 8회 제한")), {})
 
 
 class BoundaryTests(unittest.TestCase):

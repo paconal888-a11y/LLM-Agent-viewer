@@ -17,7 +17,7 @@ class RedactionTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.workspace = self.root / "workspace"
         shutil.copytree(ROOT / "demo_workspace", self.workspace)
-        self.home = self.root / "home" / "fundt"
+        self.home = self.root / "home" / "alice"
         self.home.mkdir(parents=True)
 
     def tearDown(self):
@@ -50,7 +50,7 @@ class RedactionTests(unittest.TestCase):
         self.assertIn(secret, encoded)
         self.assertIn(self.in_json(self.workspace), encoded)
         shared = redaction.share_copy(
-            snapshot, workspace=self.workspace, home=self.home, user="fundt"
+            snapshot, workspace=self.workspace, home=self.home, user="alice"
         )
         shared_text = json.dumps(shared, ensure_ascii=False)
         self.assertEqual(snapshot, original, "원본 스냅샷은 바뀌지 않아야 한다")
@@ -87,7 +87,7 @@ class RedactionTests(unittest.TestCase):
     def test_preview_counts_without_changing_anything(self):
         snapshot, secret = self.real_snapshot()
         original = copy.deepcopy(snapshot)
-        report = redaction.preview(snapshot, workspace=self.workspace, home=self.home, user="fundt")
+        report = redaction.preview(snapshot, workspace=self.workspace, home=self.home, user="alice")
         self.assertEqual(snapshot, original)
         self.assertGreaterEqual(report["counts"]["secret"], 2)
         self.assertGreaterEqual(report["counts"]["email"], 1)
@@ -104,7 +104,7 @@ class RedactionTests(unittest.TestCase):
             {"omit_file_text": True, "omit_sources": True},
             workspace=self.workspace,
             home=self.home,
-            user="fundt",
+            user="alice",
         )
         text = json.dumps(shared, ensure_ascii=False)
         self.assertNotIn(secret, text)
@@ -113,12 +113,12 @@ class RedactionTests(unittest.TestCase):
         result = next(e for e in shared["events"] if e["kind"] == "tool.result")
         self.assertTrue(result["output"]["content"].startswith("<OMITTED "))
         self.assertTrue(all(v["code"] == "<OMITTED SOURCE>" for v in shared["source_snapshots"].values()))
-        redactor = redaction.Redactor(home=self.home, user="fundt")
+        redactor = redaction.Redactor(home=self.home, user="alice")
         self.assertEqual(
-            redactor.text('{"p": "C:\\\\Users\\\\someone\\\\x", "q": "/home/other/y", "u": "fundt"}'),
+            redactor.text('{"p": "C:\\\\Users\\\\someone\\\\x", "q": "/home/other/y", "u": "alice"}'),
             '{"p": "<USER_HOME>\\\\x", "q": "<USER_HOME>/y", "u": "<USER>"}',
         )
-        self.assertEqual(redactor.text("fundtastic refundtable"), "fundtastic refundtable")
+        self.assertEqual(redactor.text("aliceastic realiceable"), "aliceastic realiceable")
         self.assertEqual(redaction.parse_options({"paths": ["0"], "emails": ["1"], "bogus": ["1"]}), {"paths": False, "emails": True})
 
 

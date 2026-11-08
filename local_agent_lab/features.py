@@ -51,6 +51,13 @@ def normalize_requirements(values=None):
             raise ValueError(
                 "완료 조건의 인자는 짧은 문자열·유한한 숫자·불리언만 지원합니다."
             )
+        # JSON 표기가 137.0이어도 정수 인자와 같은 값이다. integer 도구 인자와 영구히 어긋나지 않게 맞춘다.
+        args = {
+            key: int(value)
+            if isinstance(value, float) and value.is_integer()
+            else value
+            for key, value in args.items()
+        }
         expected = item.get("result")
         if expected is not None and (
             not isinstance(expected, dict)

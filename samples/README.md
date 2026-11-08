@@ -7,7 +7,7 @@
 | feedback | llama.cpp / Qwen3-4B | 빠진 검사를 지적 → 다음 모델 입력에 보완 → 실제 check_file. 과거 버전은 JSON 값까지 검증하지 않아 요청한 값을 놓쳤다는 한계도 포함 |
 | verified-write | llama.cpp / Qwen3-4B | read/write/check와 실제 JSON 값 비교, 244개 이벤트, 마지막 브라우저 본문 반영 |
 | tensors | Python / Qwen3-0.6B | 실제 모델·계산 도구 왕복, 토큰·임베딩·Q/K/V·attention·KV 수치 표본 |
-| team | llama.cpp / Qwen3-4B | 실제 주 에이전트와 두 하위 대화, 파일 읽기, 계산 대기, 결과 합류, 전체 모델 6회 |
+| team | llama.cpp / Qwen3-4B | 실제 주 에이전트와 두 하위 대화, 파일 읽기, 계산 대기, 결과 합류, 전체 모델 6회. 최종 답변의 요약은 하위 보고 원문과 다릅니다(Explore가 파일을 읽었다고 말하지만 파일을 읽은 것은 Oracle입니다). 코드는 이 요약을 대조하지 않으므로 `agent.join` 기록과 직접 비교해 보세요 |
 | deep | llama.cpp / Qwen3-4B | 같은 대화의 답변 후보에 점검 지시를 추가하고 실제 세 번째 모델 호출 |
 | compaction | llama.cpp / Qwen3-4B | 이전 원문 2,488자 → 실제 모델 요약 73자 → 파일 저장 → 다음 입력. 원문 저장소 스냅샷 포함 |
 | summary-reuse | llama.cpp / Qwen3-4B | 요약을 다시 생성하지 않고 저장된 요약과 최근 원문을 읽어 응답. 원문 저장소 스냅샷 포함 |

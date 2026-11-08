@@ -271,6 +271,12 @@ def _model_checks(requests, events, requirements):
                    "fail" if unchecked else "pass",
                    "미검사: " + ", ".join(unchecked) if unchecked else "수정 파일 모두 검사 통과", final)
         )
+    joined = _last(events, "agent.join")
+    if joined:
+        checks.append(
+            _check("model", "subagent_summary", "주 에이전트가 하위 보고를 정확히 옮겼는가", "warn",
+                   "코드는 이 요약을 대조하지 않습니다. 하위 보고 원문과 최종 답변을 직접 비교하세요.", joined)
+        )
     repairs = [e for e in events if e["kind"] == "context.repair"]
     if repairs:
         checks.append(
