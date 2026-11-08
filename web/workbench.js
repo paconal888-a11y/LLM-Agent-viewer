@@ -309,7 +309,7 @@
     document.body.classList.toggle("has-activity", !!run || !!experiment);
     if (run || experiment)
       $("activityBar").innerHTML =
-        `<span class="activity-dot"></span><strong>${experiment ? "비교" + " " + esc(experiment.phase) : run.status === "paused" ? "단계 대기" : run.status === "stopping" ? "중지 중" : "실행 중"}</strong><span class="activity-prompt">${esc(run?.prompt || "구성 비교")}</span><button data-activity="open">실행 열기</button>${run?.status === "paused" && !experiment ? '<button data-activity="next">다음 단계</button><button data-activity="continue">계속</button>' : ""}<button data-activity="stop" class="danger" ${run?.status === "stopping" ? "disabled" : ""}>중지</button>`;
+        `<span class="activity-dot"></span><strong>${experiment ? "비교" + " " + esc(experiment.phase) : run.status === "paused" ? "단계 대기" : run.status === "stopping" ? "중지 중 · 실행 중인 도구가 끝나야 멈춥니다. 오래 걸리면 Stop-AgentLens.cmd로 앱을 종료하세요" : "실행 중"}</strong><span class="activity-prompt">${esc(run?.prompt || "구성 비교")}</span><button data-activity="open">실행 열기</button>${run?.status === "paused" && !experiment ? '<button data-activity="next">다음 단계</button><button data-activity="continue">계속</button>' : ""}<button data-activity="stop" class="danger" ${run?.status === "stopping" ? "disabled" : ""}>중지</button>`;
     $("run").disabled = busy() || !state.health.connected;
     $("startCompare").disabled = busy() || !state.health.connected;
     $("backend").disabled = busy() || state.health.mode === "sample";
