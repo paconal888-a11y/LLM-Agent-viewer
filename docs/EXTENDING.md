@@ -23,6 +23,8 @@ schema는 `function_tool("multiply", "두 정수를 곱합니다.", {"a": {"type
 
 - context.py: 탐색할 파일명, 지침 감싸기, 메시지 배치, 도구 목록.
 - demo_workspace/skills/*/SKILL.md: 이름·설명과 실제 절차. 검색 결과와 본문 로드를 구분.
+  - 지원 형식(`skill-front-matter/1`): 첫 줄 `---`부터 다음 단독 `---` 줄까지의 front matter에서 줄 시작의 `name:`과 `description:`만 읽습니다. 값은 한 줄 스칼라이며 따옴표 없는 평문(` #` 뒤는 주석), `"..."`, `'...'`를 지원합니다. CRLF와 UTF-8 BOM, 다른 키(무시하고 기록)는 허용합니다. name은 64자, description은 500자까지입니다.
+  - 지원하지 않는 표현은 다른 값으로 바꾸지 않습니다. 여러 줄 값(`>`, `|`), 흐름 컬렉션(`[ ]`, `{ }`), anchor·alias·tag(`&`, `*`, `!`), 들여쓴 키, 중복 키, 빈 값, 닫히지 않은 따옴표가 있으면 그 스킬을 목록에서 제외하고 `skills.metadata` 이벤트(status=warning)와 `skills.catalog`의 `skipped`에 파일 경로·줄 번호·사유를 남깁니다. 일반 YAML 파서가 아니며 전체 YAML을 지원한다고 주장하지 않습니다.
 - demo_workspace/commands/*.md: `$ARGUMENTS`를 치환하는 프롬프트 템플릿.
 - harness.py: 복원할 이력과 저장 정책. 텍스트 이력을 모델 가중치나 KV와 혼동하지 않기.
 - policy.py: 공개 도구·인자·경로·완료 조건. LLM이 반환한 요청을 신뢰하지 않는 검사 위치.

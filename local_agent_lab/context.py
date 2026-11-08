@@ -45,6 +45,121 @@ def discover_rules(run, workspace):
     return ""
 
 
+SKILL_METADATA_FORMAT = {
+    "id": "skill-front-matter/1",
+    "summary": "첫 줄 '---'부터 다음 단독 '---' 줄까지의 front matter에서 name과 description을 읽습니다.",
+    "supported": [
+        "줄 시작의 name: 값, description: 값 (한 줄 스칼라)",
+        "따옴표 없는 평문 값. ' #' 뒤는 주석으로 제거",
+        "\"큰따옴표\" 또는 '작은따옴표'로 감싼 한 줄 값 (\\\" \\\\ '' 이스케이프)",
+        "CRLF 줄바꿈, UTF-8 BOM, name·description 외 키(무시하고 기록)",
+    ],
+    "unsupported": [
+        "여러 줄 값(>, |)과 다음 줄로 이어지는 값",
+        "흐름 컬렉션([ ], { })과 목록 항목(- )",
+        "anchor·alias·tag(&, *, !)",
+        "들여쓴 키, 중복 키, 빈 값, 닫히지 않은 따옴표",
+    ],
+    "limits": {"name": 64, "description": 500},
+}
+
+_SKILL_KEY = re.compile(r"^(?P<indent>[ \t]*)(?P<key>[A-Za-z0-9_-]+):(?P<rest>.*)$")
+
+
+def _skill_scalar(raw):
+    """지원하는 한 줄 스칼라만 해석한다. (값, 거부 사유)를 돌려준다."""
+    value = raw.strip()
+    if not value:
+        return None, "empty_value"
+    if value[0] in "\"'":
+        quote = value[0]
+        out = []
+        index = 1
+        while index < len(value):
+            char = value[index]
+            if quote == '"' and char == "\\" and index + 1 < len(value):
+                out.append(value[index + 1])
+                index += 2
+                continue
+            if char == quote:
+                if quote == "'" and index + 1 < len(value) and value[index + 1] == "'":
+                    out.append("'")
+                    index += 2
+                    continue
+                trailing = value[index + 1 :].strip()
+                if trailing and not trailing.startswith("#"):
+                    return None, "text_after_closing_quote"
+                return "".join(out), None
+            out.append(char)
+            index += 1
+        return None, "unterminated_quote"
+    if value[0] in ">|":
+        return None, "multiline_scalar"
+    if value[0] in "[{":
+        return None, "flow_collection"
+    if value[0] in "&*!":
+        return None, "anchor_alias_or_tag"
+    if value.startswith("- "):
+        return None, "sequence_item"
+    comment = re.search(r"\s#", value)
+    if comment:
+        value = value[: comment.start()].rstrip()
+        if not value:
+            return None, "empty_value"
+    return value, None
+
+
+def parse_skill_metadata(text):
+    """SKILL.md의 front matter에서 name·description을 읽는다.
+
+    지원하지 않는 YAML 표현은 조용히 다른 값으로 바꾸지 않고 (None, 사유)를 돌려준다.
+    사유는 skills.metadata 이벤트에 그대로 기록되어 스킬이 목록에서 빠진 까닭을 보여준다.
+    """
+    lines = text.lstrip("﻿").splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None, {"reason": "front_matter_missing"}
+    try:
+        end = next(i for i in range(1, len(lines)) if lines[i].strip() == "---")
+    except StopIteration:
+        return None, {"reason": "front_matter_unterminated"}
+    found = {}
+    ignored = []
+    problems = []
+    for number, line in enumerate(lines[1:end], start=2):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        match = _SKILL_KEY.match(line)
+        if not match:
+            problems.append({"line": number, "reason": "not_a_key_value_line"})
+            continue
+        key = match.group("key")
+        if match.group("indent"):
+            problems.append({"line": number, "key": key, "reason": "indented_key"})
+            continue
+        if key not in ("name", "description"):
+            ignored.append(key)
+            continue
+        if key in found:
+            problems.append({"line": number, "key": key, "reason": "duplicate_key"})
+            continue
+        value, reason = _skill_scalar(match.group("rest"))
+        if reason:
+            problems.append({"line": number, "key": key, "reason": reason})
+            continue
+        if len(value) > SKILL_METADATA_FORMAT["limits"][key]:
+            problems.append({"line": number, "key": key, "reason": "too_long"})
+            continue
+        found[key] = value
+    for key in ("name", "description"):
+        if key not in found and not any(p.get("key") == key for p in problems):
+            problems.append({"key": key, "reason": "missing_key"})
+    detail = {"ignored_keys": ignored, "problems": problems}
+    if problems:
+        detail["reason"] = problems[0]["reason"]
+        return None, detail
+    return {"name": found["name"], "description": found["description"]}, detail
+
+
 def discover_skills(run, workspace):
     paths = sorted((workspace / "skills").glob("*/SKILL.md"))
     run.emit(
@@ -56,34 +171,37 @@ def discover_skills(run, workspace):
         output={"files": [str(p.relative_to(workspace)) for p in paths]},
     )
     catalog = []
+    skipped = []
     for path in paths[:20]:
         path = workspace_path(workspace, str(path.relative_to(workspace)))
+        relative = str(path.relative_to(workspace)).replace("\\", "/")
         text = read_traced(
             run,
             path,
             "skills",
             reason="스킬 목록을 구성할 메타데이터를 추출합니다. 본문을 읽었어도 아직 모델 입력에 넣지 않습니다.",
         )
-        header = (
-            text.split("---", 2)[1]
-            if text.startswith("---") and text.count("---") >= 2
-            else ""
+        metadata, detail = parse_skill_metadata(text)
+        run.emit(
+            "skills.metadata",
+            "스킬 메타데이터 해석" if metadata else "스킬 메타데이터 해석 실패 · 목록 제외",
+            "front matter의 name·description을 지원 형식(" + SKILL_METADATA_FORMAT["id"] + ")으로 읽었습니다. 지원하지 않는 YAML 표현은 다른 값으로 바꾸지 않고 사유와 함께 제외합니다.",
+            category="skills",
+            actor="validator",
+            input={"path": relative, "format": SKILL_METADATA_FORMAT["id"]},
+            output={"accepted": bool(metadata), "metadata": metadata, **detail},
+            status="ok" if metadata else "warning",
         )
-        metadata = dict(re.findall(r"^(name|description):\s*(.+)$", header, re.M))
-        if metadata.get("name") and metadata.get("description"):
-            catalog.append(
-                {
-                    "name": metadata["name"].strip(),
-                    "description": metadata["description"].strip(),
-                    "path": str(path.relative_to(workspace)).replace("\\", "/"),
-                }
-            )
+        if metadata:
+            catalog.append({**metadata, "path": relative})
+        else:
+            skipped.append({"path": relative, "reason": detail["reason"]})
     run.emit(
         "skills.catalog",
         "스킬 메타데이터만 선택",
-        "하네스는 본문을 제외한 이름·설명·경로를 입력에 넣습니다. 이후 모델의 load_skill 요청 때 본문을 전달합니다.",
+        "하네스는 본문을 제외한 이름·설명·경로를 입력에 넣습니다. 이후 모델의 load_skill 요청 때 본문을 전달합니다. 제외한 파일은 skipped에 사유와 함께 남깁니다.",
         category="skills",
-        output={"catalog": catalog},
+        output={"catalog": catalog, "skipped": skipped, "format": SKILL_METADATA_FORMAT},
     )
     return catalog
 
