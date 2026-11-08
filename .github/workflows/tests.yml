@@ -36,13 +36,27 @@ jobs:
       - name: 설치 안내대로 샘플 보기 시작
         shell: pwsh
         run: |
-          .\Start-AgentLens.cmd -SamplesOnly -NoBrowser -Port 8799
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          $status = Invoke-RestMethod http://127.0.0.1:8799/api/status
-          if ($status.mode -ne 'sample') { throw "unexpected mode: $($status.mode)" }
-          if (@(Invoke-RestMethod http://127.0.0.1:8799/api/samples).Count -lt 16) { throw 'samples missing' }
-          .\Stop-AgentLens.cmd
-          if ($LASTEXITCODE -ne 0) { exit 1 }
+          # 로그는 로그인해야 보이지만 주석은 공개된다. 실패하면 마지막 출력과 앱 오류를 주석으로 남긴다.
+          function Note-Failure([string]$title, $lines) {
+            Write-Output "::error::$title"
+            @($lines) | Where-Object { $_ } | Select-Object -Last 8 | ForEach-Object { Write-Output "::warning::$_" }
+            if (Test-Path .local/app.stderr.log) { Get-Content .local/app.stderr.log -Tail 6 | ForEach-Object { Write-Output "::warning::$_" } }
+            exit 1
+          }
+          $output = .\Start-AgentLens.cmd -SamplesOnly -NoBrowser -Port 8799 2>&1 | ForEach-Object { "$_" }
+          $code = $LASTEXITCODE
+          $output
+          if ($code -ne 0) { Note-Failure "Start-AgentLens.cmd exit code $code" $output }
+          try {
+            $status = Invoke-RestMethod http://127.0.0.1:8799/api/status
+            if ($status.mode -ne 'sample') { throw "unexpected mode: $($status.mode)" }
+            $samples = @(Invoke-RestMethod http://127.0.0.1:8799/api/samples)
+            if ($samples.Count -lt 16) { throw "samples missing: $($samples.Count)" }
+          } catch { Note-Failure "API check failed: $($_.Exception.Message)" $output }
+          $output = .\Stop-AgentLens.cmd 2>&1 | ForEach-Object { "$_" }
+          $code = $LASTEXITCODE
+          $output
+          if ($code -ne 0) { Note-Failure "Stop-AgentLens.cmd exit code $code" $output }
       - uses: actions/setup-node@v7
         with:
           node-version: '22'

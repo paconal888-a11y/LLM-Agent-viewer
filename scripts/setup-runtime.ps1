@@ -1,4 +1,4 @@
-param()
+﻿param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $agentLensRoot = Join-Path $env:LOCALAPPDATA 'AgentLens'

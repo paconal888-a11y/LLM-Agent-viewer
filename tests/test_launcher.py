@@ -41,6 +41,14 @@ class LauncherSourceTests(unittest.TestCase):
         self.assertNotRegex(text, r"(?m)&\s+\(Join-Path \$projectDir '\.venv")
         self.assertGreaterEqual(len(re.findall(r"Invoke-Native\s+'uv'", text)), 3)
 
+    def test_scripts_with_korean_text_can_be_read_on_any_windows_language(self):
+        # Windows PowerShell 5.1은 BOM 없는 파일을 시스템 코드 페이지로 읽는다. 1252에서는 한글의 일부 바이트가 따옴표가 된다.
+        for script in [*ROOT.glob("*.ps1"), *(ROOT / "scripts").glob("*.ps1")]:
+            with self.subTest(script=script.name):
+                raw = script.read_bytes()
+                if any(byte >= 0x80 for byte in raw):
+                    self.assertTrue(raw.startswith(b"\xef\xbb\xbf"))
+
     def test_cmd_entry_points_do_not_inherit_a_powershell_7_module_path(self):
         for name in ("Start-AgentLens.cmd", "Stop-AgentLens.cmd"):
             with self.subTest(script=name):
