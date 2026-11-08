@@ -47,6 +47,20 @@ def browser_source(marker, function):
     }
 
 
+HISTORY_FIELDS = (
+    "id",
+    "prompt",
+    "status",
+    "created_at",
+    "event_count",
+    "model_calls",
+    "mode",
+    "session_id",
+    "agent_name",
+    "parent_run_id",
+)
+
+
 class WorkInProgress(ValueError):
     """다른 탭·새로고침 전의 실행이 계속되고 있다."""
 
@@ -391,31 +405,16 @@ class Application:
                         item["status"] = "interrupted"
                     collected[item["id"]] = {
                         key: item.get(key)
-                        for key in (
-                            "id",
-                            "prompt",
-                            "status",
-                            "created_at",
-                            "event_count",
-                            "model_calls",
-                        )
+                        for key in HISTORY_FIELDS
                     }
+                    collected[item["id"]]["backend"] = (item.get("conditions") or {}).get("backend")
                 except (OSError, ValueError, KeyError):
                     continue
         with self.lock:
             for run in self.runs.values():
                 item = run.snapshot()
-                collected[run.id] = {
-                    key: item[key]
-                    for key in (
-                        "id",
-                        "prompt",
-                        "status",
-                        "created_at",
-                        "event_count",
-                        "model_calls",
-                    )
-                }
+                collected[run.id] = {key: item.get(key) for key in HISTORY_FIELDS}
+                collected[run.id]["backend"] = (item.get("conditions") or {}).get("backend")
         return sorted(
             collected.values(), key=lambda item: item["created_at"], reverse=True
         )[:20]
@@ -747,6 +746,8 @@ def make_handler(app):
                     app.project.resolve(payload.get("path"), write=True)
                     self.send(200, check_text(payload["path"], payload.get("text")))
                 elif self.path == "/api/project/save":
+                    if app.samples_only:
+                        raise ValueError("샘플 보기 모드에서는 파일을 저장하지 않습니다. 실제 실행 모드로 시작하세요.")
                     with app.lock:
                         if app.busy():
                             raise ValueError(
@@ -761,6 +762,8 @@ def make_handler(app):
                             ),
                         )
                 elif self.path == "/api/project/restore":
+                    if app.samples_only:
+                        raise ValueError("샘플 보기 모드에서는 파일을 되돌리지 않습니다.")
                     with app.lock:
                         if app.busy():
                             raise ValueError("실행을 완료하거나 중지한 뒤 되돌리세요.")
@@ -824,7 +827,7 @@ def make_handler(app):
                     self.send(404, {"error": "찾을 수 없는 경로입니다."})
             except WorkInProgress as exc:
                 self.send(409, {"error": str(exc), "activity": app.activity()})
-            except (ValueError, TypeError, AttributeError) as exc:
+            except (ValueError, TypeError, AttributeError, OSError) as exc:
                 self.send(400, {"error": str(exc)})
 
         def log_message(self, fmt, *args):

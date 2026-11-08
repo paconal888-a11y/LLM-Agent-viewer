@@ -220,9 +220,7 @@ def execute(harness, run):
             run.model_calls += 1
             if response.get("system_fingerprint"):
                 run.conditions["engine_fingerprint"] = response["system_fingerprint"]
-            usage = response.get("usage", {})
-            for key in run.usage:
-                run.usage[key] += int(usage.get(key, 0) or 0)
+            run.add_usage(response.get("usage"))
             response_event = run.emit(
                 "model.response",
                 f"모델 호출 #{iteration} · {'SSE를 합친 응답' if streaming else '원본 응답'}",
@@ -383,6 +381,11 @@ def execute(harness, run):
                 "모델 도구 요청",
                 response_event,
             )
+            seen_ids = [c.get("id") for c in calls if isinstance(c, dict)]
+            if len(seen_ids) != len(set(seen_ids)):
+                raise RuntimeFailure(
+                    "모델이 같은 tool_call id를 두 번 사용했습니다. 결과와 요청을 짝지을 수 없어 실행하지 않습니다."
+                )
             for call in calls:
                 if (
                     not isinstance(call, dict)

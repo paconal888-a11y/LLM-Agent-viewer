@@ -446,8 +446,7 @@ def prepare(harness, run, history):
                     preview = preview_input(run, harness.runtime, payload, 0)
                     response = generate(run, harness.runtime, payload, 0)
                 run.model_calls += 1
-                for key in run.usage:
-                    run.usage[key] += int(response.get("usage", {}).get(key, 0) or 0)
+                run.add_usage(response.get("usage"))
                 run.conditions.setdefault("model_input_sha256", []).append(
                     input_fingerprint(payload)
                 )

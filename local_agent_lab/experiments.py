@@ -177,6 +177,10 @@ def summarize(run, case_id):
         "features": snapshot["features"],
         "engine": snapshot.get("engine", {}),
         "mode": snapshot.get("mode", "single"),
+        "effective_prompt": snapshot.get("effective_prompt"),
+        "implementation": (snapshot.get("implementation") or {}).get("version"),
+        "created_at": snapshot.get("created_at"),
+        "elapsed_seconds": snapshot.get("elapsed_seconds"),
         "agents": snapshot.get("agents", []),
         "conditions": snapshot["conditions"],
         "metrics": run_metrics(snapshot),
@@ -214,6 +218,8 @@ class ExperimentService:
             if right is None:
                 right = DEFAULT_FEATURES
         modes = {"A": normalize_mode(left_mode), "B": normalize_mode(right_mode)}
+        if self.app.samples_only:
+            raise ValueError("샘플 보기 모드에서는 비교 실험을 시작하지 않습니다.")
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 6000:
             raise ValueError("비교할 요청을 1~6,000자로 입력하세요.")
         features_a = normalize_features(BASELINE_FEATURES if left is None else left)
@@ -289,8 +295,18 @@ class ExperimentService:
                 return
             a = item["results"]["A"]["conditions"]
             b = item["results"]["B"]["conditions"]
+            if not a or not b:
+                # 한쪽이 루프 진입 전에 실패하면 조건이 비어 있다. 빈 값끼리 비교해 '같다'고 표시하지 않는다.
+                item["controls"] = None
+                item["status"] = "completed"
+                item["phase"] = "done"
+                item["note"] = "한쪽 실행이 조건을 기록하기 전에 실패해 통제 변수를 비교하지 않았습니다."
+                return
             item["controls"] = {
-                "same_prompt": True,
+                "same_prompt": item["results"]["A"].get("effective_prompt")
+                == item["results"]["B"].get("effective_prompt"),
+                "same_harness_code": item["results"]["A"].get("implementation")
+                == item["results"]["B"].get("implementation"),
                 "same_model": a.get("model") == b.get("model"),
                 "same_generation": bool(a.get("effective_generation_config"))
                 and a.get("effective_generation_config")

@@ -145,6 +145,15 @@ class Run:
         self.features = normalize_features(features)
         self.requirements = normalize_requirements(requirements)
         self.mode = normalize_mode(mode)
+        # 요청 시점의 설정 원본. 모드 준비가 features·requirements를 바꾸고 continue가 step을 끄기 전의 값이라
+        # 과거 실행을 그대로 다시 실행할 때 기준이 된다.
+        self.request = {
+            "step": bool(step),
+            "features": dict(self.features),
+            "requirements": [dict(item) for item in self.requirements],
+            "mode": self.mode,
+            "engine": engine_options(engine),
+        }
         self.parent_run = parent_run
         self.agent_name = agent_name
         self.children = []
@@ -178,11 +187,43 @@ class Run:
         self.model_calls = 0
         self.tool_calls = 0
         self.usage = {"prompt_tokens": 0, "completion_tokens": 0}
+        # 실행기가 usage를 보고한 호출 수와 보고하지 않은 호출 수. 미보고를 0으로 섞지 않기 위한 근거.
+        self.usage_reports = {"reported": 0, "missing": 0}
         self.lock = threading.RLock()
         self.emit_lock = threading.RLock()
         self.condition = threading.Condition(self.lock)
         self.permits = 0
         self.stopped = False
+
+    def add_usage(self, usage):
+        """실행기가 보고한 usage만 더한다. 보고가 없으면 0을 더하지 않고 missing으로 센다."""
+        if isinstance(usage, dict) and any(
+            isinstance(usage.get(key), (int, float)) for key in self.usage
+        ):
+            for key in self.usage:
+                self.usage[key] += int(usage.get(key, 0) or 0)
+            self.usage_reports["reported"] += 1
+        else:
+            self.usage_reports["missing"] += 1
+
+    def usage_totals(self):
+        """하위 포함 합계. 한 호출이라도 usage를 보고하지 않았으면 None(미수집)으로 돌려준다."""
+        runs = [self] + list(self.children)
+        missing = sum(r.usage_reports["missing"] for r in runs)
+        reported = sum(r.usage_reports["reported"] for r in runs)
+        totals = {
+            key: sum(r.usage[key] for r in runs) for key in self.usage
+        }
+        if reported == 0 and missing == 0:
+            return {**totals, "usage_reported_calls": 0, "usage_missing_calls": 0}
+        if missing:
+            return {
+                **{key: None for key in totals},
+                "usage_reported_calls": reported,
+                "usage_missing_calls": missing,
+                "partial_usage": totals,
+            }
+        return {**totals, "usage_reported_calls": reported, "usage_missing_calls": 0}
 
     def emit(self, *args, **kwargs):
         frame = inspect.currentframe().f_back
@@ -253,6 +294,9 @@ class Run:
                 self.status = "running"
         if self.parent_run:
             # 자식 lock을 해제한 뒤 부모에 전달하여 stop과 교착하지 않는다.
+            # 부모가 단계 정지 중이면 이 호출이 멈춘다. 그 시간은 자식의 forward·active 시간에서도 빼야 하므로 자식에 더한다.
+            parent_pause_before = self.parent_run.paused_seconds
+            started_mirror = time.perf_counter()
             mirrored = self.parent_run.emit(
                 kind,
                 self.agent_name + " · " + title,
@@ -271,6 +315,12 @@ class Run:
                 child_elapsed_ms=event["elapsed_ms"],
             )
             self.parent_event_ids[event["id"]] = mirrored
+            inherited = self.parent_run.paused_seconds - parent_pause_before
+            if inherited > 0:
+                with self.condition:
+                    self.paused_seconds += min(
+                        inherited, time.perf_counter() - started_mirror
+                    )
         return event["id"]
 
     def record_interrupted(self, kind, title, detail, **kwargs):
@@ -305,7 +355,9 @@ class Run:
     def control(self, action):
         with self.condition:
             if action == "next":
-                self.permits += 1
+                # 정지 중일 때만 한 단계 허가를 준다. running 상태에서 쌓인 허가는 다음 정지 지점을 조용히 건너뛰게 한다.
+                if self.status == "paused" and self.step_mode:
+                    self.permits = 1
             elif action == "continue":
                 self.step_mode = False
             elif action == "stop":
@@ -355,11 +407,9 @@ class Run:
                         + sum(c.model_calls for c in self.children),
                         "tool_calls": self.tool_calls
                         + sum(c.tool_calls for c in self.children),
-                        "prompt_tokens": self.usage["prompt_tokens"]
-                        + sum(c.usage["prompt_tokens"] for c in self.children),
-                        "completion_tokens": self.usage["completion_tokens"]
-                        + sum(c.usage["completion_tokens"] for c in self.children),
+                        **self.usage_totals(),
                     },
+                    "request": self.request,
                     "integrations": self.integration_info,
                     "plan": self.plan,
                     "engine": self.engine,
@@ -374,6 +424,7 @@ class Run:
                     "model_calls": self.model_calls,
                     "tool_calls": self.tool_calls,
                     "usage": self.usage,
+                    "usage_reports": self.usage_reports,
                     "elapsed_seconds": round(elapsed, 3),
                     "paused_seconds": round(paused, 3),
                     "active_seconds": round(max(0, elapsed - paused), 3),

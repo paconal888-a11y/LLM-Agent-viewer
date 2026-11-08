@@ -342,6 +342,8 @@ class ProjectFiles:
         if not re.fullmatch(r"[0-9-]+-[a-f0-9]{8}", edit_id):
             raise ValueError("수정 기록 ID가 올바르지 않습니다.")
         directory = self.state_dir / "edits" / edit_id
+        if not (directory / "edit.json").is_file() or not (directory / "before.txt").is_file():
+            raise ValueError("수정 기록을 찾을 수 없습니다: " + edit_id)
         metadata = json.loads((directory / "edit.json").read_text(encoding="utf-8"))
         original = (directory / "before.txt").read_text(encoding="utf-8")
         return self.save(metadata["path"], original, expected_sha)

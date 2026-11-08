@@ -169,6 +169,23 @@ class WebTests(unittest.TestCase):
         self.assertTrue(self.request("/api/project/check", {"path": "demo_workspace/AGENTS.md", "text": "# 규칙\n"})["passed"])
         self.assertFalse(self.app.busy())
 
+    def test_missing_edit_id_and_sample_mode_writes_return_json_errors(self):
+        # W-03: 없는 edit_id가 미처리 FileNotFoundError로 응답 없이 연결을 끊었다. W-05: 샘플 모드 저장 허용.
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            self.request("/api/project/restore", {"edit_id": "20260101-000000-deadbeef", "expected_sha256": "x"})
+        self.assertEqual(error.exception.code, 400)
+        self.assertIn("수정 기록", json.load(error.exception)["error"])
+        self.app.samples_only = True
+        try:
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                self.request("/api/project/save", {"path": "demo_workspace/AGENTS.md", "text": "x", "expected_sha256": "y"})
+            self.assertEqual(error.exception.code, 400)
+            self.assertIn("샘플 보기 모드", json.load(error.exception)["error"])
+        finally:
+            self.app.samples_only = False
+        history = self.request("/api/history")
+        self.assertIsInstance(history, list)
+
     def test_project_edit_is_blocked_during_active_run(self):
         run = Run("paused", "web-test")
         run.status = "paused"

@@ -105,7 +105,15 @@ def workspace_signature(workspace):
 
 def run_metrics(snapshot):
     totals = snapshot.get("totals") or {}
-    requests = [e["input"] for e in snapshot["events"] if e["kind"] == "model.request"]
+    # 공개 도구 수는 답변용 요청 기준이다. 요약(compaction) 요청은 도구가 없어 먼저 오면 0으로 보였다.
+    answer_requests = [
+        e["input"]
+        for e in snapshot["events"]
+        if e["kind"] == "model.request" and e.get("model_purpose", "answer") == "answer"
+    ]
+    requests = answer_requests or [
+        e["input"] for e in snapshot["events"] if e["kind"] == "model.request"
+    ]
     names = (
         [t["function"]["name"] for t in requests[0].get("tools", [])]
         if requests
@@ -135,12 +143,14 @@ def run_metrics(snapshot):
         ),
         "elapsed_seconds": snapshot.get("elapsed_seconds", 0),
         "paused_seconds": snapshot.get("paused_seconds", 0),
+        # 실행기가 usage를 보고하지 않은 호출이 있으면 None(미수집). 0은 실제 보고값일 때만 쓴다.
         "prompt_tokens": totals.get(
             "prompt_tokens", snapshot.get("usage", {}).get("prompt_tokens", 0)
         ),
         "completion_tokens": totals.get(
             "completion_tokens", snapshot.get("usage", {}).get("completion_tokens", 0)
         ),
+        "usage_missing_calls": totals.get("usage_missing_calls", 0),
         "model_calls": totals.get("model_calls", snapshot.get("model_calls", 0)),
         "tool_calls": totals.get("tool_calls", snapshot.get("tool_calls", 0)),
         "engine_seconds": round(
