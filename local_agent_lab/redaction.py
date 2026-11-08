@@ -67,6 +67,16 @@ def _separators(path: str):
     return [re.compile("(?i)" + pattern)]
 
 
+def _spellings(label, path):
+    """같은 위치의 표기들. 8.3 짧은 이름이나 링크로 받은 경로는 실제 경로로도 찾는다."""
+    path = Path(path)
+    try:
+        real = path.resolve()
+    except (OSError, RuntimeError):
+        return [(label, path)]
+    return [(label, path)] if real == path else [(label, path), (label, real)]
+
+
 class Redactor:
     def __init__(self, options=None, *, workspace=None, home=None, user=None):
         self.options = {**DEFAULT_OPTIONS, **(options or {})}
@@ -79,13 +89,13 @@ class Redactor:
         if self.options["paths"]:
             ordered = []
             if workspace:
-                ordered.append(("<WORKSPACE>", Path(workspace)))
-            ordered.append(("<PROJECT>", ROOT))
+                ordered += _spellings("<WORKSPACE>", workspace)
+            ordered += _spellings("<PROJECT>", ROOT)
             try:
-                ordered.append(("<LOCALAPPDATA>", data_home().parent))
+                ordered += _spellings("<LOCALAPPDATA>", data_home().parent)
             except (OSError, RuntimeError):
                 pass
-            ordered.append(("<USER_HOME>", home))
+            ordered += _spellings("<USER_HOME>", home)
             ordered.sort(key=lambda item: len(str(item[1])), reverse=True)
             for label, path in ordered:
                 for pattern in _separators(str(path)):

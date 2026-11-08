@@ -106,6 +106,14 @@ class RedactionTests(unittest.TestCase):
         self.assertNotIn("Corp%20Folder", replaced)
         self.assertIn("<WORKSPACE>", replaced)
 
+    def test_a_workspace_spelled_differently_is_found_by_its_real_path(self):
+        real = Path(self.temp.name).resolve() / "Corp Folder"
+        real.mkdir()
+        redactor = redaction.Redactor(workspace=real / ".." / "Corp Folder", home=Path(self.temp.name), user="")
+        replaced = redactor.text((real / "demo.py").as_uri())
+        self.assertNotIn("Corp%20Folder", replaced)
+        self.assertIn("<WORKSPACE>", replaced)
+
     def test_options_omit_bodies_and_generic_home_paths_and_user_name(self):
         snapshot, secret = self.real_snapshot()
         shared = redaction.share_copy(
