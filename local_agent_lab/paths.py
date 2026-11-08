@@ -5,6 +5,10 @@ from pathlib import Path
 
 
 def data_home():
+    # 런처가 기존 설치 위치를 찾았거나 사용자가 지정한 경우. 지정하지 않으면 OS 기본 위치를 쓴다.
+    override = os.environ.get("AGENT_LENS_HOME")
+    if override:
+        return Path(override)
     if os.name == "nt":
         return (
             Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))

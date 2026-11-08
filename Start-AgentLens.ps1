@@ -7,7 +7,37 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $projectDir = $PSScriptRoot
+function Find-PackagedDataHome([string[]]$RequiredFiles) {
+    # MSIX로 설치된 앱(Codex 등) 안에서 이 런처를 실행하면 %LOCALAPPDATA% 쓰기가 그 앱의 저장소
+    # (%LOCALAPPDATA%\Packages\<앱>\LocalCache\Local)로 가상화되어 일반 콘솔에서는 파일이 없는 것처럼 보인다.
+    # 이미 받은 런타임·모델을 다시 내려받지 않도록 그 위치를 찾아 그대로 쓴다. 복사·이동·삭제는 하지 않는다.
+    $packages = Join-Path $env:LOCALAPPDATA 'Packages'
+    if (-not (Test-Path -LiteralPath $packages)) { return $null }
+    foreach ($package in Get-ChildItem -LiteralPath $packages -Directory -ErrorAction SilentlyContinue) {
+        $candidate = Join-Path $package.FullName 'LocalCache\Local\AgentLens'
+        $complete = $true
+        foreach ($file in $RequiredFiles) {
+            if (-not (Test-Path -LiteralPath (Join-Path $candidate $file))) { $complete = $false; break }
+        }
+        if ($complete) { return $candidate }
+    }
+    return $null
+}
 $agentLensRoot = Join-Path $env:LOCALAPPDATA 'AgentLens'
+if ($env:AGENT_LENS_HOME) { $agentLensRoot = $env:AGENT_LENS_HOME }
+$requiredFiles = @()
+if (-not $SamplesOnly) {
+    if ($Backend -eq 'llama') { $requiredFiles = @('runtime\b12110-vulkan\llama-server.exe', 'models\Qwen3-4B-Q4_K_M.gguf') }
+    else { $requiredFiles = @('models\Qwen3-0.6B\model.safetensors') }
+}
+if (@($requiredFiles | Where-Object { -not (Test-Path -LiteralPath (Join-Path $agentLensRoot $_)) }).Count -gt 0) {
+    $packagedHome = Find-PackagedDataHome $requiredFiles
+    if ($packagedHome) {
+        $agentLensRoot = $packagedHome
+        $env:AGENT_LENS_HOME = $packagedHome
+        Write-Host ('앱 패키지 저장소에 있는 기존 런타임·모델을 그대로 사용합니다: {0}' -f $packagedHome)
+    }
+}
 $runtimeExe = Join-Path $agentLensRoot 'runtime\b12110-vulkan\llama-server.exe'
 $modelFile = Join-Path $agentLensRoot 'models\Qwen3-4B-Q4_K_M.gguf'
 $localDir = Join-Path $projectDir '.local'

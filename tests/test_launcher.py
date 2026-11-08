@@ -12,7 +12,9 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
+from local_agent_lab.paths import data_home, reference_model_path
 from local_agent_lab.trace import ROOT
 
 POWERSHELL = shutil.which("powershell") if os.name == "nt" else None
@@ -38,6 +40,22 @@ class LauncherSourceTests(unittest.TestCase):
         self.assertNotRegex(text, r"(?m)&\s+uv\b")
         self.assertNotRegex(text, r"(?m)&\s+\(Join-Path \$projectDir '\.venv")
         self.assertGreaterEqual(len(re.findall(r"Invoke-Native\s+'uv'", text)), 3)
+
+    def test_data_home_follows_the_override(self):
+        with mock.patch.dict(os.environ, {"AGENT_LENS_HOME": "D:/agent-lens-data"}):
+            self.assertEqual(data_home(), Path("D:/agent-lens-data"))
+            self.assertEqual(
+                reference_model_path(),
+                Path("D:/agent-lens-data/models/Qwen3-0.6B"),
+            )
+
+    def test_setup_honours_the_same_override_as_the_launcher(self):
+        for script in (LAUNCHER, SETUP):
+            with self.subTest(script=script.name):
+                self.assertIn(
+                    "if ($env:AGENT_LENS_HOME) { $agentLensRoot = $env:AGENT_LENS_HOME }",
+                    script.read_text(encoding="utf-8-sig"),
+                )
 
     def test_curl_runs_outside_stop_preference(self):
         text = SETUP.read_text(encoding="utf-8-sig")
@@ -117,6 +135,37 @@ Invoke-Native 'agent-lens-no-such-command' @('x')
         )
         self.assertNotIn("after-call", result.stdout)
         self.assertNotEqual(result.returncode, 0)
+
+    def find_packaged(self, *required):
+        script = r"""
+Invoke-Expression (Import-ScriptFunction $env:PROBE_LAUNCHER 'Find-PackagedDataHome')
+$found = Find-PackagedDataHome @($env:PROBE_REQUIRED -split ';')
+if ($found) { "found=$found" } else { 'found=none' }
+"""
+        return self.powershell(
+            script,
+            LOCALAPPDATA=str(self.root),
+            PROBE_REQUIRED=";".join(required),
+        ).stdout.strip()
+
+    def test_finds_runtime_stored_in_an_app_package_without_touching_it(self):
+        required = ("runtime\\llama-server.exe", "models\\model.gguf")
+        partial = self.root / "Packages" / "A.Partial" / "LocalCache" / "Local" / "AgentLens"
+        (partial / "runtime").mkdir(parents=True)
+        (partial / "runtime" / "llama-server.exe").write_bytes(b"x")
+        self.assertEqual(self.find_packaged(*required), "found=none")
+        complete = self.root / "Packages" / "B.Complete" / "LocalCache" / "Local" / "AgentLens"
+        (complete / "runtime").mkdir(parents=True)
+        (complete / "models").mkdir()
+        (complete / "runtime" / "llama-server.exe").write_bytes(b"exe")
+        (complete / "models" / "model.gguf").write_bytes(b"gguf")
+        before = sorted(str(p) for p in self.root.rglob("*"))
+        self.assertEqual(self.find_packaged(*required), f"found={complete}")
+        after = [p for p in sorted(str(p) for p in self.root.rglob("*")) if "probe.ps1" not in p]
+        self.assertEqual([p for p in before if "probe.ps1" not in p], after)
+
+    def test_no_packages_folder_means_nothing_is_found(self):
+        self.assertEqual(self.find_packaged("models\\model.gguf"), "found=none")
 
     def test_curl_progress_does_not_abort_verified_download(self):
         # 네트워크 없이 file:// 주소로 실제 curl.exe를 실행해 stderr 진행 표시를 만든다.

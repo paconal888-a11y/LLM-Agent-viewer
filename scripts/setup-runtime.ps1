@@ -2,6 +2,7 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $agentLensRoot = Join-Path $env:LOCALAPPDATA 'AgentLens'
+if ($env:AGENT_LENS_HOME) { $agentLensRoot = $env:AGENT_LENS_HOME }
 $downloadDir = Join-Path $agentLensRoot 'downloads'
 $modelDir = Join-Path $agentLensRoot 'models'
 $runtimeDir = Join-Path $agentLensRoot 'runtime\b12110-vulkan'
