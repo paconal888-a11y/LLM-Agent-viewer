@@ -1,7 +1,7 @@
 # Agent Lens
 
 [![Tests](https://github.com/paconal888-a11y/LLM-Agent-viewer/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/paconal888-a11y/LLM-Agent-viewer/actions/workflows/tests.yml)
-[![Release](https://img.shields.io/github/v/release/paconal888-a11y/LLM-Agent-viewer)](https://github.com/paconal888-a11y/LLM-Agent-viewer/releases)
+[![Version](https://img.shields.io/github/v/tag/paconal888-a11y/LLM-Agent-viewer?label=version&sort=semver)](https://github.com/paconal888-a11y/LLM-Agent-viewer/tags)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **AI 에이전트가 실제로 무엇을 하는지 한 단계씩 들여다보고, 직접 고쳐서 측정하는 로컬 도구입니다.**
