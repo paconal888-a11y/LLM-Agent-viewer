@@ -502,7 +502,7 @@ def execute(harness, run):
                     if repeated_rejection(run, rejected, message, missing, outstanding):
                         raise RuntimeFailure(
                             f"같은 미검증 답변이 {REPEATED_ANSWER_LIMIT}회 반복됐고 새 도구 호출이 없어 중단했습니다. "
-                            "필수 작업 결과는 아직 없습니다. 요청·도구 설정을 확인하고 다시 실행하세요."
+                            "필수 작업 결과는 아직 없습니다. 원인 찾기에서 어느 단계까지 정상인지 확인하세요."
                         )
                     correction = (
                         "아직 실제 도구 결과로 확인하지 못한 조건이 있습니다. 아래 목록은 실행 결과가 아니라 남은 요구 사항입니다. "

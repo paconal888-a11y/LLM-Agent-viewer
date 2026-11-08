@@ -69,7 +69,12 @@ function Test-SameProject($status) {
     # 0.5.0 이전 앱은 project_root를 보고하지 않는다. 식별할 수 없으면 같은 프로젝트로 간주하지 않는다.
     $reported = Get-Prop $status 'project_root' ''
     if ($reported -eq '') { return $false }
-    return (Get-NormalizedPath $reported) -eq (Get-NormalizedPath $projectDir)
+    # project_root는 링크를 푼 경로다. 정션 등으로 들어온 폴더는 앱의 작업 폴더와 비교한다.
+    $wanted = Get-NormalizedPath $projectDir
+    return ((Get-NormalizedPath $reported) -eq $wanted) -or ((Get-NormalizedPath (Get-Prop $status 'working_directory' '')) -eq $wanted)
+}
+function Save-ProcessRecord {
+    [System.IO.File]::WriteAllText($pidFile, ($owned | ConvertTo-Json -Depth 4), [System.Text.UTF8Encoding]::new($false))
 }
 function Get-PortListener {
     try { $connection = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Stop | Select-Object -First 1 } catch { return $null }
@@ -104,14 +109,18 @@ function Invoke-Native([string]$FilePath, [string[]]$Arguments) {
     & $FilePath @Arguments
 }
 
-if (-not $SamplesOnly -and $Backend -eq 'llama' -and (-not (Test-Path -LiteralPath $runtimeExe) -or -not (Test-Path -LiteralPath $modelFile))) {
+# 내려받다 끊긴 모델 파일도 준비되지 않은 것으로 본다.
+$modelReady = (Test-Path -LiteralPath $modelFile) -and ((Get-Item -LiteralPath $modelFile).Length -eq 2497280256)
+if (-not $SamplesOnly -and $Backend -eq 'llama' -and (-not (Test-Path -LiteralPath $runtimeExe) -or -not $modelReady)) {
     & (Join-Path $projectDir 'scripts\setup-runtime.ps1')
 }
 Push-Location -LiteralPath $projectDir
 try {
-    if ($SamplesOnly) { Invoke-Native 'uv' @('sync', '--python', '3.12', '--inexact', '--locked', '--system-certs') }
-    elseif ($Backend -eq 'reference') { Invoke-Native 'uv' @('sync', '--python', '3.12', '--extra', 'reference', '--extra', 'integrations', '--locked', '--system-certs') }
-    else { Invoke-Native 'uv' @('sync', '--python', '3.12', '--extra', 'integrations', '--inexact', '--locked', '--system-certs') }
+    # 회사망의 인증서를 쓰도록 한다. 명령행 옵션은 uv 버전마다 달라 환경 변수로 지정한다(모르는 변수는 무시된다).
+    if (-not $env:UV_SYSTEM_CERTS) { $env:UV_SYSTEM_CERTS = '1' }
+    if ($SamplesOnly) { Invoke-Native 'uv' @('sync', '--python', '3.12', '--inexact', '--locked') }
+    elseif ($Backend -eq 'reference') { Invoke-Native 'uv' @('sync', '--python', '3.12', '--extra', 'reference', '--extra', 'integrations', '--locked') }
+    else { Invoke-Native 'uv' @('sync', '--python', '3.12', '--extra', 'integrations', '--inexact', '--locked') }
     if ($LASTEXITCODE -ne 0) { throw 'Python environment setup failed.' }
     if (-not $SamplesOnly -and $Backend -eq 'reference') {
         Invoke-Native (Join-Path $projectDir '.venv\Scripts\python.exe') @((Join-Path $projectDir 'scripts\setup_reference.py'))
@@ -147,6 +156,25 @@ try {
         $engineStarted = ''
         try { $engineStarted = $engine.StartTime.ToString('o') } catch { }
         $owned.engine = @{ pid = $engine.Id; path = $runtimeExe; started = $engineStarted }
+        # 뒤의 단계가 실패해도 종료 스크립트가 엔진을 찾을 수 있게 바로 기록한다.
+        Save-ProcessRecord
+        # 드라이버·포트 문제로 바로 끝나는 경우를 알린다. 모델을 읽는 동안에는 /health가 503을 돌려준다.
+        $engineDeadline = (Get-Date).AddSeconds(10)
+        while ((Get-Date) -lt $engineDeadline -and -not $engine.HasExited) {
+            try {
+                Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:8088/health' -TimeoutSec 2 | Out-Null
+                break
+            } catch {
+                if ($_.Exception -is [System.Net.WebException] -and $null -ne $_.Exception.Response) { break }
+            }
+            Start-Sleep -Milliseconds 500
+        }
+        if ($engine.HasExited) {
+            $engineLog = Join-Path $agentLensRoot 'logs\engine.stderr.log'
+            $engineTail = ''
+            if (Test-Path -LiteralPath $engineLog) { $engineTail = (Get-Content -LiteralPath $engineLog -Tail 20) -join "`n" }
+            throw ("llama.cpp 엔진이 시작 직후 종료됐습니다 (exit code {0}). 로그: {1}`n{2}" -f $engine.ExitCode, $engineLog, $engineTail)
+        }
     }
 
     # 포트에 이미 떠 있는 것이 무엇인지 먼저 식별한다: 같은 프로젝트·같은 버전·같은 모드의 Agent Lens만 재사용한다.
@@ -169,9 +197,9 @@ try {
             & (Join-Path $projectDir 'scripts\stop-owned-app.ps1') -AppProcessId (Get-Prop $owned.app 'pid' 0) -StartedAt (Get-Prop $owned.app 'started' '')
             $deadline = (Get-Date).AddSeconds(10)
             while ((Get-Date) -lt $deadline -and $null -ne (Get-AppStatus)) { Start-Sleep -Milliseconds 300 }
-            if ($null -ne (Get-AppStatus)) { throw ('포트 {0}의 이전 앱이 종료되지 않았습니다. Stop-AgentLens.ps1을 실행한 뒤 다시 시도하세요.' -f $Port) }
+            if ($null -ne (Get-AppStatus)) { throw ('포트 {0}의 이전 앱이 종료되지 않았습니다. Stop-AgentLens.cmd를 실행한 뒤 다시 시도하세요.' -f $Port) }
         } else {
-            throw ('포트 {0}에 다른 Agent Lens가 실행 중입니다 ({1}). 그 폴더에서 Stop-AgentLens.ps1을 실행하거나 -Port 로 다른 포트를 지정하세요. 이 스크립트는 다른 프로젝트나 기록에 없는 프로세스를 종료하지 않습니다.' -f $Port, $description)
+            throw ('포트 {0}에 다른 Agent Lens가 실행 중입니다 ({1}). 그 폴더에서 Stop-AgentLens.cmd를 실행하거나 -Port 로 다른 포트를 지정하세요. 이 스크립트는 다른 프로젝트나 기록에 없는 프로세스를 종료하지 않습니다.' -f $Port, $description)
         }
     } else {
         $listener = Get-PortListener
@@ -196,7 +224,9 @@ try {
         if ($null -eq $ready) {
             $tail = Get-LogTail
             if ($appProcess.HasExited) { throw ("앱이 시작 직후 종료됐습니다 (exit code {0}). 로그: {1}`n{2}" -f $appProcess.ExitCode, $stderrLog, $tail) }
-            throw ("앱이 90초 안에 응답하지 않았습니다. 로그: {0}`n{1}" -f $stderrLog, $tail)
+            # 응답 없는 앱을 숨긴 채 남기면 다음 시작이 포트 충돌로 막힌다.
+            & (Join-Path $projectDir 'scripts\stop-owned-app.ps1') -AppProcessId $appProcess.Id -StartedAt $appProcess.StartTime.ToString('o')
+            throw ("앱이 90초 안에 응답하지 않아 종료했습니다. 로그: {0}`n{1}" -f $stderrLog, $tail)
         }
         $appStarted = ''
         try { $appStarted = $appProcess.StartTime.ToString('o') } catch { }
@@ -206,7 +236,7 @@ try {
         }
         Write-Host ('Agent Lens {0} 시작 (pid {1}, instance {2}).' -f (Get-Prop $ready 'version' '?'), $appProcess.Id, (Get-Prop $ready 'instance' '?'))
     }
-    [System.IO.File]::WriteAllText($pidFile, ($owned | ConvertTo-Json -Depth 4), [System.Text.UTF8Encoding]::new($false))
+    Save-ProcessRecord
     Write-Host ('Agent Lens: {0}' -f $appUrl)
     if ($SamplesOnly) { Write-Host '실제 저장 기록을 재생합니다. 모델을 다운로드하거나 불러오지 않습니다.' }
     else { Write-Host '모델을 불러오는 중일 수 있습니다. 화면에서 상태를 확인하세요.' }

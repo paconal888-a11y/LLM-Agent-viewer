@@ -16,6 +16,7 @@ import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 from .paths import data_home
 from .trace import ROOT
@@ -59,7 +60,9 @@ def _separators(path: str):
     if not text:
         return []
     parts = re.split(r"[\\/]+", text)
-    variants = {"\\".join(parts), "\\\\".join(parts), "/".join(parts)}
+    # LSP 문서 URI처럼 퍼센트 인코딩된 표기도 같은 경로다.
+    encoded = "/".join(quote(part, safe=":") for part in parts)
+    variants = {"\\".join(parts), "\\\\".join(parts), "/".join(parts), encoded, encoded.replace(":", "%3A", 1)}
     pattern = "|".join(re.escape(v) for v in sorted(variants, key=len, reverse=True))
     return [re.compile("(?i)" + pattern)]
 

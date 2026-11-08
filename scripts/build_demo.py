@@ -80,7 +80,7 @@ def build(output):
         status = {
             key: value
             for key, value in app.health().items()
-            if key not in {"project_root", "instance", "pid", "started_at", "workspace"}
+            if key not in {"project_root", "working_directory", "instance", "pid", "started_at", "workspace"}
         }
         write_json(data / "status.json", {**status, "demo": True, "repository": REPOSITORY})
         index = json.loads((ROOT / "samples" / "index.json").read_text(encoding="utf-8"))

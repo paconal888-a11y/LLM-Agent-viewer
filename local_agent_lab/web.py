@@ -97,6 +97,7 @@ class Application:
             "app": "Agent Lens",
             "version": app_version(),
             "project_root": str(ROOT),
+            "working_directory": os.getcwd(),
             "instance": uuid.uuid4().hex[:12],
             "pid": os.getpid(),
             "started_at": datetime.now(timezone.utc).isoformat(),

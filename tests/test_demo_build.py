@@ -41,7 +41,7 @@ class DemoBuildTests(unittest.TestCase):
         self.assertTrue(status["demo"])
         self.assertEqual(status["mode"], "sample")
         self.assertFalse(status["connected"])
-        for key in ("project_root", "pid", "instance", "workspace"):
+        for key in ("project_root", "working_directory", "pid", "instance", "workspace"):
             self.assertNotIn(key, status)
 
     def test_files_are_read_only(self):

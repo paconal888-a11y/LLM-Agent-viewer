@@ -31,5 +31,7 @@ foreach ($property in @('app', 'engine')) {
     }
     if ($property -eq 'app') { & (Join-Path $PSScriptRoot 'scripts\stop-owned-app.ps1') -AppProcessId $running.Id -StartedAt $recordedStart }
     else { Stop-Process -Id $running.Id }
-    Write-Host ("Stopped owned Agent Lens process: {0} (pid {1})" -f $property, $running.Id)
+    Start-Sleep -Milliseconds 500
+    if (Get-Process -Id $running.Id -ErrorAction Ignore) { Write-Host ("{0}: PID {1}가 아직 종료되지 않았습니다." -f $property, $running.Id) }
+    else { Write-Host ("Stopped owned Agent Lens process: {0} (pid {1})" -f $property, $running.Id) }
 }

@@ -406,7 +406,7 @@
         {
           kind: "memory.compaction.result",
           title: "2,488자가 73자가 됩니다",
-          body: "무엇을 남길지는 모델이 고릅니다. 원문 파일은 지우지 않고 그대로 둡니다.",
+          body: "2,488은 JSON으로 직렬화한 입력의 길이입니다. 무엇을 남길지는 모델이 고르고, 원문 파일은 지우지 않습니다.",
         },
         {
           kind: "memory.summary.include",

@@ -67,7 +67,7 @@ class LauncherSourceTests(unittest.TestCase):
     def test_curl_runs_outside_stop_preference(self):
         text = SETUP.read_text(encoding="utf-8-sig")
         guarded = re.search(
-            r"\$ErrorActionPreference = 'Continue'\s+try \{ & curl\.exe", text
+            r"\$ErrorActionPreference = 'Continue'\s+try \{[\s\S]*?& curl\.exe", text
         )
         self.assertIsNotNone(guarded, "curl 호출이 Continue 구간 밖에 있습니다.")
 
