@@ -488,6 +488,19 @@ def make_handler(app):
                             "content": file_path.read_text(encoding="utf-8-sig"),
                         },
                     )
+                elif path.startswith("/api/runs/") and path.endswith("/search"):
+                    from .search import search
+
+                    run_id = path.split("/")[3]
+                    kinds = [k for k in query.get("kind", []) if k]
+                    self.send(
+                        200,
+                        search(
+                            app.get_run(run_id, 0, compact=True),
+                            query.get("q", [""])[0],
+                            kinds=set(kinds) or None,
+                        ),
+                    )
                 elif path.startswith("/api/runs/") and (
                     path.endswith("/export/preview") or path.endswith("/export/share")
                 ):
