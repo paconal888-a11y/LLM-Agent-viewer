@@ -29,6 +29,7 @@ MODULES = (
 EDITABLE_CODE = {f"local_agent_lab/{name}.py" for name in MODULES}
 READABLE_CODE = EDITABLE_CODE | {
     "local_agent_lab/reference_engine.py",
+    "local_agent_lab/model_files.py",
     "local_agent_lab/runtime.py",
     "local_agent_lab/trace.py",
     "local_agent_lab/web.py",
@@ -41,6 +42,7 @@ READABLE_CODE = EDITABLE_CODE | {
     "local_agent_lab/orchestration.py",
     "local_agent_lab/context_memory.py",
     "web/architecture.js",
+    "web/inspection.js",
     "web/diagram.css",
 }
 

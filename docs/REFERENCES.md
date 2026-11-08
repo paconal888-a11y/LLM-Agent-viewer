@@ -2,13 +2,9 @@
 
 설계와 프로토콜 구현에 참고한 자료입니다. 확인일: 2026-11-08.
 
-## 비슷한 제품
+## 유사 제품
 
-| 제품 | 겹치는 목적 | Agent Lens에서 중점적으로 보는 부분 |
-| --- | --- | --- |
-| [LangSmith Studio](https://docs.langchain.com/langsmith/studio) | 에이전트 그래프, 중간 상태, 프롬프트와 실행을 확인·실험 | 파일 열기·바이트 읽기부터 실제 함수·메시지 조립까지, 수정 가능한 작은 하네스와 연결 |
-| [Langfuse Observability](https://langfuse.com/docs/observability/overview) | 프롬프트·응답·도구·토큰·시간을 trace로 관찰 | 모델 설치 없이 볼 수 있는 실제 기록과, 선택 레이어의 실제 텐서·KV 표본 |
-| [OpenCode MCP 연결](https://docs.opencode.ai/docs/mcp-servers/) | MCP 서버의 도구를 모델에 공개하여 작업 확장 | 도구 발견 → schema 변환 → 입력 증가 → 원본 JSON-RPC → 결과 재주입을 전후 비교 |
+LangSmith Studio, Langfuse, ADK Web, Transformer Explainer, LLM Visualization의 범위와 반영한 개선은 [유사 제품 비교](COMPARISON.md)에 정리했습니다.
 
 ## 하네스 구성
 
@@ -34,7 +30,7 @@
 - [server/discover](https://modelcontextprotocol.io/specification/2026-07-28/server/discover), [도구](https://modelcontextprotocol.io/specification/2026-07-28/server/tools), [전송](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports): 요청별 메타데이터·도구 목록·도구 실행과 newline framing. 표준 전체를 지원한다고 주장하지 않습니다.
 - [LSP 3.17 명세](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/): Content-Length, 문서 동기화, 0부터 시작하는 위치, 진단·심볼·정의.
 - [python-lsp-server](https://github.com/python-lsp/python-lsp-server): 실제 Python 진단 서버. 설치 버전은 uv.lock에 고정합니다.
-- [Transformers v4.57.3 Qwen3 구현](https://github.com/huggingface/transformers/blob/v4.57.3/src/transformers/models/qwen3/modeling_qwen3.py): 직접 생성 루프에서 호출하는 신경망·캐시 구현.
+- [Transformers v5.22.2 Qwen3 구현](https://github.com/huggingface/transformers/blob/v5.22.2/src/transformers/models/qwen3/modeling_qwen3.py): 직접 생성 루프에서 호출하는 신경망·캐시 구현.
 - [KV 캐시 설명](https://huggingface.co/docs/transformers/en/cache_explanation): 과거 위치의 K/V를 다시 사용하는 계산 상태.
 - [llama.cpp b12110 서버](https://github.com/ggml-org/llama.cpp/blob/b12110/tools/server/README.md): 선택 실행기의 실제 HTTP·SSE·통계 API.
 

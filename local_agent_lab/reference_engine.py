@@ -21,6 +21,7 @@ from pathlib import Path
 
 from .paths import reference_model_path
 from .runtime import RuntimeFailure
+from .model_files import verify_snapshot
 
 
 @lru_cache(maxsize=1)
@@ -121,6 +122,7 @@ class ReferenceRuntime:
 
     def _load(self):
         try:
+            verify_snapshot(self.path)
             import torch
             from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -482,7 +484,10 @@ class ReferenceRuntime:
                     break
                 reuse += 1
         if reuse:
-            self.cache.crop(reuse)
+            # Transformers 5의 crop은 제거할 위치 수를 음수로 받는다.
+            remove = self.cache.get_seq_length() - reuse
+            if remove > 0:
+                self.cache.crop(-remove)
             self.cache_ids = self.cache_ids[:reuse]
         else:
             self.cache = DynamicCache(config=self.model.config) if use_kv else None
@@ -566,7 +571,7 @@ class ReferenceRuntime:
                         logits_to_keep=1,
                     )
                     elapsed = (time.perf_counter() - started) * 1000
-                    # Hook에서 멈춘 관찰 시간은 계산 시간에서 제외한다.
+                    # 사용자 정지는 제외하지만 텐서 추출·hook 기록 비용은 포함한다.
                     elapsed = max(
                         0.0, elapsed - (run.paused_seconds - pause_before) * 1000
                     )
@@ -590,7 +595,11 @@ class ReferenceRuntime:
                             "call": iteration,
                             "step": step,
                             "phase": self._phase,
-                            "compute_ms": round(elapsed, 3),
+                            "observed_forward_ms": round(elapsed, 3),
+                            "timing_basis": "forward_with_observer_hooks_excluding_user_pause",
+                            "user_pause_ms": round(
+                                (run.paused_seconds - pause_before) * 1000, 3
+                            ),
                             "forward_input_tokens": len(ids),
                             "cumulative_forward_tokens": forward_tokens,
                             "before_tokens": before["tokens"],
@@ -653,6 +662,7 @@ class ReferenceRuntime:
                 for record in records
             ]
             timings = {
+                "timing_basis": "forward_with_observer_hooks_excluding_user_pause",
                 "cache_n": reuse,
                 "prompt_n": len(prompt_ids) - reuse,
                 "prompt_ms": round(prefill_ms, 3),

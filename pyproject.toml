@@ -1,12 +1,12 @@
 [project]
 name = "local-agent-lab"
-version = "0.4.0"
+version = "0.5.0"
 description = "A local agent harness learning and evaluation project"
 requires-python = ">=3.12,<3.14"
 dependencies = []
 
 [project.optional-dependencies]
-reference = ["torch==2.8.0", "transformers==4.57.3"]
+reference = ["torch==2.8.0", "transformers==5.22.2"]
 integrations = ["python-lsp-server[pyflakes]==1.15.0"]
 
 [tool.uv]

@@ -7,7 +7,7 @@ from pathlib import Path
 def workspace_path(workspace, relative):
     if not isinstance(relative, str) or not relative or len(relative) > 300:
         raise ValueError("파일 경로는 1~300자 문자열이어야 합니다.")
-    requested = Path(relative)
+    requested = Path(relative.replace("\\", "/"))
     if requested.is_absolute() or ":" in relative:
         raise ValueError("작업 공간 안의 상대 경로만 허용합니다.")
     resolved = (workspace / requested).resolve()

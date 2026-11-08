@@ -60,6 +60,14 @@ class FeedbackTests(unittest.TestCase):
             self.assertTrue(
                 any(e["kind"] == "memory.feedback.recall" for e in recalled.events)
             )
+            recalled_part = next(
+                p for p in recalled.context_segments if p["label"] == "과거 지적 재포함"
+            )
+            self.assertEqual(recalled_part["origin"], "harness")
+            self.assertEqual(
+                recalled.events[recalled_part["source_event_id"] - 1]["kind"],
+                "memory.feedback.recall",
+            )
 
     def test_memory_off_does_not_put_stored_feedback_into_model_messages(self):
         run = Run("request", "off", features={"memory": False, "feedback_recall": True})

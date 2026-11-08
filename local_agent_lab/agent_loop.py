@@ -5,8 +5,19 @@ import time
 from .trace import RunStopped
 from .runtime import RuntimeFailure
 from .features import workspace_signature
-from .context import expand_command, build_context, tools_for, describe_context
-from .policy import final_gate, requirement_gate
+from .context import (
+    expand_command,
+    build_context,
+    tools_for,
+    describe_context,
+    record_message,
+)
+from .policy import (
+    final_gate,
+    requirement_gate,
+    repeated_rejection,
+    REPEATED_ANSWER_LIMIT,
+)
 from .integrations import prepare as prepare_integrations
 from .feedback import recall_and_audit
 from .context_memory import prepare as prepare_memory
@@ -58,6 +69,12 @@ def execute(harness, run):
             "temperature": run.engine["temperature"],
             "seed": run.engine["seed"],
             "max_tokens": limit,
+            "effective_generation_config": {
+                **run.engine,
+                "max_tokens": limit,
+                "parallel_tool_calls": False,
+                "enable_thinking": False,
+            },
             "workspace": workspace_signature(harness.workspace),
         }
         if not run.engine["use_kv"] and not hasattr(
@@ -85,6 +102,8 @@ def execute(harness, run):
         dirty = set()
         checked = set()
         successful = []
+        rejected = []
+        run.conditions["repeat_answer_limit"] = REPEATED_ANSWER_LIMIT
         if run.requirements:
             run.emit(
                 "validation.plan",
@@ -100,7 +119,7 @@ def execute(harness, run):
                 + json.dumps(run.requirements, ensure_ascii=False),
             }
             messages.append(constraint)
-            run.emit(
+            event_id = run.emit(
                 "context.requirements",
                 "완료 조건을 모델 입력에 추가",
                 "명시한 조건을 모델에도 전달합니다. 코드 검사는 이 지시를 따랐는지 실제 결과로 다시 확인합니다.",
@@ -111,6 +130,7 @@ def execute(harness, run):
                     "message_count_after": len(messages),
                 },
             )
+            record_message(run, messages, before, "harness", "완료 조건", event_id)
         reviewed = False
         for iteration in range(1, run.max_model_calls - run.model_calls + 1):
             if run.stopped:
@@ -202,7 +222,7 @@ def execute(harness, run):
             usage = response.get("usage", {})
             for key in run.usage:
                 run.usage[key] += int(usage.get(key, 0) or 0)
-            run.emit(
+            response_event = run.emit(
                 "model.response",
                 f"모델 호출 #{iteration} · {'SSE를 합친 응답' if streaming else '원본 응답'}",
                 "원본 SSE 프레임을 합쳐 복원한 응답입니다. 각 원본 조각은 별도 이벤트에 있으며 여기서 도구 요청과 최종 답변을 구분합니다."
@@ -234,6 +254,11 @@ def execute(harness, run):
                 )
                 missing = requirement_gate(run, successful)
                 if outstanding or missing:
+                    if repeated_rejection(run, rejected, message, missing, outstanding):
+                        raise RuntimeFailure(
+                            f"같은 미검증 답변이 {REPEATED_ANSWER_LIMIT}회 반복됐고 새 도구 호출이 없어 중단했습니다. "
+                            "필수 작업 결과는 아직 없습니다. 요청·도구 설정을 확인하고 다시 실행하세요."
+                        )
                     correction = (
                         "아직 실제 도구 결과로 확인하지 못한 조건이 있습니다. 아래 목록은 실행 결과가 아니라 남은 요구 사항입니다. "
                         "지금 필요한 도구를 실제로 호출하고 반환값을 확인하세요. 수행했다고 말하는 것으로 대체할 수 없습니다: "
@@ -254,7 +279,10 @@ def execute(harness, run):
                             },
                         ]
                     )
-                    run.emit(
+                    record_message(
+                        run, messages, before, "model", "모델 응답", response_event
+                    )
+                    event_id = run.emit(
                         "context.repair",
                         "완료 조건 미충족 → 모델에 보완 요청",
                         "답변을 최종 확정하지 않고 부족한 실제 행동을 다음 모델 입력에 추가했습니다.",
@@ -268,13 +296,25 @@ def execute(harness, run):
                             "message_count_after": len(messages),
                         },
                     )
+                    record_message(
+                        run,
+                        messages,
+                        before + 1,
+                        "harness",
+                        "미충족 조건 보완 요청",
+                        event_id,
+                    )
                     continue
                 if run.mode == "deep" and not reviewed:
                     reviewed = True
+                    before = len(messages)
                     messages.extend(
                         [message, {"role": "user", "content": run.review_instruction}]
                     )
-                    run.emit(
+                    record_message(
+                        run, messages, before, "model", "모델 응답", response_event
+                    )
+                    event_id = run.emit(
                         "agent.review",
                         "집중 모드 · 답변과 근거 다시 점검",
                         "같은 에이전트의 실제 대화에 점검 지시를 넣고 한 번 더 모델을 호출합니다. 숨겨진 사고를 표시하거나 모델 종류를 바꾸는 기능이 아닙니다.",
@@ -285,8 +325,24 @@ def execute(harness, run):
                             "message_count_after": len(messages),
                         },
                     )
+                    record_message(
+                        run,
+                        messages,
+                        before + 1,
+                        "harness",
+                        "집중 모드 점검 지시",
+                        event_id,
+                    )
                     continue
                 messages.append({"role": "assistant", "content": answer})
+                record_message(
+                    run,
+                    messages,
+                    len(messages) - 1,
+                    "model",
+                    "모델 응답",
+                    response_event,
+                )
                 run.answer = answer
                 run.emit(
                     "output.answer",
@@ -318,6 +374,14 @@ def execute(harness, run):
                     "한 응답의 도구 호출 수가 허용 범위를 벗어났습니다."
                 )
             messages.append(message)
+            record_message(
+                run,
+                messages,
+                len(messages) - 1,
+                "model",
+                "모델 도구 요청",
+                response_event,
+            )
             for call in calls:
                 if (
                     not isinstance(call, dict)
@@ -351,7 +415,10 @@ def execute(harness, run):
                     checked.add(result["path"])
                 before = len(messages)
                 messages.append(result_message)
-                run.emit(
+                record_message(
+                    run, messages, before, "tool", "도구 결과", run.events[-1]["id"]
+                )
+                event_id = run.emit(
                     "context.append",
                     "도구 결과를 다음 모델 입력에 추가",
                     "assistant의 도구 요청과 tool 결과를 함께 보존합니다. 다음 호출의 messages가 이만큼 늘어납니다.",

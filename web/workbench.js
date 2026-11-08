@@ -46,6 +46,7 @@
     agentFilter: "all",
     activity: { run: null, experiment: null },
     ready: false,
+    inputMessage: -1,
   };
   const features = {
       rules: true,
@@ -812,6 +813,7 @@
     "agent.compute": "모델 차례 획득",
     "validation.final": "수정 파일 검사 확인",
     "validation.requirements": "완료 조건 확인",
+    "validation.repeat": "미검증 답변 반복 확인",
     "output.answer": "답변 확정",
     "memory.save": "이력 저장",
     "run.complete": "실행 종료",
@@ -896,6 +898,7 @@
     $("detailIndex").textContent = "";
     $("detailExplanation").textContent = definition[0];
     $("componentNavigator").classList.add("hidden");
+    clearInspectionExtras();
     $("detailPath").classList.add("hidden");
     $("detailContent").innerHTML =
       `<p class="note">현재 단계까지 이 구성 요소의 실행 기록이 없습니다.</p><button class="secondary" data-file="${definition[1]}">구현 파일 열기</button>`;
@@ -990,6 +993,7 @@
     $("run").disabled = busy() || !state.health.connected;
     $("export").disabled = false;
     $("showAnswer").disabled = !data.answer && !data.error;
+    $("showInput").disabled = !state.events.length;
     $("showAnswer").classList.toggle("ready", !!data.answer);
     $("saveFile").disabled = busy() || !state.file?.editable;
     $("undoFile").disabled =
@@ -1076,6 +1080,7 @@
     state.sources = {};
     state.live = false;
     state.cursor = -1;
+    state.inputMessage = -1;
     state.timelineRendered = false;
     $("journeyView").classList.add("focus");
     state.openGroups = new Set();
@@ -1176,6 +1181,9 @@
             (item) =>
               item.kind === kind &&
               (!e.agent_id || !item.agent_id || item.agent_id === e.agent_id) &&
+              (!kind.startsWith("model.") ||
+                AgentInspection.purposeOf(item) ===
+                  AgentInspection.purposeOf(e)) &&
               (kind !== "file.read" || item.input?.path === e.input?.path),
           );
     switch (e.kind) {
@@ -1349,6 +1357,16 @@
           ["실제 K/V 메모리", (c.bytes / 1048576).toFixed(2) + " MiB"],
           ["이번 forward 입력", num(o.forward_input_tokens)],
           ["누적 forward 입력", num(o.cumulative_forward_tokens)],
+          [
+            "forward 벽시간 (hook 포함)",
+            o.observed_forward_ms == null
+              ? "미기록"
+              : num(o.observed_forward_ms) + " ms",
+          ],
+          [
+            "제외한 사용자 정지",
+            o.user_pause_ms == null ? "미기록" : num(o.user_pause_ms) + " ms",
+          ],
         ]) +
         `<p class="note">${c.enabled ? "K/V 텐서의 numel × element_size를 합산했습니다. 가중치·임시 attention 메모리는 포함하지 않습니다." : "KV를 끈 실행입니다. 매 토큰마다 전체 접두부를 다시 계산합니다."}</p>` +
         matrix(
@@ -1437,7 +1455,139 @@
       );
     return "";
   }
+  function inspectionLink(record, label, tab = "input", message = -1) {
+    return `<button class="inspection-link" data-inspection-event="${record.event.id}" data-inspection-tab="${tab}" data-inspection-message="${message}">${esc(label)}</button>`;
+  }
+  function changeLabel(change) {
+    return {
+      added: "추가",
+      removed: "제거",
+      changed: "변경",
+      unchanged: "유지",
+    }[change];
+  }
+  function renderInputView() {
+    const inspected = AgentInspection.snapshot(
+      state.events,
+      state.cursor,
+      rootAgentId(),
+    );
+    if (!inspected.request)
+      return `<div class="input-empty"><h3>모델 입력 확정 전</h3><p>${inspected.draft ? `컨텍스트 조립 기록 #${inspected.draft.id}가 있습니다. 아직 model.request가 기록되지 않았습니다.` : "이 에이전트와 요청 유형의 model.request가 아직 없습니다."}</p><p class="note">이후 단계의 입력을 현재 값으로 표시하지 않습니다. 단계를 진행하거나 저장된 요청을 선택하세요.</p>${inspected.next ? inspectionLink(inspected.next, `다음 요청 #${inspected.next.event.id}`) : ""}</div>`;
+    const { request, previous, next } = inspected,
+      payload = request.event.input;
+    const segments = request.event.output?.segments || [];
+    const tools = payload.tools || [];
+    const counts = inspected.messageDiff.reduce(
+      (all, row) => ({ ...all, [row.change]: (all[row.change] || 0) + 1 }),
+      {},
+    );
+    const changed = inspected.messageDiff.filter(
+      (row) => row.change !== "unchanged",
+    );
+    const changedTools = inspected.toolDiff.filter(
+      (row) => row.change !== "unchanged",
+    );
+    const check = (value) =>
+      value === true ? "일치" : value === false ? "불일치" : "미확인";
+    const body = payload.messages
+      .map((message, index) => {
+        const labels = [
+          ...new Set(
+            segments
+              .filter((part) => part.message_index === index)
+              .map((part) => {
+                const label =
+                  !part.origin &&
+                  part.label === "모델 응답" &&
+                  message.role === "user"
+                    ? "출처 미기록 (이전 기록)"
+                    : part.label;
+                return (
+                  label +
+                  (part.origin
+                    ? " · 작성: " +
+                      ({
+                        user: "사용자",
+                        harness: "하네스",
+                        model: "모델",
+                        tool: "도구",
+                        unknown: "미기록",
+                      }[part.origin] || part.origin)
+                    : "")
+                );
+              }),
+          ),
+        ];
+        const matches = AgentInspection.origins(
+          state.events,
+          request.index,
+          index,
+          rootAgentId(),
+        );
+        const declared = AgentInspection.declaredOrigins(
+          state.events,
+          request.index,
+          index,
+          rootAgentId(),
+        );
+        const pieces = AgentInspection.fragments(
+          message,
+          segments.filter((part) => part.message_index === index),
+        );
+        const content =
+          pieces.length > 1
+            ? pieces
+                .map(
+                  (part) =>
+                    `<details class="message-fragment" ${state.inputMessage === index && part.kind === "rules" ? "open" : ""}><summary>${esc(part.label || "본문")} · ${num([...part.text].length)}자</summary>${box("본문 원문", part.text)}</details>`,
+                )
+                .join("")
+            : box("content", message.content);
+        const tags =
+          labels.length && pieces.length < 2
+            ? `<div class="message-labels">${labels.map((label) => `<span>${esc(label)}</span>`).join("")}${declared.map((record) => inspectionLink(record, `추가 기록 #${record.event.id} ${eventName(record.event)}`, "change")).join("")}</div>`
+            : "";
+        const messageSummary = [
+          typeof message.content === "string"
+            ? num([...message.content].length) + "자"
+            : null,
+          message.tool_calls?.length
+            ? "도구 요청 " + message.tool_calls.length + "개"
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        return `<details class="input-message" ${index === state.inputMessage || (state.inputMessage < 0 && index === payload.messages.length - 1) ? "open" : ""}><summary><code>messages[${index}]</code><strong>${esc(message.role)}</strong><span>${esc(messageSummary)}</span></summary>${tags}${content}${message.tool_calls?.length ? box("tool_calls", message.tool_calls) : ""}<details class="message-json"><summary>메시지 JSON</summary>${box("전체 메시지", message)}</details>${matches.length ? `<div class="input-origins"><small>값이 일치하는 기록</small>${matches.map((record) => inspectionLink(record, `#${record.event.id} ${eventName(record.event)}${record.path ? " · " + record.path.replaceAll("\\", "/").split("/").at(-1) : ""}`, "change")).join("")}</div>` : ""}</details>`;
+      })
+      .join("");
+    const diff = previous
+      ? `<details class="input-diff" open><summary>이전 입력 #${previous.event.id}과 비교</summary><p class="note">같은 에이전트·요청 유형의 직전 요청입니다. messages의 배열 위치별 값을 대조합니다.</p><div class="input-diff-counts">${["unchanged", "added", "removed", "changed"].map((key) => `<span>${changeLabel(key)} ${counts[key] || 0}</span>`).join("")}</div>${changed.map((row) => `<details class="input-change"><summary><span class="change-${row.change}">${changeLabel(row.change)}</span><code>messages[${row.index}]</code><span>${esc((row.after || row.before).role)}</span></summary>${row.before !== undefined ? box("이전", row.before) : ""}${row.after !== undefined ? box("현재", row.after) : ""}</details>`).join("") || '<p class="note">메시지 변경이 없습니다.</p>'}${changedTools.length ? `<h4>도구 정의 변경</h4>${changedTools.map((row) => `<details class="input-change"><summary><span class="change-${row.change}">${changeLabel(row.change)}</span><code>${esc(row.name)}</code></summary>${row.before ? box("이전 schema", row.before) : ""}${row.after ? box("현재 schema", row.after) : ""}</details>`).join("")}` : '<p class="note">도구 정의 변경이 없습니다.</p>'}</details>`
+      : '<p class="input-first">같은 에이전트·요청 유형의 첫 입력입니다.</p>';
+    const parameters = Object.fromEntries(
+      [
+        "model",
+        "temperature",
+        "max_tokens",
+        "seed",
+        "top_k",
+        "top_p",
+        "cache_prompt",
+        "stream",
+      ]
+        .filter((key) => payload[key] !== undefined)
+        .map((key) => [key, payload[key]]),
+    );
+    return `<div class="input-snapshot"><header><strong>마지막 확정 입력 #${request.event.id}</strong><span>${esc(request.event.agent_name || "주 에이전트")} · ${inspected.purpose === "compaction" ? "대화 요약" : "일반 답변"}</span></header><div class="input-navigation">${previous ? inspectionLink(previous, "← 이전 입력") : ""}${inspectionLink(request, "요청 원본", "values")}${next ? inspectionLink(next, "다음 입력 →") : ""}</div><p class="note">선택한 단계까지 기록된 model.request입니다. 이후 도구 결과가 자동으로 이 입력에 추가되지는 않습니다.</p><div class="input-stats"><span><b>${payload.messages.length}</b> 메시지</span><span><b>${tools.length}</b> 도구</span><span><b>${num(inspected.diagnosticTokens)}</b> 진단 토큰</span><span><b>${num(inspected.reportedTokens)}</b> 보고 토큰</span></div><div class="input-audit">토큰 수 대조: ${check(inspected.audit?.countMatches)} · 템플릿 대조: ${check(inspected.audit?.templateMatches)}</div>${diff}<h3>messages</h3>${body}<details class="input-tools"><summary>모델에 공개한 tools · ${tools.length}개</summary>${box("tools 원문", tools)}</details><details class="input-tools"><summary>생성 설정</summary>${box("기록된 요청 필드", parameters)}</details><p class="note">진단 토큰과 생성 응답의 보고 토큰은 별도 값입니다. —는 아직 수집되지 않은 값입니다. 파일 연결은 문자열·메시지 값의 일치이며, 모델이 내용을 이해하거나 따랐다는 판정은 아닙니다.</p></div>`;
+  }
+  function clearInspectionExtras() {
+    $("inputLinks").classList.add("hidden");
+    $("evidenceKind").textContent = "";
+    $("evidenceKind").title = "";
+    $("detailExplanation").classList.remove("hidden");
+  }
   function renderDetail() {
+    $("inspector").classList.toggle("input-view", state.tab === "input");
     document.querySelector(".detailtabs").classList.remove("hidden");
     const e = state.events[state.cursor];
     $("detailEmpty").classList.toggle("hidden", !!e);
@@ -1463,8 +1613,11 @@
       "#" + e.id + " · " + num(e.elapsed_ms) + " ms";
     $("detailActor").textContent =
       (actors[e.actor] || actors.harness)[1] +
-      " · " +
-      (e.status === "ok" ? "관측값" : e.status);
+      (e.status === "ok" ? "" : " · " + e.status);
+    const evidence = AgentInspection.evidence(e);
+    $("evidenceKind").textContent = evidence.label;
+    $("evidenceKind").title = evidence.explanation;
+    $("evidenceKind").dataset.evidence = evidence.type;
     $("detailTitle").textContent = eventName(e);
     $("detailKind").textContent = e.kind;
     const filePath = e.kind.startsWith("file.")
@@ -1473,9 +1626,30 @@
     $("detailPath").classList.toggle("hidden", !filePath);
     $("detailPath").textContent = filePath || "";
     $("detailExplanation").textContent = e.detail;
+    $("detailExplanation").classList.toggle("hidden", state.tab === "input");
+    const targets = AgentInspection.consumers(
+      state.events,
+      state.cursor,
+      rootAgentId(),
+    );
+    $("inputLinks").classList.toggle(
+      "hidden",
+      !targets.length || state.tab === "input",
+    );
+    $("inputLinks").innerHTML = targets.length
+      ? inspectionLink(
+          targets[0],
+          `모델 입력 #${targets[0].event.id}에서 확인`,
+          "input",
+          targets[0].indices[0],
+        ) + `<small>동일한 값이 포함된 요청 ${targets.length}개</small>`
+      : "";
     const source = e.source,
       peek = $("sourcePeek");
-    peek.classList.toggle("hidden", !source || state.tab === "code");
+    peek.classList.toggle(
+      "hidden",
+      !source || ["code", "input"].includes(state.tab),
+    );
     if (source && state.tab !== "code") {
       const lines = source.code.split("\n"),
         position = source.line - source.start_line;
@@ -1499,7 +1673,9 @@
         b.classList.toggle("active", b.dataset.detail === state.tab),
       );
     const c = $("detailContent");
-    if (state.tab === "values") c.innerHTML = box("전체 이벤트 · 원본 값", e);
+    if (state.tab === "input") c.innerHTML = renderInputView();
+    else if (state.tab === "values")
+      c.innerHTML = box("전체 이벤트 · 원본 값", e);
     else if (state.tab === "code") {
       const frames = e.source?.stack?.length
           ? e.source.stack
@@ -1710,12 +1886,22 @@
         .join("") || '<p class="note">아직 실행 기록이 없습니다.</p>';
   }
   async function openFile(path, { discard = false } = {}) {
-    if (!discard && state.view === "editor" && state.file)
-      state.drafts.set(state.file.path, $("codeEditor").value);
-    const file = await api(
-      "/api/project/file?path=" + encodeURIComponent(path),
-    );
+    const ticket = (state.fileTicket || 0) + 1;
+    state.fileTicket = ticket;
+    if (!discard && state.view === "editor" && state.file) {
+      if ($("codeEditor").value === state.file.text)
+        state.drafts.delete(state.file.path);
+      else state.drafts.set(state.file.path, $("codeEditor").value);
+    }
+    const revision = state.fileRevisions?.get(path) || 0;
+    let file = await api("/api/project/file?path=" + encodeURIComponent(path));
+    if (state.fileTicket !== ticket) return;
+    if ((state.fileRevisions?.get(path) || 0) !== revision) {
+      file = await api("/api/project/file?path=" + encodeURIComponent(path));
+      if (state.fileTicket !== ticket) return;
+    }
     state.file = file;
+    if (state.drafts.get(path) === file.text) state.drafts.delete(path);
     view("editor");
     $("editorTitle").textContent = path.split("/").at(-1);
     $("editorKind").textContent = path;
@@ -1751,10 +1937,15 @@
     $("editMessage").classList.toggle("error", error);
   }
   async function checkFile() {
+    const submitted = { path: state.file.path, text: $("codeEditor").value };
     const r = await api("/api/project/check", {
-      path: state.file.path,
-      text: $("codeEditor").value,
+      ...submitted,
     });
+    if (
+      state.file?.path !== submitted.path ||
+      $("codeEditor").value !== submitted.text
+    )
+      return false;
     editMessage(r.passed ? r.checker + " 통과" : r.message, !r.passed);
     return r.passed;
   }
@@ -1782,32 +1973,62 @@
     $("diff").classList.remove("hidden");
   }
   async function saveFile() {
-    const path = state.file.path,
+    const submitted = { ...state.file, text: $("codeEditor").value };
+    const path = submitted.path;
+    state.pendingSaves ||= new Set();
+    if (state.pendingSaves.has(path)) return;
+    state.pendingSaves.add(path);
+    let r;
+    try {
       r = await api("/api/project/save", {
         path,
-        text: $("codeEditor").value,
-        expected_sha256: state.file.sha256,
+        text: submitted.text,
+        expected_sha256: submitted.sha256,
       });
+    } finally {
+      state.pendingSaves.delete(path);
+    }
     if (!r.saved) {
-      editMessage(r.validation.message, true);
+      if (state.file?.path === path) editMessage(r.validation.message, true);
       return;
     }
     state.edits.set(path, r.edit_id);
-    state.drafts.delete(path);
-    state.file.text = $("codeEditor").value;
+    state.fileRevisions ||= new Map();
+    state.fileRevisions.set(path, (state.fileRevisions.get(path) || 0) + 1);
+    if (state.file?.path !== path) {
+      if (state.drafts.get(path) === submitted.text) state.drafts.delete(path);
+      return;
+    }
+    const currentText = $("codeEditor").value;
+    if (currentText === submitted.text) state.drafts.delete(path);
+    else state.drafts.set(path, currentText);
+    state.file.text = submitted.text;
     state.file.sha256 = r.sha256;
     $("undoFile").disabled = false;
-    $("editState").textContent = "저장됨 · SHA " + r.sha256.slice(0, 10);
-    editMessage(r.applies + " 이전 내용도 로컬에 보관했습니다.");
+    $("editState").textContent =
+      (currentText === submitted.text ? "저장됨" : "추가 편집 미저장") +
+      " · SHA " +
+      r.sha256.slice(0, 10);
+    editMessage(
+      r.applies +
+        (currentText === submitted.text
+          ? " 이전 내용도 로컬에 보관했습니다."
+          : " 저장을 누른 뒤 입력한 내용은 아직 저장하지 않았습니다."),
+    );
   }
   async function undoFile() {
     const path = state.file.path,
+      submittedText = $("codeEditor").value,
       r = await api("/api/project/restore", {
         edit_id: state.edits.get(path),
         expected_sha256: state.file.sha256,
       });
     state.edits.delete(path);
-    state.drafts.delete(path);
+    state.fileRevisions ||= new Map();
+    state.fileRevisions.set(path, (state.fileRevisions.get(path) || 0) + 1);
+    if (state.file?.path !== path) return;
+    if ($("codeEditor").value === submittedText) state.drafts.delete(path);
+    else state.drafts.set(path, $("codeEditor").value);
     await openFile(path, { discard: true });
     editMessage("직전 저장 이전의 내용으로 되돌렸습니다. " + r.applies);
   }
@@ -1998,7 +2219,9 @@
               ([k, v]) =>
                 `${v ? "✓" : "×"} ${esc({ same_prompt: "같은 요청", same_model: "같은 모델", same_generation: "같은 생성 설정", same_workspace: "같은 작업 파일", isolated_sessions: "분리한 대화 이력", same_model_input: "동일한 모델 입력" }[k] || k)}`,
             )
-            .join(" · ")}<p>${esc(item.note)}</p></div>`
+            .join(
+              " · ",
+            )}<p>${esc(item.note)}</p><p class="note">Python 실행기의 prefill/decode는 사용자 정지를 뺀 forward 벽시간이며 텐서 추출·hook 기록 비용을 포함합니다. 모델 계산만의 벤치마크가 아닙니다.</p>${item.generation_diff && Object.keys(item.generation_diff).length ? box("다른 실행 설정 (A / B)", item.generation_diff) : ""}</div>`
         : "");
     if (item.status === "running")
       setTimeout(() => pollCompare().catch((e) => toast(e.message)), 1200);
@@ -2074,6 +2297,18 @@
         renderTimeline();
         renderAgents();
       }
+      if (b.dataset.inspectionEvent) {
+        const at = state.events.findIndex(
+          (event) => event.id === Number(b.dataset.inspectionEvent),
+        );
+        if (at >= 0) {
+          state.live = false;
+          stopPlay();
+          state.tab = b.dataset.inspectionTab || "input";
+          state.inputMessage = Number(b.dataset.inspectionMessage ?? -1);
+          select(at, { open: true });
+        }
+      }
       if (b.dataset.view) view(b.dataset.view);
       if (b.dataset.feedbackEvent) {
         const id = state.feedbackCurrent.run_id;
@@ -2104,6 +2339,7 @@
           $("detailEmpty").classList.add("hidden");
           $("detailBody").classList.remove("hidden");
           $("componentNavigator").classList.add("hidden");
+          clearInspectionExtras();
           $("detailPath").classList.add("hidden");
           $("sourcePeek").classList.add("hidden");
           $("detailTitle").textContent = tool.name;
@@ -2265,6 +2501,12 @@
       window.location.assign("/api/runs/" + state.run.id + "/export");
   };
   $("openDetail").onclick = () => $("inspector").classList.add("open");
+  $("showInput").onclick = () => {
+    state.tab = "input";
+    state.inputMessage = -1;
+    renderDetail();
+    $("inspector").classList.add("open");
+  };
   $("zoomIn").onclick = () => AgentArchitecture.scale(1);
   $("zoomOut").onclick = () => AgentArchitecture.scale(-1);
   $("zoomFit").onclick = () => AgentArchitecture.fit();
@@ -2273,6 +2515,7 @@
     renderTimeline();
   };
   $("showAnswer").onclick = () => {
+    clearInspectionExtras();
     $("componentNavigator").classList.add("hidden");
     $("detailPath").classList.add("hidden");
     $("detailEmpty").classList.add("hidden");
@@ -2353,7 +2596,9 @@
   $("refreshHistory").onclick = action(history);
   $("codeEditor").oninput = () => {
     editorLines();
-    state.drafts.set(state.file.path, $("codeEditor").value);
+    if ($("codeEditor").value === state.file.text)
+      state.drafts.delete(state.file.path);
+    else state.drafts.set(state.file.path, $("codeEditor").value);
     $("editState").textContent = "저장 전 변경 · " + state.file.path;
   };
   $("codeEditor").onscroll = () =>
@@ -2382,7 +2627,10 @@
     api("/api/experiments/" + state.experiment + "/stop", {}),
   );
   window.addEventListener("beforeunload", (e) => {
-    if (state.file && $("codeEditor").value !== state.file.text) {
+    if (
+      state.drafts.size ||
+      (state.file && $("codeEditor").value !== state.file.text)
+    ) {
       e.preventDefault();
       e.returnValue = "";
     }

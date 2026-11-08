@@ -157,17 +157,20 @@ class StdioRpc:
         )
 
     def receive(self, run, deadline, parent=None):
-        while time.monotonic() < deadline:
+        while time.monotonic() < deadline[0]:
             if run.stopped:
                 raise RunStopped()
             try:
-                item = self.inbox.get(timeout=0.1)
+                item = self.inbox.get(
+                    timeout=min(0.1, max(0.001, deadline[0] - time.monotonic()))
+                )
             except queue.Empty:
                 continue
             if "reader_error" in item:
                 raise RuntimeFailure(
                     item["reader_error"] + " " + "".join(self.stderr)[-1500:]
                 )
+            observed = time.monotonic()
             run.emit(
                 self.protocol + ".receive",
                 self.protocol.upper() + " 원본 메시지 수신",
@@ -189,6 +192,7 @@ class StdioRpc:
                     ),
                 },
             )
+            deadline[0] += time.monotonic() - observed
             return item
         raise RuntimeFailure(self.protocol.upper() + " 서버 응답 시간 초과")
 
@@ -207,12 +211,13 @@ class StdioRpc:
                 },
                 parent,
             )
-            deadline = time.monotonic() + self.timeout
+            deadline = [time.monotonic() + self.timeout]
             while True:
                 item = self.receive(run, deadline, parent)
                 message = item["message"]
                 if "method" in message:
                     if "id" in message:
+                        observed = time.monotonic()
                         # LSP 서버의 configuration 질의. MCP 2026에서는 서버 요청을 허용하지 않는다.
                         if (
                             self.protocol == "lsp"
@@ -245,11 +250,30 @@ class StdioRpc:
                                 },
                                 parent,
                             )
+                        deadline[0] += time.monotonic() - observed
                     else:
                         self.notifications.append(item)
                         self.notifications = self.notifications[-100:]
                     continue
                 if message.get("id") != identity:
+                    old_id = message.get("id")
+                    if type(old_id) is int and old_id < identity:
+                        observed = time.monotonic()
+                        run.emit(
+                            self.protocol + ".response.stale",
+                            "이전 요청의 지연 응답 분리",
+                            "시간 초과된 요청의 늦은 응답입니다. 현재 요청의 결과로 사용하거나 원래 작업을 재실행하지 않습니다.",
+                            category="integrations",
+                            actor=self.protocol,
+                            parent=parent,
+                            output={
+                                "ignored_id": old_id,
+                                "waiting_id": identity,
+                                "message": message,
+                            },
+                        )
+                        deadline[0] += time.monotonic() - observed
+                        continue
                     raise RuntimeFailure("RPC 응답 ID가 현재 요청과 다릅니다.")
                 if "error" in message:
                     raise RpcError(message["error"])
@@ -274,7 +298,7 @@ class StdioRpc:
         )
 
     def wait_notification(self, run, predicate, parent=None):
-        deadline = time.monotonic() + self.timeout
+        deadline = [time.monotonic() + self.timeout]
         for index, item in enumerate(self.notifications):
             if predicate(item["message"]):
                 return self.notifications.pop(index)["message"]

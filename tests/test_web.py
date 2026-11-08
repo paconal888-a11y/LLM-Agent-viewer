@@ -61,6 +61,12 @@ class WebTests(unittest.TestCase):
                 self.request("/api/project/save", {}, headers)
             self.assertEqual(error.exception.code, 403)
 
+    def test_input_inspection_script_is_served_as_javascript(self):
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(self.url + "/inspection.js", timeout=3) as reply:
+            self.assertIn("javascript", reply.headers["Content-Type"])
+            self.assertIn(b"scope.AgentInspection", reply.read())
+
     def test_memory_endpoint_uses_a_validated_session_identifier(self):
         empty = self.request("/api/memory?session_id=new-chat")
         self.assertEqual(empty["records"], [])

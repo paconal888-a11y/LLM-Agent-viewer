@@ -59,7 +59,7 @@ def mcp_params(client, params=None):
             "io.modelcontextprotocol/clientCapabilities": {},
             "io.modelcontextprotocol/clientInfo": {
                 "name": "Agent Lens",
-                "version": "0.4.0",
+                "version": "0.5.0",
             },
         },
     }
@@ -83,7 +83,7 @@ def prepare_mcp(run, config):
             {
                 "protocolVersion": "2025-11-25",
                 "capabilities": {},
-                "clientInfo": {"name": "Agent Lens", "version": "0.4.0"},
+                "clientInfo": {"name": "Agent Lens", "version": "0.5.0"},
             },
         )
         if info.get("protocolVersion") != "2025-11-25":
@@ -99,6 +99,14 @@ def prepare_mcp(run, config):
         raise ValueError("MCP 서버 이름은 짧은 영문 식별자를 사용하세요.")
     exposed = []
     allowed = config.get("allow_tools")
+    read_only = config.get("read_only_tools", [])
+    if not isinstance(read_only, list) or not all(
+        isinstance(name, str) for name in read_only
+    ):
+        raise ValueError(
+            "read_only_tools는 호스트가 읽기·계산 전용으로 지정한 도구 이름 목록이어야 합니다."
+        )
+    run.mcp_read_only_tools = set()
     if allowed is not None and (
         not isinstance(allowed, list)
         or not all(isinstance(name, str) for name in allowed)
@@ -106,6 +114,17 @@ def prepare_mcp(run, config):
         raise ValueError("allow_tools는 서버 도구 이름의 목록이어야 합니다.")
     for tool in response.get("tools", []):
         remote = tool.get("name", "")
+        if run.mode == "plan" and remote not in read_only:
+            run.emit(
+                "mcp.tool.filtered",
+                "계획 모드에서 외부 도구 제외",
+                "호스트 설정의 read_only_tools에 없는 외부 도구입니다. 서버의 readOnlyHint만으로 권한을 부여하지 않습니다.",
+                category="integrations",
+                actor="validator",
+                input=tool,
+                output={"exposed": False, "reason": "plan_requires_host_read_only"},
+            )
+            continue
         if allowed is not None and remote not in allowed:
             run.emit(
                 "mcp.tool.filtered",
@@ -140,6 +159,8 @@ def prepare_mcp(run, config):
             },
         }
         run.extra_tools.append(mapped)
+        if remote in read_only:
+            run.mcp_read_only_tools.add(name)
         run.tool_handlers[name] = functools.partial(
             _mcp_tool, client=client, remote=remote
         )
@@ -206,7 +227,7 @@ def prepare_lsp(run, config, workspace):
                 "capabilities": {
                     "textDocument": {"publishDiagnostics": {"versionSupport": True}}
                 },
-                "clientInfo": {"name": "Agent Lens", "version": "0.4.0"},
+                "clientInfo": {"name": "Agent Lens", "version": "0.5.0"},
             },
         )
         client.notify(run, "initialized")

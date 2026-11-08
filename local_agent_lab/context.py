@@ -183,6 +183,7 @@ def build_context(run, workspace, history):
                     "label": label,
                     "message_index": 0,
                     "role": "system",
+                    "origin": "harness",
                     "start": offset,
                     "end": offset + len(text),
                     "characters": len(text),
@@ -204,6 +205,7 @@ def build_context(run, workspace, history):
             {
                 "kind": "memory",
                 "label": "저장된 맥락",
+                "origin": "harness",
                 "message_index": 1,
                 "role": "user",
                 "characters": len(messages[-1]["content"]),
@@ -222,6 +224,7 @@ def build_context(run, workspace, history):
             {
                 "kind": "memory",
                 "label": "이전 대화 요약",
+                "origin": "harness",
                 "message_index": len(messages) - 1,
                 "role": "user",
                 "characters": len(summary_message["content"]),
@@ -249,6 +252,8 @@ def build_context(run, workspace, history):
             {
                 "kind": "memory",
                 "label": "최근 대화",
+                "origin": "unknown",
+                "reason": "이전 대화에서 복원; 최초 작성 주체는 이 세션 상태에 미기록",
                 "message_index": index,
                 "role": messages[index]["role"],
                 "characters": len(text),
@@ -260,6 +265,7 @@ def build_context(run, workspace, history):
         {
             "kind": "input",
             "label": "현재 요청",
+            "origin": "harness" if run.parent_run else "user",
             "message_index": len(messages) - 1,
             "role": "user",
             "characters": len(run.effective_prompt),
@@ -325,8 +331,9 @@ def describe_context(run, messages, tools):
             )
             segments.append(
                 {
-                    "kind": "tools" if message["role"] == "tool" else "model",
-                    "label": "도구 결과" if message["role"] == "tool" else "모델 응답",
+                    "kind": "unknown",
+                    "origin": "unknown",
+                    "label": "출처 미기록",
                     "message_index": index,
                     "role": message["role"],
                     "characters": len(text),
@@ -346,6 +353,27 @@ def describe_context(run, messages, tools):
             }
         )
     return segments
+
+
+def record_message(run, messages, index, origin, reason, source_event_id=None):
+    """API role과 별개로 메시지를 만든 주체를 추가 시점에 기록한다."""
+    message = messages[index]
+    text = message.get("content") or json.dumps(
+        message.get("tool_calls", []), ensure_ascii=False
+    )
+    run.context_segments.append(
+        {
+            "kind": {"model": "model", "tool": "tools"}.get(origin, "context"),
+            "origin": origin,
+            "label": reason,
+            "reason": reason,
+            "source_event_id": source_event_id,
+            "message_index": index,
+            "role": message["role"],
+            "characters": len(text),
+            "text": text,
+        }
+    )
 
 
 def expand_command(run, workspace):

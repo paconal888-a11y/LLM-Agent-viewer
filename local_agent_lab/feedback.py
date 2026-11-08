@@ -1,6 +1,7 @@
 """지적 내용이 저장·선택·입력된 사실을 대조한다. 모델의 가중치 학습을 추정하지 않는다."""
 
 import hashlib
+from .context import record_message
 
 
 def prompt_hash(text):
@@ -37,7 +38,7 @@ def recall_and_audit(run, history, messages):
         }
         before = len(messages)
         messages.append(message)
-        run.emit(
+        event_id = run.emit(
             "memory.feedback.recall",
             "동일 요청의 과거 지적을 다시 입력",
             "저장된 지적 중 같은 원본 요청 해시의 최근 세 개만 선택합니다. 가중치를 학습하지 않고 실제 메시지로 다시 전달합니다.",
@@ -55,6 +56,7 @@ def recall_and_audit(run, history, messages):
                 ],
             },
         )
+        record_message(run, messages, before, "harness", "과거 지적 재포함", event_id)
     rows = []
     for item in ledger:
         matches = [

@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="/workbench.css" />
     <link rel="stylesheet" href="/diagram.css" />
     <script src="/architecture.js" defer></script>
+    <script src="/inspection.js" defer></script>
     <script src="/workbench.js" defer></script>
   </head>
   <body>
@@ -232,6 +233,7 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
                   ＋
                 </button>
                 <button id="toggleRecords" class="quiet">기록</button>
+                <button id="showInput" class="quiet" disabled>모델 입력</button>
                 <button id="showAnswer" class="quiet" disabled>답변</button>
                 <button id="export" class="quiet" disabled>내보내기</button
                 ><button id="openDetail" class="quiet">코드 · 데이터</button>
@@ -498,15 +500,18 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
         <div id="detailBody" class="hidden">
           <div class="detailhead">
             <span id="detailActor" class="pill"></span>
+            <span id="evidenceKind" class="evidence-kind"></span>
             <h2 id="detailTitle"></h2>
             <code id="detailKind"></code>
             <code id="detailPath" class="storage-path hidden"></code>
             <p id="detailExplanation"></p>
           </div>
           <div id="componentNavigator" class="componentnav hidden"></div>
+          <div id="inputLinks" class="inputlinks hidden"></div>
           <nav class="detailtabs">
             <button data-detail="change" class="active">데이터 변화</button
             ><button data-detail="code">실행 코드</button
+            ><button data-detail="input">모델 입력</button
             ><button data-detail="values">전체 값</button>
           </nav>
           <div id="sourcePeek" class="sourcepeek hidden"></div>

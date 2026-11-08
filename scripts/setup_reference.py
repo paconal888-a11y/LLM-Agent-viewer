@@ -1,6 +1,5 @@
 """공식 Qwen 모델을 고정 revision에서 받고 safetensors의 SHA256을 검증한다."""
 
-import hashlib
 import json
 import os
 import sys
@@ -9,33 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from local_agent_lab.paths import reference_model_path
-
-REPOSITORY = "Qwen/Qwen3-0.6B"
-REVISION = "c1899de289a04d12100db370d81485cdf75e47ca"
-FILES = {
-    "model.safetensors": (
-        1503300328,
-        "f47f71177f32bcd101b7573ec9171e6a57f4f4d31148d38e382306f42996874b",
-    ),
-    "tokenizer.json": (
-        11422654,
-        "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
-    ),
-    "config.json": (726, None),
-    "generation_config.json": (239, None),
-    "tokenizer_config.json": (9732, None),
-    "vocab.json": (2776833, None),
-    "merges.txt": (1671853, None),
-    "LICENSE": (11343, None),
-}
-
-
-def digest(path):
-    result = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(4 * 1024 * 1024), b""):
-            result.update(block)
-    return result.hexdigest()
+from local_agent_lab.model_files import REPOSITORY, REVISION, FILES, digest
 
 
 def download(directory):

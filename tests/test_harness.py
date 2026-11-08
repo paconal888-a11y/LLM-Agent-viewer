@@ -207,9 +207,60 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(run.tool_calls, 0)
         self.assertEqual(run.answer, "")
         checks = [e for e in run.events if e["kind"] == "validation.requirements"]
-        self.assertEqual(len(checks), 8)
+        self.assertEqual(len(checks), 3)
+        repeated = [e for e in run.events if e["kind"] == "validation.repeat"]
+        self.assertEqual([e["output"]["streak"] for e in repeated], [1, 2, 3])
+        self.assertTrue(repeated[-1]["output"]["blocked"])
+        self.assertEqual(len(repeated[-1]["output"]["response_event_ids"]), 3)
+        self.assertEqual(run.model_calls, 3)
         self.assertTrue(all(not e["output"]["passed"] for e in checks))
         self.assertFalse((self.workspace / "data/new.json").exists())
+
+    def test_repeated_answer_guard_resets_after_a_new_tool_call(self):
+        runtime = FixtureRuntime(
+            response({"content": "done"}),
+            response({"content": "done"}),
+            response({"tool_calls": [tool_call("add_numbers", a=2, b=2)]}),
+            response({"content": "done"}),
+            response({"content": "done"}),
+            response({"tool_calls": [tool_call("add_numbers", a=1, b=2)]}),
+            response({"content": "done"}),
+        )
+        run = Run(
+            "calculate",
+            "repeat-progress",
+            requirements=[{"tool": "add_numbers", "arguments": {"a": 1, "b": 2}}],
+        )
+        Harness(self.workspace, self.root / "state", runtime=runtime).execute(run)
+        self.assertEqual(run.status, "completed", run.error)
+        repeated = [e["output"] for e in run.events if e["kind"] == "validation.repeat"]
+        self.assertEqual([item["streak"] for item in repeated], [1, 2, 1, 2])
+        self.assertFalse(any(item["blocked"] for item in repeated))
+        self.assertEqual(run.model_calls, 7)
+
+    def test_different_rejected_answers_are_not_counted_as_identical_repeats(self):
+        runtime = FixtureRuntime(
+            response({"content": "A"}),
+            response({"content": "B"}),
+            response({"content": "A"}),
+            response({"tool_calls": [tool_call("add_numbers", a=1, b=2)]}),
+            response({"content": "done"}),
+        )
+        run = Run(
+            "calculate",
+            "repeat-different",
+            requirements=[{"tool": "add_numbers", "arguments": {"a": 1, "b": 2}}],
+        )
+        Harness(self.workspace, self.root / "state", runtime=runtime).execute(run)
+        self.assertEqual(run.status, "completed", run.error)
+        self.assertEqual(
+            [
+                e["output"]["streak"]
+                for e in run.events
+                if e["kind"] == "validation.repeat"
+            ],
+            [1, 1, 1],
+        )
 
     def test_rejected_answer_is_repaired_and_actual_results_satisfy_requirements(self):
         runtime = FixtureRuntime(

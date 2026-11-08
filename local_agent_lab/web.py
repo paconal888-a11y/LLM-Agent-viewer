@@ -363,7 +363,7 @@ class Application:
 
 def make_handler(app):
     class Handler(BaseHTTPRequestHandler):
-        server_version = "AgentLens/0.4"
+        server_version = "AgentLens/0.5"
 
         def local_host(self):
             try:
@@ -493,6 +493,7 @@ def make_handler(app):
                         "index.html",
                         "workbench.js",
                         "architecture.js",
+                        "inspection.js",
                         "diagram.css",
                         "workbench.css",
                         "favicon.svg",

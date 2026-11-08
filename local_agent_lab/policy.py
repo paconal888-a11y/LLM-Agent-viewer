@@ -2,7 +2,68 @@
 
 import json
 import math
+import hashlib
+import posixpath
 from .files import workspace_path
+
+
+REPEATED_ANSWER_LIMIT = 3
+
+
+def repeated_rejection(run, attempts, message, missing, outstanding):
+    """같은 미검증 답변·미충족 조건·도구 호출 수의 연속 반복을 검사한다."""
+    signature = hashlib.sha256(
+        json.dumps(
+            {
+                "message": message,
+                "missing": missing,
+                "outstanding": sorted(outstanding),
+                "tool_calls": run.tool_calls,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    if attempts and attempts[-1]["signature"] != signature:
+        attempts.clear()
+    response = next(
+        (
+            event
+            for event in reversed(run.events)
+            if event["kind"] == "model.response"
+            and event.get("agent_id", run.id) == run.id
+        ),
+        None,
+    )
+    attempts.append(
+        {
+            "signature": signature,
+            "response_event_id": response["id"] if response else None,
+        }
+    )
+    blocked = len(attempts) >= REPEATED_ANSWER_LIMIT
+    run.emit(
+        "validation.repeat",
+        "미검증 답변 반복 확인",
+        "답변·미충족 조건이 같고 새 도구 호출이 없는 연속 반복을 셉니다. 의미가 비슷한 답변이나 모든 종류의 반복을 탐지하는 기능은 아닙니다.",
+        category="output",
+        actor="validator",
+        input={
+            "candidate_message": message,
+            "missing": missing,
+            "unchecked_files": sorted(outstanding),
+            "tool_calls": run.tool_calls,
+        },
+        output={
+            "streak": len(attempts),
+            "limit": REPEATED_ANSWER_LIMIT,
+            "blocked": blocked,
+            "signature": signature,
+            "response_event_ids": [item["response_event_id"] for item in attempts],
+        },
+        status="error" if blocked else "ok",
+    )
+    return blocked
 
 
 def validate_tool_call(run, workspace, allowed, call, parent):
@@ -13,6 +74,14 @@ def validate_tool_call(run, workspace, allowed, call, parent):
     )
     if selected is None:
         raise ValueError("현재 구성에서 공개하지 않은 도구입니다.")
+    if (
+        run.mode == "plan"
+        and name.startswith("mcp_")
+        and name not in getattr(run, "mcp_read_only_tools", set())
+    ):
+        raise ValueError(
+            "계획 모드에서는 호스트가 읽기·계산 전용으로 분류한 MCP 도구만 실행합니다."
+        )
     schema = selected["function"]["parameters"]
     if not isinstance(args, dict):
         raise ValueError("인자는 JSON 객체여야 합니다.")
@@ -97,7 +166,49 @@ def contains_value(actual, expected):
             key in actual and contains_value(actual[key], value)
             for key, value in expected.items()
         )
+    if isinstance(expected, list):
+        return (
+            isinstance(actual, list)
+            and len(actual) == len(expected)
+            and all(contains_value(a, b) for a, b in zip(actual, expected))
+        )
     return type(actual) is type(expected) and actual == expected
+
+
+PATH_TOOLS = {
+    "read_file",
+    "write_file",
+    "check_file",
+    "list_files",
+    "lsp_diagnostics",
+    "lsp_symbols",
+    "lsp_definition",
+}
+
+
+def same_argument(tool, key, actual, expected):
+    if (
+        tool in PATH_TOOLS
+        and key == "path"
+        and isinstance(actual, str)
+        and isinstance(expected, str)
+    ):
+
+        def normalized(value):
+            value = value.replace("\\", "/")
+            value = posixpath.normpath(value)
+            if value.startswith(("/", "../")) or value == ".." or ":" in value:
+                return None
+            return value
+
+        left, right = normalized(actual), normalized(expected)
+        return left is not None and right is not None and left == right
+    # 인자는 전체 값이 같아야 한다. 결과 객체의 부분 포함 검사와 구분한다.
+    return (
+        type(actual) is type(expected)
+        and actual == expected
+        and contains_value(actual, expected)
+    )
 
 
 def requirement_gate(run, successful):
@@ -111,8 +222,9 @@ def requirement_gate(run, successful):
                 for item in reversed(successful)
                 if item["name"] == required["tool"]
                 and all(
-                    type(item["arguments"].get(key)) is type(value)
-                    and item["arguments"].get(key) == value
+                    same_argument(
+                        required["tool"], key, item["arguments"].get(key), value
+                    )
                     for key, value in required["arguments"].items()
                 )
             ),

@@ -116,3 +116,60 @@ class IntegrationTests(unittest.TestCase):
                 for e in run.events
             )
         )
+
+    def test_plan_rejects_external_write_despite_server_read_only_hint(self):
+        script = self.workspace / "server.py"
+        script.write_text(
+            """import json, sys
+from pathlib import Path
+for line in sys.stdin:
+    m = json.loads(line)
+    method = m["method"]
+    if method == "server/discover":
+        result = {"supportedVersions":["2026-07-28"]}
+    elif method == "tools/list":
+        result = {"tools":[{"name":"write_marker", "inputSchema":{"type":"object", "properties":{}}, "annotations":{"readOnlyHint":True}}]}
+    else:
+        Path(__file__).with_name("marker.txt").write_text("written")
+        result = {"structuredContent":{"written":True}}
+    print(json.dumps({"jsonrpc":"2.0", "id":m["id"], "result":result}), flush=True)
+""",
+            encoding="utf-8",
+        )
+        path = self.workspace / "integrations.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "mcp": {
+                        "name": "external",
+                        "command": "{python}",
+                        "args": ["-u", str(script)],
+                        "allow_tools": ["write_marker"],
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        run = Run("plan", "external-write", mode="plan", features={"mcp": True})
+        prepare(run, self.workspace)
+        self.assertEqual(run.extra_tools, [])
+        # 공개 목록이 잘못 추가돼도 실행 경계에서 모드 정책을 다시 검사한다.
+        run.extra_tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": "mcp_external_write_marker",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            }
+        )
+        result = self.call(run, "mcp_external_write_marker")
+        self.assertFalse(result["executed_successfully"])
+        self.assertFalse((self.workspace / "marker.txt").exists())
+        self.assertFalse(
+            any(
+                e["kind"] == "mcp.send"
+                and e["input"]["message"]["method"] == "tools/call"
+                for e in run.events
+            )
+        )

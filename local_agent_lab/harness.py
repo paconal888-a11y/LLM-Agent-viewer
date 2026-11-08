@@ -17,7 +17,14 @@ from .context import (
 from .toolkit import TOOLS, IMPLEMENTATIONS, ToolContext, function_tool
 from .policy import validate_tool_call
 from .feedback import collect_feedback
-from .context_memory import append_archive
+from .context_memory import (
+    append_archive,
+    write_state,
+    bounded_state,
+    STATE_LIMIT,
+    archive_path,
+    legacy_records,
+)
 
 
 def execute_tool(run, workspace, catalog, call, active_skills):
@@ -100,9 +107,40 @@ class Harness:
             path,
             "memory",
             reason="현재 세션의 이전 완료 대화와 응답 발췌를 불러옵니다.",
-            max_bytes=524288,
+            max_bytes=8 * 1024 * 1024,
         )
-        return json.loads(raw)
+        history = json.loads(raw)
+        if len(raw.encode("utf-8")) > STATE_LIMIT:
+            archive = archive_path(self, run.session_id)
+            if not archive.exists():
+                records = legacy_records(history)
+                archive.parent.mkdir(parents=True, exist_ok=True)
+                archive.write_text(
+                    "".join(
+                        json.dumps(record, ensure_ascii=False) + "\n"
+                        for record in records
+                    ),
+                    encoding="utf-8",
+                    newline="",
+                )
+                history["archive_turn_count"] = len(records)
+                run.emit(
+                    "memory.archive.bootstrap",
+                    "큰 이전 세션의 원문 보존",
+                    "활성 상태를 줄이기 전에 기존 최근 대화 원문을 JSONL에 보존했습니다.",
+                    category="memory",
+                    output={"path": str(archive), "recovered_turns": len(records)},
+                    pause=False,
+                )
+            history = bounded_state(history)
+            run.emit(
+                "memory.state.recover",
+                "큰 활성 세션을 읽기 예산에 맞게 복원",
+                "대화 전체를 모델 입력에 넣지 않습니다. 큰 최근 대화는 활성 상태에서 제외하며 원본 archive는 보존합니다.",
+                category="memory",
+                output=history.get("state_budget", {}),
+            )
+        return history
 
     def save_history(self, run, previous, turn):
         if run.parent_run:
@@ -122,7 +160,7 @@ class Harness:
                 path,
                 "memory",
                 reason="저장 이력을 이어붙이기 위한 읽기입니다. 이 내용은 이번 모델 입력에는 넣지 않습니다.",
-                max_bytes=524288,
+                max_bytes=8 * 1024 * 1024,
             )
             previous = json.loads(raw)
         archive_count = append_archive(self, run, previous, turn)
@@ -140,10 +178,8 @@ class Harness:
                 previous.get("feedback_ledger", []) + collect_feedback(run)
             )[-20:],
         }
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        data = bounded_state(data)
+        write_state(path, data)
         run.emit(
             "memory.save",
             "세션 이력과 직전 답변 발췌 저장",
@@ -151,7 +187,8 @@ class Harness:
             category="memory",
             output={
                 "path": str(path),
-                "saved_turns": len(turns),
+                "saved_turns": len(data["turns"]),
+                "state_budget": data.get("state_budget"),
                 "excerpt": data["excerpt"],
                 "dropped_turn_ids": previous.get("turn_ids", [])[:-1]
                 if len(previous.get("turn_ids", [])) >= 2

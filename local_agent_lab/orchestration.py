@@ -146,7 +146,6 @@ def prepare(run, harness):
 def inference_turn(harness, run, iteration):
     from .trace import RunStopped
 
-    started = time.perf_counter()
     run.emit(
         "agent.queue",
         "모델 계산 차례 대기",
@@ -154,6 +153,7 @@ def inference_turn(harness, run, iteration):
         category="model",
         output={"call": iteration, "scheduler": "shared_runtime_lock"},
     )
+    started = time.perf_counter()
     while not harness.inference_lock.acquire(timeout=0.1):
         if run.stopped:
             raise RunStopped()
@@ -163,7 +163,7 @@ def inference_turn(harness, run, iteration):
         run.emit(
             "agent.compute",
             "모델 계산 차례 획득",
-            "대기 시간과 실제 계산 구간을 구분합니다. 에이전트마다 입력과 KV의 유효 접두부는 달라질 수 있습니다.",
+            "queue 이벤트의 관찰 정지 이후부터 lock 획득까지의 벽시간입니다. 다른 에이전트가 lock을 가진 채 관찰 중인 시간은 포함될 수 있습니다.",
             category="model",
             output={
                 "call": iteration,

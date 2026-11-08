@@ -41,6 +41,8 @@ MCP는 2026-07-28의 server/discover → tools/list → 모델용 schema → too
 
 MCP 프로필의 allow_tools는 서버가 광고한 도구 중 공개할 원본 이름 목록입니다. 기본은 ["add"]이며 빈 목록이면 어떤 도구도 모델에 공개하지 않습니다. 서버의 도구 목록이 바뀌었다는 사실만으로 실행 권한이 늘어나지 않습니다. 연결 프로필 변경은 다음 연결 준비에서 새 설정으로 구별합니다.
 
+계획 모드에서는 호스트의 `read_only_tools`에도 이름을 등록한 도구만 공개·실행합니다. 기본 계산 도구는 `["add"]`입니다. 미분류 외부 도구와 서버의 `readOnlyHint`만 있는 도구는 거부합니다. 이 목록은 신뢰하는 사용자가 서버 구현을 확인해 지정하는 정책이며, 외부 프로세스의 임의 부작용을 차단하는 OS 샌드박스는 아닙니다.
+
 LSP는 실제 python-lsp-server에 initialize → initialized → 문서 didOpen/didChange를 보내고 진단 통지·심볼·정의 응답을 받습니다. 문서 URI·버전·원문과 Content-Length 바이트 경계를 확인하세요. 원본 range는 0부터 시작하며 모델용 locations는 1부터 시작하는 행 번호를 별도 필드로 계산합니다. ast.parse/compile 검사와 언어 서버의 pyflakes 진단은 다른 증거입니다.
 
 모델에 공개하는 도구는 Run.extra_tools, 실행 어댑터는 Run.tool_handlers에 연결합니다. 전송 자체가 도구 성공은 아니며, 서버의 오류와 도구 결과를 정규화한 다음 tool 메시지로 추가합니다. 서버의 self-reported 이름이나 설명을 실행 권한의 근거로 사용하지 않습니다. 기본 어댑터는 서버 통신까지만 관찰하며 외부 서버의 모든 내부 함수·파일 I/O를 추적하지 않습니다.

@@ -292,13 +292,24 @@ class ExperimentService:
             item["controls"] = {
                 "same_prompt": True,
                 "same_model": a.get("model") == b.get("model"),
-                "same_generation": all(
-                    a.get(key) == b.get(key)
-                    for key in ("temperature", "seed", "max_tokens")
-                ),
+                "same_generation": bool(a.get("effective_generation_config"))
+                and a.get("effective_generation_config")
+                == b.get("effective_generation_config"),
                 "same_workspace": a.get("workspace", {}).get("sha256")
                 == b.get("workspace", {}).get("sha256"),
                 "isolated_sessions": True,
+            }
+            item["generation_diff"] = {
+                key: {
+                    "A": a.get("effective_generation_config", {}).get(key),
+                    "B": b.get("effective_generation_config", {}).get(key),
+                }
+                for key in set(a.get("effective_generation_config", {}))
+                | set(b.get("effective_generation_config", {}))
+                if a.get("effective_generation_config", {}).get(key)
+                != b.get("effective_generation_config", {}).get(key)
+                or key not in a.get("effective_generation_config", {})
+                or key not in b.get("effective_generation_config", {})
             }
             if item["case_id"] in {"kv_cache", "decode_kv"}:
                 item["controls"]["same_model_input"] = bool(

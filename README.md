@@ -20,7 +20,7 @@ cd LLM-Agent-viewer
 .\Start-AgentLens.ps1 -SamplesOnly
 ```
 
-[http://127.0.0.1:8765](http://127.0.0.1:8765)에서 왼쪽 **예제 기록**을 선택하세요. 모델 설치 없이 파일 작업, 토큰·KV 캐시, 하위 에이전트, 대화 요약 등 일곱 개의 실행 기록을 재생할 수 있습니다.
+[http://127.0.0.1:8765](http://127.0.0.1:8765)에서 왼쪽 **예제 기록**을 선택하세요. 모델 설치 없이 파일 작업, 토큰·KV 캐시, 하위 에이전트, 대화 요약과 반복 응답 중단 등 아홉 개의 실행 기록을 재생할 수 있습니다.
 
 ### 로컬 모델로 실행
 
@@ -36,6 +36,7 @@ cd LLM-Agent-viewer
 ## 기능
 
 - **실행 추적** — 파일 읽기, 메시지 조립, 모델 호출, 도구 실행을 구조도에서 따라가며 입력·출력과 코드 확인
+- **입력 비교** — 파일 원문이 포함된 메시지로 이동하고, 모델 호출 사이에 추가·변경된 메시지와 도구 정의 확인
 - **하네스 편집** — AGENTS.md, 스킬, 커맨드와 Python 도구 함수를 수정하고 다음 실행에 반영
 - **추론 관찰** — 토큰 ID, 임베딩, Q/K/V, attention, KV 캐시, 다음 토큰 선택의 수치 표본
 - **대화 관리** — 원문·요약·현재 모델 입력을 비교하고 저장된 요약의 재사용 확인
@@ -43,7 +44,11 @@ cd LLM-Agent-viewer
 - **MCP·LSP 연결** — 외부 서버의 도구 목록·호출·응답과 연결 전후의 토큰·시간 비교
 
 <details>
-<summary>KV 캐시와 대화 저장소 화면</summary>
+<summary>모델 입력, KV 캐시와 대화 저장소 화면</summary>
+
+**모델 입력** — 요청 사이의 메시지 변경과 도구 정의를 비교합니다.
+
+![모델 입력과 이전 요청 비교](docs/images/input-diff.jpg)
 
 **KV 캐시** — 처리한 위치 수, 메모리 사용량, 선택한 레이어의 K/V 표본을 표시합니다.
 
@@ -68,6 +73,7 @@ cd LLM-Agent-viewer
 | [실습](docs/LEARNING.md) | 구성을 바꾸며 확인할 항목 |
 | [테스트·측정 결과](docs/REVIEW.md) | 검증 환경, 실행 결과, 알려진 제한 |
 | [관련 프로젝트와 명세](docs/REFERENCES.md) | 설계 참고 자료와 프로토콜 문서 |
+| [유사 제품 비교](docs/COMPARISON.md) | 비교 대상, 반영한 개선, 남은 차이 |
 
 ## 개발
 
@@ -76,10 +82,10 @@ cd LLM-Agent-viewer
 ```powershell
 uv sync --python 3.12 --extra reference --extra integrations --locked
 uv run --extra reference --extra integrations --offline python -m unittest discover -s tests -v
-node --test tests/architecture.test.cjs
+node --test tests/architecture.test.cjs tests/inspection.test.cjs tests/editor.test.cjs
 ```
 
-Node.js는 구조도 테스트에만 필요합니다. [이슈](https://github.com/paconal888-a11y/LLM-Agent-viewer/issues)에 재현 절차와 실행기 정보를 남기거나, 변경한 기능의 테스트와 함께 PR을 보내 주세요.
+Node.js는 구조도·입력 검사·편집기 테스트에만 필요합니다. [이슈](https://github.com/paconal888-a11y/LLM-Agent-viewer/issues)에 재현 절차와 실행기 정보를 남기거나, 변경한 기능의 테스트와 함께 PR을 보내 주세요.
 
 ## 지원 범위
 

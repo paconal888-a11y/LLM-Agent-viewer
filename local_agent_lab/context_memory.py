@@ -11,6 +11,31 @@ from .runtime import RuntimeFailure
 from .orchestration import inference_turn
 from .inference import preview_input, generate, audit_response, input_fingerprint
 
+STATE_LIMIT = 524288
+
+
+def bounded_state(value):
+    """원문은 archive에 남기고 활성 상태는 읽기와 같은 UTF-8 예산에 맞춘다."""
+    value = json.loads(json.dumps(value, ensure_ascii=False))
+    omitted = 0
+    size = lambda: len(json.dumps(value, ensure_ascii=False, indent=2).encode("utf-8"))
+    while size() > STATE_LIMIT:
+        if value.get("turns"):
+            value["turns"].pop(0)
+            if value.get("turn_ids"):
+                value["turn_ids"].pop(0)
+            omitted += 1
+        elif value.get("feedback_ledger"):
+            value["feedback_ledger"].pop(0)
+        else:
+            raise ValueError("활성 세션의 요약·메타데이터가 512 KiB 한도를 넘었습니다.")
+        value["state_budget"] = {
+            "max_bytes": STATE_LIMIT,
+            "omitted_recent_turns": omitted,
+            "raw_messages_preserved_in_archive": True,
+        }
+    return value
+
 
 def archive_path(harness, session_id):
     harness.history_path(session_id)
@@ -50,6 +75,7 @@ def read_archive(harness, session_id, run=None, history=None):
 
 
 def write_state(path, value):
+    value = bounded_state(value)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + "." + uuid.uuid4().hex[:8] + ".tmp")
     try:

@@ -12,3 +12,4 @@ models/
 sandbox/
 .runtime.json
 .local/
+.codex-remote-attachments/

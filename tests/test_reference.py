@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import unittest
+import time
 
 from local_agent_lab.reference_engine import ReferenceRuntime, parse_tool_output
 from local_agent_lab.runtime import RuntimeFailure
@@ -126,3 +127,29 @@ class ReferenceTests(unittest.TestCase):
             runtime.generate_observed(StopOnForward("x", "stop"), {"messages": []}, 1)
         self.assertIsNone(runtime.cache)
         self.assertEqual(runtime.cache_ids, [])
+
+    def test_forward_timing_explicitly_includes_observer_cost(self):
+        class SlowObserver(Run):
+            def emit(self, kind, *a, **kw):
+                if kind in {
+                    "reference.embedding",
+                    "reference.projection",
+                    "reference.attention",
+                }:
+                    time.sleep(0.02)
+                return super().emit(kind, *a, **kw)
+
+        runtime = self.runtime()
+        run = SlowObserver("timing", "observer-time")
+        result = runtime.generate_observed(
+            run, {"messages": [], "max_tokens": 1, "temperature": 0}, 1
+        )
+        self.assertEqual(
+            result["timings"]["timing_basis"],
+            "forward_with_observer_hooks_excluding_user_pause",
+        )
+        measured = next(
+            e["output"] for e in run.events if e["kind"] == "reference.cache.write"
+        )
+        self.assertGreater(measured["observed_forward_ms"], 80)
+        self.assertNotIn("compute_ms", measured)
