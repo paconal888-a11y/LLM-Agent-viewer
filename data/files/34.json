@@ -1,0 +1,1 @@
+{"path":"demo_workspace/examples/hello.py","text":"def greet(name):\n    return f\"안녕하세요, {name}!\"\n","sha256":"3ae9407819947082b401306f14b5ea3befad0f9f2260b0f426e98404f6506219","version":null,"file_format":{"newline":"lf","mixed":false,"bom":false},"editable":false}

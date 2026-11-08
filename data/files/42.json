@@ -1,0 +1,1 @@
+{"path":"demo_workspace/rules-demo/memo.md","text":"# 규칙 계층 실습 메모\n\n이 파일을 읽으면 하네스가 같은 폴더의 AGENTS.md를 찾아 다음 모델 입력에 추가합니다.\n프로젝트 전체 규칙은 시작할 때 system 메시지에 들어가고, 폴더 규칙은 이 폴더의 파일을 다룬 뒤에 들어갑니다.\n","sha256":"76fb700df06f02370aa951a85853f069187725d932f615ec0119f69208e3fc3c","version":null,"file_format":{"newline":"lf","mixed":false,"bom":false},"editable":false}

@@ -1,0 +1,1 @@
+{"path":"demo_workspace/notes/release-brief.md","text":"# 출시 검토 메모\n\n- 프로젝트 코드: NARI-042\n- 예정 출시일: 2026-12-12\n- 담당 팀: 로컬 에이전트 학습팀\n- 검토 기준: 파일 읽기, 도구 실행, 입력 변화의 관찰 가능성\n\n이 문서는 로컬 파일을 실제로 읽어 답하는 실험용 자료입니다.\n","sha256":"7a9bb3c9af4c8ba864c431cac7ec25bbbdcd7f1b2ddf871653631f025253bbdb","version":null,"file_format":{"newline":"crlf","mixed":false,"bom":false},"editable":false}
