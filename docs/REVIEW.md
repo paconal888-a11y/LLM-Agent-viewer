@@ -27,7 +27,7 @@ uv run --extra reference --extra integrations --offline python -m unittest disco
 node --test tests/architecture.test.cjs tests/inspection.test.cjs tests/editor.test.cjs tests/settings.test.cjs tests/export_search.test.cjs tests/lessons.test.cjs
 ```
 
-Python 테스트 235개와 화면(Node) 테스트 36개를 실행합니다. 모의 모델로 도구 루프·권한·완료 조건·기억·편집·HTTP 경계를 검사합니다. Windows에서는 `test_launcher`가 실제 Windows PowerShell과 curl을 실행해 런처의 네이티브 명령 처리를 검사합니다(모델 다운로드 없음). 작은 무작위 Qwen 모델로 실제 KV 사용/전체 재계산의 결과와 접두부 처리를 검사합니다. MCP는 별도 stdio 프로세스를, LSP는 설치된 실제 pylsp의 진단·심볼·정의·문서 변경을 검사합니다. 모드 검증에는 독립 하위 컨텍스트·권한 제한·실제 결과 합류·대기 중 중지 전파·에이전트별 지적 연결을 포함합니다. 이 숫자는 다운로드한 모델이 모든 지시를 잘 따른다는 뜻이 아닙니다.
+Python 테스트 236개와 화면(Node) 테스트 36개를 실행합니다. 모의 모델로 도구 루프·권한·완료 조건·기억·편집·HTTP 경계를 검사합니다. Windows에서는 `test_launcher`가 실제 Windows PowerShell과 curl을 실행해 런처의 네이티브 명령 처리를 검사합니다(모델 다운로드 없음). 작은 무작위 Qwen 모델로 실제 KV 사용/전체 재계산의 결과와 접두부 처리를 검사합니다. MCP는 별도 stdio 프로세스를, LSP는 설치된 실제 pylsp의 진단·심볼·정의·문서 변경을 검사합니다. 모드 검증에는 독립 하위 컨텍스트·권한 제한·실제 결과 합류·대기 중 중지 전파·에이전트별 지적 연결을 포함합니다. 이 숫자는 다운로드한 모델이 모든 지시를 잘 따른다는 뜻이 아닙니다.
 
 ## 실제 모델과 화면 검증
 

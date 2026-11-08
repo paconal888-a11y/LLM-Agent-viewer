@@ -156,7 +156,7 @@ class WebTests(unittest.TestCase):
         self.app.harness = Broken(self.app.harness.workspace, self.app.harness.state_dir, runtime=FixtureRuntime())
         run = self.app.start("깨진 하네스", "broken", False)
         deadline = time.monotonic() + 3
-        while run.status == "running" and time.monotonic() < deadline:
+        while not run.closed and time.monotonic() < deadline:
             time.sleep(0.02)
         self.assertEqual(run.status, "failed")
         self.assertIn("promt", run.error)

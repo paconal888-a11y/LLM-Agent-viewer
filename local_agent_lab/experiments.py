@@ -398,10 +398,8 @@ class ExperimentService:
             )
             item["current_run"] = run.id
             with run.condition:
-                run.condition.wait_for(
-                    lambda: run.status in {"completed", "failed", "stopped"},
-                    timeout=1800,
-                )
+                # 상태만 보면 저장 중인 기록과 다음 회차가 겹친다.
+                run.condition.wait_for(lambda: run.closed, timeout=1800)
             if run.status not in {"completed", "failed", "stopped"}:
                 run.control("stop")
                 raise ValueError("비교 실행의 제한 시간을 초과했습니다.")

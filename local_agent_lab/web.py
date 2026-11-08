@@ -259,6 +259,7 @@ class Application:
             run.finished = time.perf_counter()
             run.save(self.harness.state_dir / "traces")
             with run.condition:
+                run.closed = True
                 run.condition.notify_all()
             return
         harness = self.harness
@@ -301,7 +302,10 @@ class Application:
                     run.save(harness.state_dir / "traces")
                 except Exception:  # noqa: BLE001 - 기록 실패가 상태 확정을 막지 않게 한다.
                     pass
+            finally:
+                # 상태는 저장 전에 바뀐다. 저장까지 끝났음은 이 값으로 알린다.
                 with run.condition:
+                    run.closed = True
                     run.condition.notify_all()
 
         worker = threading.Thread(target=guarded, daemon=True)

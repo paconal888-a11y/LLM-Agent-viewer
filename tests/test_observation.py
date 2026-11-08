@@ -178,6 +178,30 @@ class ObservationTests(unittest.TestCase):
         self.assertEqual(set(result["generation_diff"]), {"cache_prompt"})
 
 
+    def test_experiment_waits_until_each_run_has_been_saved(self):
+        # Windows CI에서 찾은 경합: 상태가 바뀐 뒤 저장이 끝나기 전에 실험이 끝나 임시 폴더 정리와 충돌했다.
+        import time
+        from unittest.mock import patch
+
+        app = Application(self.harness(response({"content": "A"}), response({"content": "B"})))
+        original = Run.save
+
+        def slow(run, directory):
+            time.sleep(0.1)
+            original(run, directory)
+
+        with patch.object(Run, "save", slow):
+            experiment = app.experiments.start("same", left_engine={"cache_prompt": False}, right_engine={"cache_prompt": True})
+            deadline = time.monotonic() + 15
+            while app.experiment_active and time.monotonic() < deadline:
+                time.sleep(0.01)
+        self.assertIsNone(app.experiment_active)
+        result = app.experiments.get(experiment)
+        for rows in result["trials"].values():
+            for row in rows:
+                saved = json.loads((self.root / "state" / "traces" / (row["run_id"] + ".json")).read_text(encoding="utf-8"))
+                self.assertEqual(saved["status"], "completed")
+
     def test_reference_hook_timer_excludes_user_pause_and_needs_no_torch(self):
         # ⑦: hook 본문에서 쓴 시간만 누적하고 그 안의 사용자 정지는 뺀다(torch 없이 검사 가능한 부분).
         from local_agent_lab.reference_engine import ReferenceRuntime

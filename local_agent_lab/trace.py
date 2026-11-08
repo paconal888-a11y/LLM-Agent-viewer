@@ -221,6 +221,7 @@ class Run:
         self.created_at = datetime.now(timezone.utc).isoformat()
         self.started = time.perf_counter()
         self.finished = None
+        self.closed = False
         self.status = "running"
         self.step_mode = step
         self.answer = ""
