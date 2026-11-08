@@ -160,5 +160,23 @@ class ObservationTests(unittest.TestCase):
         self.assertEqual(metrics["tool_names"], ["read_file", "check_file"])
 
 
+    def test_cache_experiment_reports_same_sampling_even_when_transport_differs(self):
+        # I-14: kv_cache 실험은 cache_prompt만 다른데 '같은 생성 설정 ×'로만 보여 샘플링 차이와 구분되지 않았다.
+        import time
+
+        app = Application(self.harness(response({"content": "A"}), response({"content": "B"})))
+        experiment = app.experiments.start("same", left_engine={"cache_prompt": False}, right_engine={"cache_prompt": True})
+        deadline = time.monotonic() + 10
+        while app.experiment_active and time.monotonic() < deadline:
+            time.sleep(0.01)
+        result = app.experiments.get(experiment)
+        self.assertEqual(result["status"], "completed", result.get("error"))
+        self.assertFalse(result["controls"]["same_generation"])
+        self.assertTrue(result["controls"]["same_sampling"])
+        self.assertTrue(result["controls"]["same_prompt"])
+        self.assertIn("same_harness_code", result["controls"])
+        self.assertEqual(set(result["generation_diff"]), {"cache_prompt"})
+
+
 if __name__ == "__main__":
     unittest.main()

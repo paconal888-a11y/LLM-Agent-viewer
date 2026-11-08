@@ -109,8 +109,10 @@ class LocalRuntime:
                         raise RuntimeFailure("SSE 줄의 크기 제한을 초과했습니다.")
                     if not line:
                         raise RuntimeFailure("[DONE] 전에 SSE 연결이 끝났습니다.")
-                    size += len(line)
                     stripped = line.rstrip(b"\r\n")
+                    # frame_bytes는 data 줄과 종결 빈 줄만 센다. 주석(: ping)·event 줄은 프레임 크기에 넣지 않는다.
+                    if not stripped or stripped.startswith(b"data:"):
+                        size += len(line)
                     if not stripped:
                         if not data:
                             size = 0

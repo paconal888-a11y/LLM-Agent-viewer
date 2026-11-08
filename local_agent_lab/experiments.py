@@ -164,6 +164,13 @@ def evaluate(snapshot, case_id):
     }
 
 
+TRANSPORT_KEYS = {"cache_prompt", "stream", "use_kv", "capture_layer"}
+
+
+def sampling_only(config):
+    return {k: v for k, v in (config or {}).items() if k not in TRANSPORT_KEYS}
+
+
 def summarize(run, case_id):
     snapshot = run.snapshot()
     counts = {}
@@ -311,6 +318,11 @@ class ExperimentService:
                 "same_generation": bool(a.get("effective_generation_config"))
                 and a.get("effective_generation_config")
                 == b.get("effective_generation_config"),
+                # 샘플링(temperature·seed·top_k·top_p·max_tokens 등)만 비교. 캐시·전송·관찰 설정(cache_prompt,
+                # stream, use_kv, capture_layer)은 모델 출력 분포가 아니라 계산 경로를 바꾸므로 따로 본다.
+                "same_sampling": bool(a.get("effective_generation_config"))
+                and sampling_only(a.get("effective_generation_config"))
+                == sampling_only(b.get("effective_generation_config")),
                 "same_workspace": a.get("workspace", {}).get("sha256")
                 == b.get("workspace", {}).get("sha256"),
                 "isolated_sessions": True,

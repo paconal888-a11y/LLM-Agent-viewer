@@ -380,6 +380,11 @@ class InferenceTests(unittest.TestCase):
             frames = list(runtime.stream_json("/stream", {"stream": True}))
             self.assertTrue(frames[0]["opened"])
             self.assertEqual(frames[1]["data"]["choices"][0]["delta"]["content"], "안")
+            # I-12: 선행 주석(: ping) 바이트는 프레임 크기에 넣지 않는다. data 줄 2개 + 종결 빈 줄.
+            self.assertEqual(
+                frames[1]["frame_bytes"],
+                len('data: {"choices":\r\n'.encode()) + len('data: [{"index":0,"delta":{"content":"안"}}]}\r\n'.encode()) + 2,
+            )
             self.assertTrue(frames[-1]["done"])
             with self.assertRaises(RuntimeFailure):
                 list(runtime.stream_json("/broken", {"stream": True}))
@@ -387,6 +392,75 @@ class InferenceTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
             worker.join(timeout=2)
+
+
+class StreamObservationTests(unittest.TestCase):
+    """독립 검토(추론 계측)에서 재현한 표시 결함: 생성 토큰 수 대조, 부분 조립 기록, 출처 라벨."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.workspace = self.root / "workspace"
+        shutil.copytree(ROOT / "demo_workspace", self.workspace)
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def run_with(self, parts):
+        class Fixture(StreamingFixture):
+            def stream_json(self, route, payload):
+                yield {"opened": True, "http_status": 200, "content_type": "text/event-stream", "arrival_ms": 1}
+                for index, part in enumerate(parts):
+                    if part == "ERROR":
+                        raise RuntimeFailure("SSE 프레임에 유효한 응답 대신 오류가 있습니다: fixture")
+                    yield {"data": part, "raw": json.dumps(part), "arrival_ms": index + 2, "frame_bytes": 10}
+                yield {"done": True, "raw": "[DONE]", "arrival_ms": 99, "frame_bytes": 14}
+
+        run = Run("stream", "stream-audit", features={"rules": False, "skills": False, "commands": False, "memory": False})
+        Harness(self.workspace, self.root / "state", runtime=Fixture()).execute(run)
+        return run
+
+    def test_generation_count_mismatch_is_detected_and_sources_are_labelled(self):
+        # I-04: llama.cpp는 불완전한 UTF-8 토큰을 보류·병합해 logprobs 항목이 completion_tokens보다 적어도 대조하지 않았다.
+        probs = [{"token": "a", "logprob": -0.1}, {"token": "b", "logprob": -0.2}]
+        parts = [
+            chunk({"content": "ab"}, logprobs={"content": probs}),
+            chunk(finish="stop"),
+            {"choices": [], "usage": {"prompt_tokens": 10, "completion_tokens": 6}, "timings": {"cache_n": 4, "prompt_n": 6, "predicted_n": 6, "prompt_ms": 1, "predicted_ms": 2}},
+        ]
+        run = self.run_with(parts)
+        self.assertEqual(run.status, "completed", run.error)
+        cache = next(e["output"] for e in run.events if e["kind"] == "runtime.cache")
+        self.assertEqual(cache["logprob_entries"], 2)
+        self.assertEqual(cache["predicted_n"], 6)
+        self.assertIs(cache["generation_count_matches"], False)
+        self.assertIn("보류", cache["generation_count_note"])
+        # I-07: cached_tokens가 어느 서버 필드에서 왔는지, 보고/진단/계산값이 무엇인지 적는다.
+        self.assertEqual(cache["cached_tokens_source"], "timings.cache_n")
+        self.assertIn("accounting_matches", cache["value_sources"]["derived"])
+        self.assertIn("prompt_tokens", cache["value_sources"]["reported"])
+        assembly = next(e["output"]["assembly"] for e in run.events if e["kind"] == "model.stream.assemble")
+        self.assertEqual(assembly["logprob_entries"], 2)
+        self.assertIn("timing_basis", assembly)
+        self.assertEqual(assembly["first_payload_received_ms_excluding_pause"], assembly["first_payload_received_ms"])
+        frame = next(e["output"] for e in run.events if e["kind"] == "model.stream")
+        self.assertIn("arrival_ms_excluding_pause", frame)
+        self.assertEqual(frame["assembled_so_far"]["content_characters"], 2)
+
+    def test_stream_failure_keeps_the_partial_assembly(self):
+        # I-08: 스트림이 중간에 실패하면 그때까지 합친 content·도구 조각이 어떤 이벤트에도 남지 않았다.
+        parts = [
+            chunk({"tool_calls": [{"index": 0, "id": "c1", "type": "function", "function": {"name": "read_file", "arguments": '{"path":'}}]}),
+            chunk({"content": "부분"}),
+            "ERROR",
+        ]
+        run = self.run_with(parts)
+        self.assertEqual(run.status, "failed")
+        partial = next(e for e in run.events if e["kind"] == "model.stream.partial")
+        self.assertEqual(partial["output"]["frames"], 2)
+        self.assertEqual(partial["output"]["tool_calls_so_far"][0]["function"]["arguments"], '{"path":')
+        self.assertEqual(partial["output"]["message_so_far"]["content"], "부분")
+        self.assertEqual(partial["status"], "warning")
 
 
 if __name__ == "__main__":

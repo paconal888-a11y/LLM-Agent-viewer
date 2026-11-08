@@ -270,8 +270,9 @@ class ChatAssembly:
         self.logprobs = []
         self.frames = 0
         self.first_payload_ms = None
+        self.first_payload_excluding_pause_ms = None
 
-    def add(self, frame, arrival_ms):
+    def add(self, frame, arrival_ms, arrival_excluding_pause_ms=None):
         self.frames += 1
         for key in (
             "id",
@@ -332,6 +333,9 @@ class ChatAssembly:
                 delta.get("content") or fragments or probabilities
             ):
                 self.first_payload_ms = arrival_ms
+                self.first_payload_excluding_pause_ms = (
+                    arrival_excluding_pause_ms if arrival_excluding_pause_ms is not None else arrival_ms
+                )
             if choice.get("finish_reason") is not None:
                 self.finish = choice["finish_reason"]
 
@@ -357,7 +361,11 @@ class ChatAssembly:
                 "source": "original_sse_frames",
                 "frame_count": self.frames,
                 "first_payload_received_ms": self.first_payload_ms,
+                "first_payload_received_ms_excluding_pause": self.first_payload_excluding_pause_ms,
+                "timing_basis": "하네스가 프레임을 읽은 시각. _excluding_pause는 단계 정지 시간을 뺀 값이며 서버 계산 시간은 timings에 따로 있다.",
+                "logprob_entries": len(self.logprobs),
                 "observed_token_ids": len(self.logprobs),
+                "observed_token_ids_basis": "logprobs 항목 수(llama.cpp는 불완전한 UTF-8 토큰을 보류·병합해 생성 토큰 수보다 적을 수 있음)",
             },
         }
 
@@ -408,6 +416,46 @@ def generate(run, runtime, payload, iteration):
             )
         return result
     assembly = ChatAssembly()
+    pause_at_start = run.paused_seconds
+    try:
+        _consume_stream(run, runtime, payload, iteration, assembly, pause_at_start)
+    except Exception as error:
+        # 스트림이 중간에 실패해도 그 시점까지 합친 메시지·도구 조각을 남긴다. 성공한 응답처럼 쓰지는 않는다.
+        if assembly.frames:
+            run.record_interrupted(
+                "model.stream.partial",
+                "스트림 실패 시점까지 합친 부분 응답",
+                "스트림이 끝나기 전에 오류가 났습니다. 지금까지 받은 조각을 합친 상태이며 모델의 최종 응답이 아닙니다.",
+                category="model",
+                output={
+                    "call": iteration,
+                    "error": str(error),
+                    "frames": assembly.frames,
+                    "message_so_far": assembly.message,
+                    "tool_calls_so_far": [assembly.calls[i] for i in sorted(assembly.calls)],
+                    "finish_reason": assembly.finish,
+                },
+            )
+        raise
+    response = assembly.response()
+    response["_assembly"]["pause_during_stream_seconds"] = round(
+        run.paused_seconds - pause_at_start, 3
+    )
+    run.emit(
+        "model.stream.assemble",
+        "전송 조각을 모델 메시지·도구 요청으로 복원",
+        "content는 문자열 조각을 순서대로 합치고 tool_calls는 index별로 id·이름·인자를 복원했습니다. 이 객체는 하네스가 원본 SSE를 합친 결과입니다.",
+        category="model",
+        output={
+            "call": iteration,
+            "message": response["choices"][0]["message"],
+            "assembly": response["_assembly"],
+        },
+    )
+    return response
+
+
+def _consume_stream(run, runtime, payload, iteration, assembly, pause_at_start):
     with contextlib.closing(
         runtime.stream_json("/v1/chat/completions", payload)
     ) as frames:
@@ -433,7 +481,9 @@ def generate(run, runtime, payload, iteration):
                 )
                 break
             frame = received["data"]
-            assembly.add(frame, received["arrival_ms"])
+            # 수신 시각은 하네스가 읽은 시각이라 단계 정지를 포함한다. 정지를 뺀 값도 함께 남긴다.
+            paused_ms = round((run.paused_seconds - pause_at_start) * 1000, 3)
+            assembly.add(frame, received["arrival_ms"], arrival_excluding_pause_ms=received["arrival_ms"] - paused_ms)
             if "prompt_progress" in frame:
                 kind, title, actor = (
                     "runtime.prefill",
@@ -474,36 +524,42 @@ def generate(run, runtime, payload, iteration):
                     "call": iteration,
                     "frame": frame,
                     "arrival_ms": received["arrival_ms"],
+                    "arrival_ms_excluding_pause": round(received["arrival_ms"] - paused_ms, 3),
                     "frame_bytes": received["frame_bytes"],
                     "frame_index": assembly.frames,
+                    "assembled_so_far": {
+                        "content_characters": len(assembly.message.get("content", "")),
+                        "tool_call_fragments": len(assembly.calls),
+                    },
                 },
             )
         else:
             raise RuntimeFailure("SSE 종료 표식을 받지 못했습니다.")
-    response = assembly.response()
-    run.emit(
-        "model.stream.assemble",
-        "전송 조각을 모델 메시지·도구 요청으로 복원",
-        "content는 문자열 조각을 순서대로 합치고 tool_calls는 index별로 id·이름·인자를 복원했습니다. 이 객체는 하네스가 원본 SSE를 합친 결과입니다.",
-        category="model",
-        output={
-            "call": iteration,
-            "message": response["choices"][0]["message"],
-            "assembly": response["_assembly"],
-        },
-    )
-    return response
 
 
 def audit_response(run, response, preview, iteration, payload=None):
     usage = response.get("usage") or {}
     timings = response.get("timings") or {}
-    cached = (usage.get("prompt_tokens_details") or {}).get(
-        "cached_tokens", timings.get("cache_n")
-    )
+    details = usage.get("prompt_tokens_details") or {}
+    if "cached_tokens" in details:
+        cached, cached_source = details.get("cached_tokens"), "usage.prompt_tokens_details.cached_tokens"
+    elif "cache_n" in timings:
+        cached, cached_source = timings.get("cache_n"), "timings.cache_n"
+    else:
+        cached, cached_source = None, None
     total = usage.get("prompt_tokens")
     fresh = timings.get("prompt_n")
     actual_prompt = (response.get("__verbose") or {}).get("prompt")
+    # 생성 쪽 대조: usage.completion_tokens, timings.predicted_n, logprobs 항목 수. EOS 1개 차이는 흔하다.
+    completion = usage.get("completion_tokens")
+    predicted_n = timings.get("predicted_n")
+    logprob_entries = len(
+        ((response.get("choices") or [{}])[0].get("logprobs") or {}).get("content") or []
+    )
+    generation_count_matches = None
+    if type(completion) is int and logprob_entries:
+        generation_count_matches = logprob_entries in (completion, completion - 1)
+    stream_assembly = response.get("_assembly") or {}
     run.emit(
         "runtime.cache",
         "이번 호출의 계산량·캐시 요약",
@@ -515,8 +571,21 @@ def audit_response(run, response, preview, iteration, payload=None):
             "cache_prompt": (payload or run.engine)["cache_prompt"],
             "prompt_tokens": total,
             "cached_tokens": cached,
+            "cached_tokens_source": cached_source,
             "fresh_prompt_tokens": fresh,
             "completion_tokens": usage.get("completion_tokens"),
+            "predicted_n": predicted_n,
+            "logprob_entries": logprob_entries or None,
+            "generation_count_matches": generation_count_matches,
+            "generation_count_note": "logprobs 항목 수가 completion_tokens보다 적으면 실행기가 불완전한 UTF-8 토큰을 보류해 병합했거나 EOS가 빠진 것이다. 생성 토큰을 토큰별 화면이 모두 보여주지는 못한다."
+            if generation_count_matches is False
+            else None,
+            "pause_during_stream_seconds": stream_assembly.get("pause_during_stream_seconds"),
+            "value_sources": {
+                "reported": ["prompt_tokens", "cached_tokens", "fresh_prompt_tokens", "completion_tokens", "predicted_n", "prompt_ms", "decode_ms", "decode_tokens_per_second", "effective_generation_settings", "stop_type", "truncated"],
+                "diagnostic": ["diagnostic_token_count"],
+                "derived": ["accounting_matches", "diagnostic_count_matches", "template_matches_generation_prompt", "generation_count_matches", "logprob_entries"],
+            },
             "accounting_matches": cached + fresh == total
             if all(type(item) is int for item in (cached, fresh, total))
             else None,
