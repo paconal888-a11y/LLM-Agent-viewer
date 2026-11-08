@@ -1809,3 +1809,20 @@ body {
 .samplenote code {
   font: 12.5px var(--mono);
 }
+
+.demolink {
+  text-decoration: none;
+  white-space: nowrap;
+}
+.lessonlink {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 7px 12px;
+  text-decoration: none;
+}
+body.demo #export,
+body.demo #bodySearch,
+body.demo #bodySearchKind,
+body.demo #newSession {
+  display: none;
+}

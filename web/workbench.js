@@ -463,6 +463,7 @@
     $("startCompare").disabled = !state.health.connected || busy();
     $("backend").disabled = busy() || state.health.mode === "sample";
     $("sampleComposerNote").classList.toggle("hidden", state.health.mode !== "sample");
+    document.body.classList.toggle("demo", !!state.health.demo);
     if (state.health.mode === "sample") {
       $("connection").textContent = "샘플 기록 · 모델 실행 없음";
       $("backend").disabled = true;
@@ -1020,7 +1021,7 @@
               .join("")}</div></section>`,
         )
         .join("") +
-      `<section class="lessonrun"><h2>직접 실행해 보기</h2><p>${sample ? "지금은 샘플 보기 모드입니다. 직접 프롬프트를 실행하려면 <code>Start-AgentLens.ps1</code>을 일반 모드로 시작하세요. 첫 실행에 모델을 내려받습니다." : "로컬 모델이 연결되어 있습니다. 구조 · 실행 화면에서 요청을 실행하고, 하네스 파일을 고친 뒤 다시 측정할 수 있습니다."}</p><button class="secondary" data-view="${sample ? "learn" : "journey"}">${sample ? "구성 설명 보기" : "실행 화면으로"}</button></section>` +
+      `<section class="lessonrun"><h2>직접 실행해 보기</h2><p>${state.health.demo ? "이 페이지는 저장 기록을 재생하는 웹 데모입니다. 직접 프롬프트를 실행하고 하네스를 고쳐 보려면 Windows PC에 설치하세요. 모델도 PC에서 돌아갑니다." : sample ? "지금은 샘플 보기 모드입니다. 직접 프롬프트를 실행하려면 <code>Start-AgentLens.ps1</code>을 일반 모드로 시작하세요. 첫 실행에 모델을 내려받습니다." : "로컬 모델이 연결되어 있습니다. 구조 · 실행 화면에서 요청을 실행하고, 하네스 파일을 고친 뒤 다시 측정할 수 있습니다."}</p>${state.health.demo ? `<a class="secondary lessonlink" href="${esc(state.health.repository)}" target="_blank" rel="noopener">설치 안내 보기 ↗</a>` : `<button class="secondary" data-view="${sample ? "learn" : "journey"}">${sample ? "구성 설명 보기" : "실행 화면으로"}</button>`}</section>` +
       `<details class="lessonglossary"><summary>용어</summary><dl>${AgentLessons.glossary.map(([term, text]) => `<dt>${esc(term)}</dt><dd>${esc(text)}</dd>`).join("")}</dl></details></div>`;
   }
   async function route() {
