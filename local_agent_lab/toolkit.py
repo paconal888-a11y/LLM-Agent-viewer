@@ -155,15 +155,17 @@ def write_file(ctx, path, content):
 
 def check_file(ctx, path):
     text = ctx.read(path)
-    canonical = (
-        workspace_path(ctx.workspace, path).relative_to(ctx.workspace).as_posix()
-    )
+    target = workspace_path(ctx.workspace, path)
+    canonical = target.relative_to(ctx.workspace).as_posix()
+    # 검사기는 모델이 적은 문자열이 아니라 실제로 읽은 파일(정규화 경로)의 확장자로 고른다.
+    # 'data/x.json\\'·심볼릭 링크 별칭·대소문자 변형으로 JSON 검사를 비껴가지 못하게 한다.
+    suffix = target.suffix.lower()
     parsed = None
     try:
-        if Path(path).suffix == ".py":
-            compile(ast.parse(text, filename=path), path, "exec")
+        if suffix == ".py":
+            compile(ast.parse(text, filename=canonical), canonical, "exec")
             checker = "ast.parse + compile (Python 구문 확인; 프로그램 실행 없음)"
-        elif Path(path).suffix == ".json":
+        elif suffix == ".json":
             parsed = json.loads(text)
             checker = "json.loads (JSON 구문 분석)"
         else:
@@ -171,7 +173,7 @@ def check_file(ctx, path):
                 raise ValueError("파일 내용이 비어 있습니다.")
             checker = "non-empty text"
         result = {"path": canonical, "passed": True, "checker": checker}
-        if Path(path).suffix == ".json":
+        if suffix == ".json":
             result["json_value"] = parsed
     except (SyntaxError, ValueError) as error:
         result = {"path": canonical, "passed": False, "error": str(error)}

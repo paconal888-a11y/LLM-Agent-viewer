@@ -31,8 +31,22 @@ class StdioRpc:
         self.counter = 0
         self.lock = threading.RLock()
         self.stderr = []
+        self.broken = None
 
     def start(self, run):
+        if self.process and self.process.poll() is None and self.broken:
+            # reader 스레드가 프로토콜 위반(비JSON 줄, 길이 초과)으로 끝난 뒤에는 프로세스가 살아 있어도
+            # 응답을 받을 수 없다. 같은 연결을 재사용하면 이후 모든 요청이 시간 초과로 끝나므로 다시 시작한다.
+            run.emit(
+                self.protocol + ".process.restart",
+                "응답을 읽지 못하는 도구 서버 재시작",
+                "이전 연결의 stdout 해석이 실패해 프로세스를 종료하고 새로 시작합니다. 서버가 stdout에 JSON-RPC 외 출력을 쓰지 않는지 확인하세요.",
+                category="integrations",
+                actor=self.protocol,
+                status="warning",
+                output={"pid": self.process.pid, "reader_error": self.broken},
+            )
+            self.close()
         if self.process and self.process.poll() is None:
             run.emit(
                 self.protocol + ".process.reuse",
@@ -45,6 +59,7 @@ class StdioRpc:
             return
         self.inbox = queue.Queue()
         self.notifications = []
+        self.broken = None
         self.process = subprocess.Popen(
             self.argv,
             cwd=self.cwd,
@@ -124,6 +139,7 @@ class StdioRpc:
                     }
                 )
         except Exception as error:
+            self.broken = str(error)
             self.inbox.put({"reader_error": str(error)})
 
     def send(self, run, message, parent=None):
@@ -167,6 +183,7 @@ class StdioRpc:
             except queue.Empty:
                 continue
             if "reader_error" in item:
+                self.broken = item["reader_error"]
                 raise RuntimeFailure(
                     item["reader_error"] + " " + "".join(self.stderr)[-1500:]
                 )

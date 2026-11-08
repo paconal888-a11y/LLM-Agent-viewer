@@ -184,6 +184,7 @@ PATH_TOOLS = {
     "write_file",
     "check_file",
     "list_files",
+    "search_text",
     "lsp_diagnostics",
     "lsp_symbols",
     "lsp_definition",

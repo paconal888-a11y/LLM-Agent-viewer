@@ -387,6 +387,7 @@ def execute(harness, run):
                     not isinstance(call, dict)
                     or not isinstance(call.get("id"), str)
                     or call.get("type") != "function"
+                    or not isinstance(call.get("function"), dict)
                 ):
                     raise RuntimeFailure("모델의 도구 호출 형식이 올바르지 않습니다.")
                 run.tool_calls += 1

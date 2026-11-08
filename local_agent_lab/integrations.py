@@ -128,6 +128,12 @@ def prepare_mcp(run, config):
             output={"policy": policy, "exposed": []},
         )
     writes_allowed = bool(run.features.get("writes"))
+    advertised = [t.get("name", "") for t in response.get("tools", [])]
+    duplicates = sorted({n for n in advertised if advertised.count(n) > 1})
+    if duplicates:
+        raise RuntimeFailure(
+            "MCP 서버가 같은 이름의 도구를 두 번 광고했습니다: " + ", ".join(duplicates)
+        )
     for tool in response.get("tools", []):
         remote = tool.get("name", "")
         if not writes_allowed and remote not in read_only:
@@ -217,12 +223,34 @@ def prepare_mcp(run, config):
 
 
 def _mcp_tool(ctx, client, remote, **args):
-    result = client.request(
-        ctx.run,
-        "tools/call",
-        mcp_params(client, {"name": remote, "arguments": args}),
-        ctx.parent,
-    )
+    try:
+        result = client.request(
+            ctx.run,
+            "tools/call",
+            mcp_params(client, {"name": remote, "arguments": args}),
+            ctx.parent,
+        )
+    except RpcError as error:
+        # 서버가 JSON-RPC 오류로 답한 도구 호출은 실행 전체의 실패가 아니라 도구 실패다.
+        # 모델이 오류를 보고 다음 행동을 고를 수 있게 tool 메시지로 돌려준다.
+        return ctx.finish(
+            {
+                "error": "MCP 서버가 JSON-RPC 오류를 반환했습니다: " + str(error),
+                "executed_successfully": False,
+                "rpc_error": error.error,
+                "protocol": "mcp",
+            }
+        )
+    except RuntimeFailure as error:
+        return ctx.finish(
+            {
+                "error": str(error),
+                "executed_successfully": False,
+                "protocol": "mcp",
+                "side_effects": "unknown",
+                "note": "시간 초과나 전송 실패입니다. 서버 쪽에서 작업이 이미 수행됐을 수 있으며 하네스는 같은 요청을 다시 보내지 않습니다.",
+            }
+        )
     if result.get("resultType", "complete") != "complete":
         raise ValueError("이 클라이언트는 complete 도구 결과만 지원합니다.")
     if result.get("isError"):

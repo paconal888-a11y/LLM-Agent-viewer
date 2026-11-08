@@ -39,7 +39,7 @@ inference.py가 하네스와 실행기 사이의 경계입니다. 외부 실행�
 
 실제 어댑터는 integrations.py, framing과 프로세스 수명은 stdio_rpc.py에 있습니다. demo_workspace/integrations.json에서 로컬 서버 실행 프로필을 바꾸세요. command는 실행 파일, args는 인자 목록입니다. shell 문자열을 실행하지 않습니다. UI의 MCP·LSP 스위치를 켠 다음 실행부터 설정을 읽습니다. 외부 서버는 이 PC의 별도 프로세스로 실행하므로 신뢰하는 서버를 연결하세요.
 
-MCP는 2026-07-28의 server/discover → tools/list → 모델용 schema → tools/call → 구조화 결과 정규화 경로를 사용합니다. 모든 요청의 _meta와 응답 ID를 기록합니다. 도구에는 mcp_서버명_도구명 접두부를 붙입니다. 이전 initialize 방식의 호환 경로와 최신 경로를 같은 초기화라고 표시하지 않습니다. 현재는 단일 stdio 프로필과 단순 스칼라 인자를 지원합니다. 복합 schema를 쓰려면 policy.py 검증기를 함께 확장하세요. HTTP/OAuth와 전체 MCP 기능을 구현한 SDK는 아닙니다.
+MCP는 2026-07-28의 server/discover → tools/list → 모델용 schema → tools/call → 구조화 결과 정규화 경로를 사용합니다. tools/call이 JSON-RPC 오류나 시간 초과로 끝나면 실행 전체가 아니라 그 도구 호출의 실패로 처리해 `error`·`executed_successfully=false`를 tool 메시지로 모델에 돌려줍니다(시간 초과는 서버 쪽 부수효과가 이미 일어났을 수 있어 `side_effects: unknown`으로 표시하고 같은 요청을 다시 보내지 않습니다). 서버가 stdout에 JSON-RPC 외 출력을 쓰거나 2 MiB를 넘는 메시지를 보내면 그 연결은 더 쓰지 않고 다음 실행에서 프로세스를 다시 시작합니다(`mcp.process.restart`). 같은 이름의 도구를 두 번 광고하는 서버는 거부합니다. 모든 요청의 _meta와 응답 ID를 기록합니다. 도구에는 mcp_서버명_도구명 접두부를 붙입니다. 이전 initialize 방식의 호환 경로와 최신 경로를 같은 초기화라고 표시하지 않습니다. 현재는 단일 stdio 프로필과 단순 스칼라 인자를 지원합니다. 복합 schema를 쓰려면 policy.py 검증기를 함께 확장하세요. HTTP/OAuth와 전체 MCP 기능을 구현한 SDK는 아닙니다.
 
 MCP 프로필의 allow_tools는 서버가 광고한 도구 중 공개할 원본 이름 목록입니다. 기본은 ["add"]이며 빈 목록이면 어떤 도구도 모델에 공개하지 않습니다. allow_tools 키가 아예 없으면 기본 거부입니다. 어떤 도구도 공개하지 않고 `mcp.policy` 이벤트로 광고된 도구 이름과 함께 그 사실을 기록하며, 실행 요청도 거부합니다. 서버의 도구 목록이 바뀌었다는 사실만으로 실행 권한이 늘어나지 않습니다. 연결 프로필 변경은 다음 연결 준비에서 새 설정으로 구별합니다.
 

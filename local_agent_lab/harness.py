@@ -3,7 +3,7 @@
 import json
 import re
 import threading
-from .trace import ROOT, Run
+from .trace import ROOT, Run, RunStopped
 from .runtime import LocalRuntime
 from .files import workspace_path, read_traced
 from .context import (
@@ -41,7 +41,21 @@ def execute_tool(run, workspace, catalog, call, active_skills):
         if not callable(implementation):
             raise ValueError("도구 구현이 등록되지 않았습니다: " + str(name))
         context = ToolContext(run, workspace, catalog, active_skills, parent, name)
-        result = implementation(context, **args)
+        try:
+            result = implementation(context, **args)
+        except RunStopped:
+            # 중지 요청이 도구 실행 도중 도착하면 부수효과는 이미 끝났을 수 있다. 결과 이벤트가
+            # 없어 기록에서 사라지지 않도록 중단 사실을 남긴 뒤 중지를 계속 전파한다.
+            run.record_interrupted(
+                "tool.interrupted",
+                name + " 실행 중 중지",
+                "사용자 중지가 도구 실행 도중 도착했습니다. 도구 함수가 이미 만든 파일·외부 효과는 되돌리지 않았습니다.",
+                category="tools",
+                actor="tool",
+                parent=parent,
+                input={"name": name, "arguments": args},
+            )
+            raise
     except (OSError, ValueError, TypeError) as error:
         result = {"error": str(error), "executed_successfully": False}
         run.emit(

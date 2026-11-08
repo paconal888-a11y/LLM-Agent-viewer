@@ -273,6 +273,35 @@ class Run:
             self.parent_event_ids[event["id"]] = mirrored
         return event["id"]
 
+    def record_interrupted(self, kind, title, detail, **kwargs):
+        """중지 이후에도 남겨야 하는 기록. 정지하지 않고 RunStopped도 일으키지 않는다."""
+        frame = inspect.currentframe().f_back
+        source = source_location(frame)
+        del frame
+        with self.condition:
+            event = {
+                "id": len(self.events) + 1,
+                "kind": kind,
+                "title": title,
+                "detail": detail,
+                "actor": kwargs.get("actor", "harness"),
+                "category": kwargs.get("category", "context"),
+                "status": "warning",
+                "parent": kwargs.get("parent"),
+                "elapsed_ms": round((time.perf_counter() - self.started) * 1000, 2),
+                "input": copy.deepcopy(kwargs.get("input")),
+                "output": copy.deepcopy(kwargs.get("output")),
+                "source": source,
+                "agent_id": self.id,
+                "agent_name": self.agent_name,
+                "child_event_id": None,
+                "child_elapsed_ms": None,
+                "model_purpose": self.model_purpose,
+            }
+            self.events.append(event)
+            self.condition.notify_all()
+        return event["id"]
+
     def control(self, action):
         with self.condition:
             if action == "next":
