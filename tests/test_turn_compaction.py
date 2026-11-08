@@ -130,6 +130,40 @@ class CompactionLoopTests(unittest.TestCase):
         self.assertIn("큰 문서 큰 문서", source)
         self.assertNotIn("omitted_by_harness", source)
 
+    def test_restored_tool_results_are_pruned_before_the_first_call(self):
+        # 이전 대화의 큰 도구 결과가 복원되면 다음 요청이 컨텍스트 창을 넘겨 새 대화 전까지 막혔다.
+        self.settings(compact_at_tokens=800, keep_recent_messages=2, prune_tool_characters=200, max_summaries=0)
+        self.execute(self.read(), reply({"content": "읽었음"}))
+        run, runtime = self.execute(reply({"content": "다음 답변"}))
+        self.assertEqual(run.status, "completed", run.error)
+        sent = json.dumps(completions(runtime)[0]["messages"], ensure_ascii=False)
+        self.assertIn("omitted_by_harness", sent)
+        self.assertNotIn("큰 문서 큰 문서", sent)
+        self.assertTrue(self.kinds(run, "context.prune"))
+        state = json.loads((self.root / "state" / "sessions" / "compact.json").read_text(encoding="utf-8"))
+        self.assertIn("큰 문서 큰 문서", json.dumps(state["turns"], ensure_ascii=False))
+
+    def test_a_summary_does_not_bring_back_pruned_history(self):
+        self.settings(compact_at_tokens=200, keep_recent_messages=2, prune_tool_characters=200)
+        self.execute(self.read(), reply({"content": "읽었음"}))
+        run, runtime = self.execute(self.add(), self.add(3, 4), reply({"content": "요약"}), reply({"content": "끝"}))
+        self.assertEqual(run.status, "completed", run.error)
+        self.assertTrue(self.kinds(run, "context.compact.result"))
+        self.assertNotIn("큰 문서 큰 문서", json.dumps(completions(runtime)[-1]["messages"], ensure_ascii=False))
+
+    def test_context_window_is_known_before_the_first_call(self):
+        class Windowed(FixtureRuntime):
+            context_limit = 1000
+
+        self.settings(compact_at_ratio=0.5)
+        runtime = Windowed(reply({"content": "끝"}))
+        harness = Harness(self.workspace, self.root / "state", runtime=runtime)
+        run = Run("질문", "windowed")
+        harness.execute(run)
+        check = self.kinds(run, "context.check")[0]
+        self.assertEqual(check["input"]["window_tokens"], 1000)
+        self.assertEqual(check["input"]["threshold_tokens"], 500)
+
     def test_segments_describe_the_request_that_was_actually_sent(self):
         self.settings(compact_at_tokens=200, keep_recent_messages=2, prune_tool_characters=200)
         run, _ = self.execute(self.read(), self.add(), reply({"content": "요약"}), reply({"content": "끝"}))

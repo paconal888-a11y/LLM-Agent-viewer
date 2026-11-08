@@ -343,10 +343,15 @@ def execute(harness, run):
                 discard_checkpoint(harness.state_dir, run.resumed_from)
             return saved
 
+        engine_observed = False
         for iteration in range(turn["next_iteration"], last_iteration + 1):
             if run.stopped:
                 raise RunStopped()
             allowed_tools = tools_for(run)
+            if not engine_observed:
+                # 입력 크기 판단에 컨텍스트 창이 필요하므로 첫 호출을 준비하기 전에 읽는다.
+                observe_engine(run, harness.runtime, iteration)
+                engine_observed = True
             # messages는 전체 기록이다. 모델에는 필요하면 줄인 입력만 보낸다.
             request_messages, request_origin = prepare_input(
                 harness, run, messages, allowed_tools, view
@@ -453,8 +458,6 @@ def execute(harness, run):
                 },
             )
             with inference_turn(harness, run, iteration):
-                if iteration == 1:
-                    observe_engine(run, harness.runtime, iteration)
                 preview = preview_input(run, harness.runtime, payload, iteration)
                 observe_slots(run, harness.runtime, iteration, "생성 전")
                 response = generate(run, harness.runtime, payload, iteration)

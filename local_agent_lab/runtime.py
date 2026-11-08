@@ -19,6 +19,17 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+def http_failure(error):
+    """서버가 본문에 적은 이유까지 전달한다. 컨텍스트 초과 같은 원인을 구분하는 근거가 된다."""
+    try:
+        detail = error.read(2000).decode("utf-8", "replace").strip()
+    except OSError:
+        detail = ""
+    return RuntimeFailure(
+        f"런타임이 HTTP {error.code}을 반환했습니다." + (" " + detail if detail else "")
+    )
+
+
 class LocalRuntime:
     def __init__(self, base_url="http://127.0.0.1:1234/v1", timeout=120.0):
         try:
@@ -76,7 +87,7 @@ class LocalRuntime:
                 }
                 value = json.load(response)
         except urllib.error.HTTPError as exc:
-            raise RuntimeFailure(f"런타임이 HTTP {exc.code}을 반환했습니다.") from exc
+            raise http_failure(exc) from exc
         except (urllib.error.URLError, OSError, ValueError) as exc:
             raise RuntimeFailure(f"런타임 연결 또는 JSON 응답 실패: {exc}") from exc
         if not isinstance(value, (dict, list)):
@@ -148,7 +159,7 @@ class LocalRuntime:
                             )
                     # SSE 주석·ping·event 이름은 모델 출력으로 취급하지 않는다.
         except urllib.error.HTTPError as exc:
-            raise RuntimeFailure(f"런타임이 HTTP {exc.code}을 반환했습니다.") from exc
+            raise http_failure(exc) from exc
         except (urllib.error.URLError, OSError, ValueError) as exc:
             raise RuntimeFailure(f"SSE 수신 또는 JSON 해석 실패: {exc}") from exc
 

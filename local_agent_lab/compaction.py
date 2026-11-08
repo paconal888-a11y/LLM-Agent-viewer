@@ -18,7 +18,7 @@ SUMMARY_MESSAGE_CHARACTERS = 1200
 
 
 def new_view(work_start):
-    """work_start 앞은 규칙·현재 요청이므로 압축하지 않는다."""
+    """work_start 앞의 규칙·현재 요청은 요약하지 않는다. 복원한 도구 결과의 본문만 생략할 수 있다."""
     return {
         "work_start": work_start,
         "summary": "",
@@ -41,7 +41,8 @@ def summary_message(view):
 def input_view(messages, view):
     """모델에 보낼 messages와, 각 항목이 원본의 몇 번째인지 돌려준다."""
     start, end = view["work_start"], view["summary_end"]
-    result, origin = list(messages[:start]), list(range(start))
+    result = [view["pruned"].get(str(index)) or messages[index] for index in range(start)]
+    origin = list(range(start))
     if view["summary"]:
         result.append(summary_message(view))
         origin.append("summary")
@@ -131,7 +132,8 @@ def safe_end(messages, end, floor):
 def prune_tool_results(run, messages, view, limit, end):
     """오래된 도구 결과의 본문을 자리표시자로 바꾼다. 모델을 호출하지 않는 결정적 단계다."""
     pruned = []
-    for index in range(view["summary_end"], end):
+    # 이전 대화에서 복원한 도구 결과도 대상이다. 그대로 두면 다음 요청이 컨텍스트 창을 넘겨 세션이 막힌다.
+    for index in [*range(view["work_start"]), *range(view["summary_end"], end)]:
         message = messages[index]
         content = message.get("content")
         if (
@@ -256,7 +258,7 @@ def summarize(harness, run, messages, view, end):
         return False
     finally:
         run.model_purpose = "answer"
-    for key in [k for k in view["pruned"] if int(k) < end]:
+    for key in [k for k in view["pruned"] if view["work_start"] <= int(k) < end]:
         del view["pruned"][key]
     view.update(summary=text, summary_end=end, summaries=view["summaries"] + 1)
     event_id = run.emit(
