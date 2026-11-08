@@ -69,6 +69,14 @@ class ObservatoryTests(unittest.TestCase):
             )
             self.assertNotEqual(saved["source"]["stack"][-1]["code"], "changed later")
 
+    def test_every_component_says_who_decides_what(self):
+        from local_agent_lab.learning import EXPLANATIONS
+
+        for key, item in EXPLANATIONS.items():
+            with self.subTest(component=key):
+                self.assertEqual(set(item["decided"]), {"code", "model", "change"})
+                self.assertTrue(all(item["decided"].values()))
+
     def test_implementation_endpoint_serves_catalog_without_arbitrary_file_access(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(Application()))
         worker = threading.Thread(target=server.serve_forever, daemon=True)

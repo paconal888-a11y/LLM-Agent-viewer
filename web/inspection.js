@@ -343,7 +343,106 @@
         "하네스가 남긴 이벤트입니다. 전체 값 탭에서 원본 데이터를 확인할 수 있습니다.",
     };
   }
+  const OWNERS = {
+    model: "모델이 선택",
+    code: "코드가 결정",
+    config: "설정·파일에서 옴",
+    user: "사용자 입력",
+    runtime: "실행기 계산",
+    external: "외부 서버",
+  };
+  // 이 단계의 내용을 누가 정했는지 구분한다. 실행 주체(actor)와 다르다: 파일을 읽는 것은 파일 시스템이지만
+  // 그 파일을 읽기로 한 것은 코드일 수도, 모델의 도구 요청일 수도 있다.
+  function decision(event, events = []) {
+    const kind = event?.kind || "",
+      owner = (name, explanation) => ({
+        owner: name,
+        label: OWNERS[name],
+        explanation,
+      });
+    if (
+      ["model.response", "model.stream", "reference.sample", "output.answer"].includes(kind)
+    )
+      return owner(
+        "model",
+        "모델의 생성 결과입니다. 답할지 도구를 요청할지, 어떤 문장을 낼지가 여기서 정해집니다. 하네스는 이 출력을 해석할 뿐 고르지 않습니다.",
+      );
+    if (kind === "tool.dispatch" || kind === "agent.delegate")
+      return owner(
+        "model",
+        "어떤 도구를 어떤 인자로 부를지는 모델이 정했습니다. 이 요청을 검사하고 실행하는 다음 단계부터는 코드입니다.",
+      );
+    if (kind === "memory.compaction.result")
+      return owner(
+        "model",
+        "요약 문장은 모델이 썼습니다. 언제 무엇을 요약할지는 코드와 memory.json이 정합니다.",
+      );
+    if (kind.startsWith("file.")) {
+      const parent = events.find((item) => item.id === event.parent);
+      return parent?.kind === "tool.dispatch"
+        ? owner(
+            "model",
+            "이 파일을 읽은 것은 모델의 도구 요청 때문입니다. 경로 제한과 읽는 방법은 코드가 정합니다.",
+          )
+        : owner(
+            "code",
+            "하네스 코드가 정해진 순서로 읽는 파일입니다. 모델이 요청한 것이 아닙니다.",
+          );
+    }
+    if (kind === "input.receive" || kind === "browser.input" || kind === "browser.serialize")
+      return owner("user", "사용자가 입력한 내용입니다.");
+    if (
+      kind.endsWith(".disabled") ||
+      [
+        "config.apply",
+        "agent.mode",
+        "validation.plan",
+        "context.requirements",
+        "mcp.policy",
+        "mcp.tool.filtered",
+        "memory.compaction.check",
+      ].includes(kind)
+    )
+      return owner(
+        "config",
+        "실행 설정·스위치·완료 조건·설정 파일에서 정해진 값입니다. 코드를 고치지 않고 바꿀 수 있습니다.",
+      );
+    if (
+      ["rules.wrap", "skills.catalog", "skills.scan", "skills.metadata", "command.expand"].includes(kind)
+    )
+      return owner(
+        "config",
+        "내용은 작업 공간의 파일(AGENTS.md·skills·commands)에서 옵니다. 파일을 찾고 입력에 넣는 규칙은 코드입니다.",
+      );
+    if (kind.startsWith("mcp.") || kind.startsWith("lsp."))
+      return owner(
+        "external",
+        "별도 프로세스의 서버와 주고받은 내용입니다. 서버 내부 동작은 이 기록 밖입니다.",
+      );
+    if (
+      kind.startsWith("runtime.") ||
+      kind.startsWith("http.inference") ||
+      kind.startsWith("reference.") ||
+      ["model.template", "model.tokenize", "model.detokenize", "model.decode.report", "model.stream.control", "model.stream.usage", "model.stream.done"].includes(kind) ||
+      kind.startsWith("model.preview") ||
+      kind.startsWith("model.detokenize.")
+    )
+      return owner(
+        "runtime",
+        "실행기가 모델 파일과 실행 설정에 따라 계산한 값입니다. 모델의 ‘선택’이 아니라 정해진 계산입니다.",
+      );
+    if (kind.startsWith("validation.") || kind === "tool.validate")
+      return owner(
+        "code",
+        "정책 코드의 판정입니다. 모델은 이 판정에 참여하지 않습니다. policy.py를 바꾸면 달라집니다.",
+      );
+    return owner(
+      "code",
+      "하네스 코드가 정해진 순서로 처리한 단계입니다. local_agent_lab의 코드를 바꾸면 달라집니다.",
+    );
+  }
   const api = {
+    decision,
     agentOf,
     purposeOf,
     canonical,

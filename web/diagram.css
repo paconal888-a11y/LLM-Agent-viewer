@@ -123,8 +123,68 @@ body {
   color: #3b638e;
   background: #edf4fc;
 }
-.evidence-kind:empty {
+.evidence-kind:empty,
+.decision-kind:empty,
+.decision-note:empty {
   display: none;
+}
+.decision-kind {
+  display: inline-block;
+  border-radius: 3px;
+  padding: 3px 6px;
+  margin-left: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #3d4f63;
+  background: #eef1f5;
+}
+.decision-kind[data-owner="model"] {
+  color: #5238a8;
+  background: #f0ecfb;
+}
+.decision-kind[data-owner="config"] {
+  color: #7a5620;
+  background: #fbf3e2;
+}
+.decision-kind[data-owner="user"] {
+  color: #2f6b58;
+  background: #e9f5f0;
+}
+.decision-kind[data-owner="runtime"] {
+  color: #2c5fae;
+  background: #eaf1fb;
+}
+.decision-kind[data-owner="external"] {
+  color: #6b4a7a;
+  background: #f4eef7;
+}
+.detailhead .decision-note {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #5b6778;
+  margin-top: 3px;
+}
+.decisionsummary {
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 0 0 8px;
+}
+.decisionsummary button {
+  margin-left: 8px;
+}
+.decisionmap {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 4px 8px;
+  margin: 6px 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.decisionmap dt {
+  color: #5b6778;
+}
+.decisionmap dd {
+  margin: 0;
 }
 .evidence-kind[data-evidence="diagnostic"] {
   color: #826529;
@@ -675,10 +735,22 @@ body {
     fill 0.15s,
     stroke 0.15s;
 }
-.arch-node:hover rect,
-.arch-node:focus-visible rect {
+.arch-node:hover rect {
   fill: #f2f6fd;
   stroke: #7995c2;
+}
+.arch-node:focus-visible rect {
+  fill: #f2f6fd;
+  stroke: #2f55c7;
+  stroke-width: 2.5;
+}
+.arch-compact .arch-node:not(.current) .node-meta,
+.arch-compact .model-stage,
+.arch-compact .group-sub {
+  display: none;
+}
+.arch-compact .arch-node.current .node-meta {
+  font-size: 13px;
 }
 .arch-node.related rect {
   stroke: #6688cb;
@@ -880,6 +952,26 @@ body {
   .layout:has(.inspector.open) > .project {
     display: none;
   }
+  /* 상세를 보는 동안에도 메뉴·예제 기록·파일 트리에 한 번에 갈 수 있게 한다. */
+  body:has(.inspector.open) #menu,
+  .layout:has(.inspector.open) > .project .mobile {
+    display: inline-grid !important;
+    place-items: center;
+  }
+  .layout:has(.inspector.open) > .project.open {
+    display: flex;
+    position: fixed;
+    left: 0;
+    top: 49px;
+    width: 245px;
+    height: calc(100dvh - 49px);
+    z-index: 45;
+    box-shadow: 10px 0 30px #20304022;
+  }
+  .has-activity .layout:has(.inspector.open) > .project.open {
+    top: 91px;
+    height: calc(100dvh - 91px);
+  }
   .layout > .inspector.open {
     position: relative;
     top: auto;
@@ -887,6 +979,25 @@ body {
     width: auto;
     height: 100%;
     box-shadow: none;
+  }
+}
+@media (min-width: 1366px) {
+  .layout:has(.inspector.open) {
+    grid-template-columns: 190px minmax(0, 1fr) 420px !important;
+  }
+  .layout:has(.inspector.open) > .project,
+  .layout:has(.inspector.open) > .project.open {
+    display: flex;
+    position: relative;
+    top: 0;
+    left: auto;
+    width: auto;
+    height: 100%;
+    box-shadow: none;
+  }
+  body:has(.inspector.open) #menu,
+  .layout:has(.inspector.open) > .project .mobile {
+    display: none !important;
   }
 }
 @media (max-width: 800px) {

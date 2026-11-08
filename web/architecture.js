@@ -412,18 +412,22 @@
       ""
     );
   }
+  // 노드 제목(16px)이 화면에서 11.5px 이상이 되는 배율. 이보다 작아지면 글자를 읽을 수 없다.
+  const READABLE_SCALE = 11.5 / 16;
   let callbacks = {},
     svg,
     host,
     lastEvent = null,
     zoom = 1,
-    pan = { x: 0, y: 0 };
+    pan = { x: 0, y: 0 },
+    auto = true,
+    focus = null;
   function init(element, handlers = {}) {
     host = element;
     callbacks = handlers;
     const group = (x, y, w, h, title, sub) =>
       `<g class="arch-group"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10"/><text x="${x + 16}" y="${y + 25}" class="group-title">${title}</text>${sub ? `<text x="${x + w - 16}" y="${y + 25}" text-anchor="end" class="group-sub">${sub}</text>` : ""}</g>`;
-    host.innerHTML = `<svg viewBox="0 0 1100 600" role="img" aria-label="에이전트 전체 구조도. 단계에 따라 구성 요소와 데이터 경로가 강조됩니다."><defs><marker id="arch-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7"/></marker><marker id="arch-hot-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7"/></marker></defs><g class="arch-world">${group(202, 24, 410, 562, "하네스", "Python")}${group(682, 24, 406, 430, "추론 경로", "Python / llama.cpp")}${group(682, 474, 406, 112, "외부 프로세스", "")}<text x="24" y="58" class="group-title">사용자 · 브라우저</text><text x="24" y="207" class="group-title">프로젝트 파일</text><g class="arch-edges">${edges.map(([id, path]) => `<path data-arch-edge="${id}" d="${path}" fill="none" marker-end="url(#arch-arrow)"/>`).join("")}</g>${nodes.map((n) => `<g data-arch-node="${n.id}" class="arch-node" role="button" tabindex="0" aria-label="${n.title} 구성과 기록"><rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="7"/><circle class="node-dot" cx="${n.x + n.w - 12}" cy="${n.y + 13}" r="3"/><text x="${n.x + 12}" y="${n.y + 22}" class="node-title">${n.title}</text><text x="${n.x + 12}" y="${n.y + 41}" class="node-meta">${n.description}</text>${n.id === "forward" ? `<text x="${n.x + 12}" y="${n.y + 66}" class="model-stage">선택 레이어의 수치 표본</text><text x="${n.x + 12}" y="${n.y + 86}" class="model-stage">실행기에 따라 노출 범위 다름</text>` : ""}</g>`).join("")}<g class="arch-pulse hidden"><circle r="5"/></g></g></svg>`;
+    host.innerHTML = `<svg viewBox="0 0 1100 600" role="img" aria-label="에이전트 전체 구조도. 단계에 따라 구성 요소와 데이터 경로가 강조됩니다."><defs><marker id="arch-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7"/></marker><marker id="arch-hot-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7"/></marker></defs><g class="arch-world">${group(202, 24, 410, 562, "하네스", "Python")}${group(682, 24, 406, 430, "추론 경로", "Python / llama.cpp")}${group(682, 474, 406, 112, "외부 프로세스", "")}<text x="24" y="58" class="group-title">사용자 · 브라우저</text><text x="24" y="207" class="group-title">프로젝트 파일</text><g class="arch-edges">${edges.map(([id, path]) => `<path data-arch-edge="${id}" d="${path}" fill="none" marker-end="url(#arch-arrow)"/>`).join("")}</g>${nodes.map((n) => `<g data-arch-node="${n.id}" class="arch-node" role="button" tabindex="0" aria-label="${n.title} 구성과 기록"><title>${n.title} · ${n.description}</title><rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="7"/><circle class="node-dot" cx="${n.x + n.w - 12}" cy="${n.y + 13}" r="3"/><text x="${n.x + 12}" y="${n.y + 22}" class="node-title">${n.title}</text><text x="${n.x + 12}" y="${n.y + 41}" class="node-meta">${n.description}</text>${n.id === "forward" ? `<text x="${n.x + 12}" y="${n.y + 66}" class="model-stage">선택 레이어의 수치 표본</text><text x="${n.x + 12}" y="${n.y + 86}" class="model-stage">실행기에 따라 노출 범위 다름</text>` : ""}</g>`).join("")}<g class="arch-pulse hidden"><circle r="5"/></g></g></svg>`;
     svg = host.querySelector("svg");
     svg.setAttribute("viewBox", "0 0 1100 430");
     svg.setAttribute("role", "group");
@@ -482,22 +486,62 @@
     svg.addEventListener("pointercancel", () => {
       drag = null;
     });
+    if (typeof ResizeObserver !== "undefined")
+      new ResizeObserver(transform).observe(host);
+  }
+  function view() {
+    const bounds = svg.getBoundingClientRect(),
+      base = Math.min(bounds.width / 1100, bounds.height / 430);
+    if (!base) return null;
+    return {
+      base,
+      width: bounds.width / base,
+      height: bounds.height / base,
+      effective: auto ? Math.max(zoom, READABLE_SCALE / base) : zoom,
+    };
   }
   function transform() {
+    const current = svg && view();
+    if (!current) return;
+    let followX = 0,
+      followY = 0;
+    // 공간이 좁으면 전체를 줄이는 대신 읽을 수 있는 배율을 유지하고 현재 단계가 보이도록 옮긴다.
+    if (auto && focus && current.base < READABLE_SCALE) {
+      const limit = (value, range) =>
+        Math.max(-Math.max(0, range), Math.min(Math.max(0, range), value));
+      followX = limit(
+        -(focus.x - 550) * current.effective,
+        (1100 * current.effective - current.width) / 2,
+      );
+      followY = limit(
+        -(focus.y - 215) * current.effective,
+        (430 * current.effective - current.height) / 2,
+      );
+    }
     svg
-      ?.querySelector(".arch-world")
+      .querySelector(".arch-world")
       .setAttribute(
         "transform",
-        `translate(${pan.x} ${pan.y}) translate(550 215) scale(${zoom}) translate(-550 -215)`,
+        `translate(${pan.x + followX} ${pan.y + followY}) translate(550 215) scale(${current.effective}) translate(-550 -215)`,
       );
+    svg.classList.toggle("arch-compact", current.base * current.effective < 0.79);
   }
   function scale(direction) {
-    zoom = Math.min(3.5, Math.max(0.7, zoom + direction * 0.2));
+    // 사용자가 배율을 직접 바꾸면 자동 맞춤을 멈춘다.
+    const current = svg && view();
+    zoom = Math.min(
+      3.5,
+      Math.max(0.7, (current ? current.effective : zoom) + direction * 0.2),
+    );
+    auto = false;
     transform();
   }
   function fit() {
+    // 자동 맞춤 → 전체 보기 → 자동 맞춤 순서로 전환한다.
+    const full = !auto && zoom === 1 && pan.x === 0 && pan.y === 0;
     zoom = 1;
     pan = { x: 0, y: 0 };
+    auto = full;
     transform();
   }
   function update({ events = [], cursor = -1, run, health }) {
@@ -566,7 +610,10 @@
             : record
               ? measurement(record)
               : n.description;
-      el.querySelector(".node-meta").textContent = short(label, 25);
+      el.querySelector(".node-meta").textContent = short(
+        label,
+        svg.classList.contains("arch-compact") ? 16 : 25,
+      );
     }
     for (const [id] of edges) {
       const edge = svg.querySelector(`[data-arch-edge="${id}"]`),
@@ -595,6 +642,10 @@
     }
     lastEvent = key;
     const active = nodes.find((n) => n.id === location.node);
+    focus = active
+      ? { x: active.x + active.w / 2, y: active.y + active.h / 2 }
+      : null;
+    transform();
     return {
       current,
       location,

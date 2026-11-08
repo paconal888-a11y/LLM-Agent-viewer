@@ -11,6 +11,49 @@ const request = (id, messages, extra = {}) => ({
   ...extra,
 });
 
+test("decision owner separates what the model chose from code, settings and the runtime", () => {
+  const owner = (kind, extra = {}, events = []) =>
+    inspection.decision({ kind, ...extra }, events).owner;
+  for (const kind of ["model.response", "model.stream", "output.answer", "tool.dispatch", "memory.compaction.result"])
+    assert.equal(owner(kind), "model", kind);
+  for (const kind of ["validation.requirements", "validation.final", "tool.validate", "tool.result", "context.append", "context.repair", "model.request", "run.complete"])
+    assert.equal(owner(kind), "code", kind);
+  for (const kind of ["config.apply", "rules.wrap", "skills.catalog", "command.expand", "rules.disabled", "context.requirements", "mcp.tool.filtered"])
+    assert.equal(owner(kind), "config", kind);
+  for (const kind of ["runtime.cache", "model.tokenize", "reference.attention", "http.inference.send"])
+    assert.equal(owner(kind), "runtime", kind);
+  assert.equal(owner("reference.sample"), "model");
+  assert.equal(owner("mcp.send"), "external");
+  assert.equal(owner("input.receive"), "user");
+});
+
+test("a file read counts as the model's choice only when a tool request caused it", () => {
+  const dispatch = { id: 5, kind: "tool.dispatch" },
+    loader = { id: 6, kind: "function.enter" };
+  assert.equal(
+    inspection.decision({ id: 7, kind: "file.read", parent: 5 }, [dispatch, loader]).owner,
+    "model",
+  );
+  assert.equal(
+    inspection.decision({ id: 8, kind: "file.read", parent: 6 }, [dispatch, loader]).owner,
+    "code",
+  );
+  assert.equal(inspection.decision({ id: 9, kind: "file.read" }, []).owner, "code");
+});
+
+test("every recorded event kind in the samples gets a decision owner", () => {
+  const root = path.join(__dirname, "..", "samples");
+  const known = new Set(["model", "code", "config", "user", "runtime", "external"]);
+  for (const name of fs.readdirSync(root).filter((f) => f.endsWith(".json.gz"))) {
+    const data = JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(root, name))));
+    for (const event of data.events.slice(0, 2000)) {
+      const result = inspection.decision(event, data.events);
+      assert.ok(known.has(result.owner), event.kind);
+      assert.ok(result.label && result.explanation, event.kind);
+    }
+  }
+});
+
 test("declared origins resolve child-local IDs without crossing agents or time", () => {
   // 주 기록에 비친 하위 에이전트 이벤트는 child_event_id(하위 기록의 번호)로 식별된다.
   // 하위 에이전트의 model.request가 적은 source_event_id는 그 번호를 가리킨다.

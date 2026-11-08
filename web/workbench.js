@@ -683,6 +683,9 @@
     flushFrames();
     return result;
   }
+  function isTokenFrame(e) {
+    return e.kind === "model.stream" || e.kind === "reference.sample";
+  }
   function renderTimeline() {
     if (
       !state.events.length ||
@@ -706,12 +709,27 @@
         ]
           .join(" ")
           .toLowerCase(),
-      events = query
-        ? state.events.filter((e) => haystack(e).includes(query))
-        : state.events;
-    $("eventCount").textContent = query
-      ? `${events.length} / ${state.events.length} 기록`
-      : state.events.length + " 기록";
+      decided = $("decisionFocus").value,
+      ownerMatches = (e) => {
+        // 토큰·스트림 조각은 결정 단위가 아니다. 요약의 '모델이 선택' 수와 같은 기준으로 보여 준다.
+        if (decided === "model" && isTokenFrame(e)) return false;
+        const owner = AgentInspection.decision(e, state.events).owner;
+        return (
+          owner === decided || (decided === "runtime" && owner === "external")
+        );
+      },
+      events =
+        query || decided
+          ? state.events.filter(
+              (e) =>
+                (!query || haystack(e).includes(query)) &&
+                (!decided || ownerMatches(e)),
+            )
+          : state.events;
+    $("eventCount").textContent =
+      query || decided
+        ? `${events.length} / ${state.events.length} 기록`
+        : state.events.length + " 기록";
     const groups = chapterGroups(
       events.filter(
         (e) =>
@@ -725,7 +743,7 @@
           const active = g.events.some(
               (e) => e.id === state.events[state.cursor]?.id,
             ),
-            open = query || active || opened.has(g.key + "-" + i);
+            open = query || decided || active || opened.has(g.key + "-" + i);
           const title = chapterTitle(g);
           const label =
             g.agentId !== rootAgentId()
@@ -1912,6 +1930,10 @@
     $("evidenceKind").dataset.evidence = evidence.type;
     $("evidenceKind").setAttribute("aria-label", evidence.label + ". " + evidence.explanation);
     $("evidenceKind").tabIndex = 0;
+    const owner = AgentInspection.decision(e, state.events);
+    $("decisionKind").textContent = owner.label;
+    $("decisionKind").dataset.owner = owner.owner;
+    $("decisionNote").textContent = owner.explanation;
     $("detailTitle").textContent = eventName(e);
     $("detailKind").textContent = e.kind;
     const filePath = e.kind.startsWith("file.")
@@ -2216,7 +2238,7 @@
       (c) => c.edit_path === path || c.source?.file === path,
     );
     $("fileDescription").innerHTML = component
-      ? `<strong>${esc(component.label)} · 이 파일의 역할</strong><p>${esc(component.purpose)}</p><p>${esc(component.when)}</p>`
+      ? `<strong>${esc(component.label)} · 이 파일의 역할</strong><p>${esc(component.purpose)}</p><p>${esc(component.when)}</p>${decidedMap(component.decided)}`
       : `<strong>${path.startsWith("demo_workspace/") ? "모델이 읽거나 도구가 작업하는 실제 파일" : "실행에 사용되는 소스"}</strong><p>수정 전후의 차이와 다음 실행 기록을 함께 확인하세요.</p>`;
     editorLines();
     highlightFiles();
@@ -2343,6 +2365,10 @@
     await openFile(path, { discard: true });
     editMessage("직전 저장 이전의 내용으로 되돌렸습니다. " + r.applies);
   }
+  function decidedMap(decided) {
+    if (!decided) return "";
+    return `<dl class="decisionmap"><dt>코드가 정함</dt><dd>${esc(decided.code)}</dd><dt>모델이 고름</dt><dd>${esc(decided.model)}</dd><dt>바꾸는 곳</dt><dd>${esc(decided.change)}</dd></dl>`;
+  }
   function learn() {
     $("toolCount").textContent = state.catalog.tools.length;
     $("toolList").innerHTML = state.catalog.tools
@@ -2355,7 +2381,7 @@
     $("componentCards").innerHTML = components
       .map(
         (c) =>
-          `<article class="componentcard"><header><h3>${esc(c.label)}</h3><span class="pill">${c.status === "implemented" ? "구현됨" : "미구현"}</span></header><p>${esc(c.purpose)}</p><details><summary>언제 동작하나 · 확인할 것</summary><p>${esc(c.when)}</p><p>${esc(c.exercise)}</p></details>${c.edit_path ? `<button data-file="${esc(c.edit_path)}">관련 파일 열기 ↗</button>` : '<span class="unavailable">현재 전용 클라이언트가 없습니다.</span>'}</article>`,
+          `<article class="componentcard"><header><h3>${esc(c.label)}</h3><span class="pill">${c.status === "implemented" ? "구현됨" : "미구현"}</span></header><p>${esc(c.purpose)}</p><details><summary>언제 동작하나 · 누가 정하나 · 확인할 것</summary><p>${esc(c.when)}</p>${decidedMap(c.decided)}<p>${esc(c.exercise)}</p></details>${c.edit_path ? `<button data-file="${esc(c.edit_path)}">관련 파일 열기 ↗</button>` : '<span class="unavailable">현재 전용 클라이언트가 없습니다.</span>'}</article>`,
       )
       .join("");
   }
@@ -2889,6 +2915,7 @@
     }, 650);
   };
   $("eventSearch").oninput = renderTimeline;
+  $("decisionFocus").onchange = renderTimeline;
   // EXPORT_PREVIEW_START
   // 내보내기 대화상자: 저장 전에 공유용 사본에서 무엇이 몇 번 치환될지 서버(/export/preview)에 묻는다.
   // 원본 저장(/export)은 그대로 두고, 공유용 사본(/export/share)만 치환한다. 치환은 정규식 기반이며 서버 응답의 note를 그대로 보여 준다.
@@ -3156,7 +3183,14 @@
       event?.kind === "model.request" && Array.isArray(event.input?.messages)
         ? event.input.messages.length
         : 0;
-    const step2 = `<section class="learningstep" data-step="2"><h3><span>2</span>증거 확인</h3>${
+    // 토큰 하나하나의 프레임을 세면 '모델의 결정'이 부풀어 보이므로 결정 단위 기록만 센다.
+    const decisionCount = (name) =>
+      state.events.filter(
+        (item) =>
+          !isTokenFrame(item) &&
+          AgentInspection.decision(item, state.events).owner === name,
+      ).length;
+    const step2 = `<section class="learningstep" data-step="2"><h3><span>2</span>증거 확인</h3><p class="decisionsummary">이 실행에서 <b>모델이 선택 ${decisionCount("model")}</b> · 코드가 결정 ${decisionCount("code")} · 설정·파일 ${decisionCount("config")} · 실행기·외부 ${decisionCount("runtime") + decisionCount("external")}<button class="inspection-link" data-learning="model-decisions">모델이 선택한 단계만 보기</button></p>${
       event
         ? `<p>선택한 기록 <button class="inspection-link" data-event="${event.id}">#${event.id} ${esc(eventName(event))}</button> · <b class="evidence-kind" data-evidence="${esc(evidence.type)}">${esc(evidence.label)}</b><br>${esc(evidence.explanation)}</p><div class="learninglinks">${
             consumers.length
@@ -3284,6 +3318,10 @@
         state.tab = "learn";
         renderDetail();
         $("inspector").classList.add("open");
+      } else if (b.dataset.learning === "model-decisions") {
+        $("decisionFocus").value = "model";
+        document.querySelector(".execution").classList.add("records-open");
+        renderTimeline();
       } else if (b.dataset.learning === "features") {
         $("journeyView").classList.remove("focus");
         $("configuration").open = true;

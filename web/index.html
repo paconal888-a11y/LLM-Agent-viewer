@@ -313,7 +313,14 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
                 type="search"
                 placeholder="단계 이름 · 파일 · 도구 찾기"
                 aria-label="단계 검색"
-              /><span id="eventCount">기록 없음</span
+              /><select id="decisionFocus" aria-label="누가 정했는지로 거르기">
+                <option value="">전체 결정 주체</option>
+                <option value="model">모델이 선택</option>
+                <option value="code">코드가 결정</option>
+                <option value="config">설정·파일에서 옴</option>
+                <option value="runtime">실행기·외부 서버</option>
+                <option value="user">사용자 입력</option>
+              </select><span id="eventCount">기록 없음</span
               ><input
                 id="bodySearch"
                 type="search"
@@ -562,10 +569,12 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
           <div class="detailhead">
             <span id="detailActor" class="pill"></span>
             <span id="evidenceKind" class="evidence-kind"></span>
+            <span id="decisionKind" class="decision-kind"></span>
             <h2 id="detailTitle"></h2>
             <code id="detailKind"></code>
             <code id="detailPath" class="storage-path hidden"></code>
             <p id="detailExplanation"></p>
+            <p id="decisionNote" class="decision-note"></p>
           </div>
           <div id="componentNavigator" class="componentnav hidden"></div>
           <div id="inputLinks" class="inputlinks hidden"></div>
