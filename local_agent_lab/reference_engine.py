@@ -94,6 +94,7 @@ class ReferenceRuntime:
         self.attention_sample = None
         self.embedding_sample = None
         self._hooks = []
+        self._hook_ms = 0.0
         self._capture_layer = 0
         self._run = None
         self._call = 0
@@ -287,6 +288,25 @@ class ReferenceRuntime:
             "norm": float(value.norm()),
         }
 
+    def _timed(self, hook):
+        """hook 본문(텐서 표본 추출·이벤트 기록)에 쓴 시간을 누적한다. 사용자 정지 시간은 뺀다."""
+
+        def wrapper(*args, **kwargs):
+            run = self._run
+            if run is None:
+                return hook(*args, **kwargs)
+            pause_before = run.paused_seconds
+            started = time.perf_counter()
+            try:
+                return hook(*args, **kwargs)
+            finally:
+                spent = (time.perf_counter() - started) * 1000 - (
+                    run.paused_seconds - pause_before
+                ) * 1000
+                self._hook_ms += max(0.0, spent)
+
+        return wrapper
+
     def _attach_hooks(self):
         def embedding(module, inputs, output):
             if self._run is not None:
@@ -307,7 +327,7 @@ class ReferenceRuntime:
                 )
 
         self._hooks.append(
-            self.model.model.embed_tokens.register_forward_hook(embedding)
+            self.model.model.embed_tokens.register_forward_hook(self._timed(embedding))
         )
         for layer_index, layer in enumerate(self.model.model.layers):
             for name in ("q_proj", "k_proj", "v_proj"):
@@ -333,7 +353,9 @@ class ReferenceRuntime:
                         )
 
                 self._hooks.append(
-                    getattr(layer.self_attn, name).register_forward_hook(projection)
+                    getattr(layer.self_attn, name).register_forward_hook(
+                        self._timed(projection)
+                    )
                 )
 
             def attention(module, inputs, output, index=layer_index):
@@ -369,7 +391,9 @@ class ReferenceRuntime:
                             },
                         )
 
-            self._hooks.append(layer.self_attn.register_forward_hook(attention))
+            self._hooks.append(
+                layer.self_attn.register_forward_hook(self._timed(attention))
+            )
 
     def _cache_snapshot(self, cache):
         if cache is None:
@@ -430,6 +454,8 @@ class ReferenceRuntime:
             rejected[0] = False
             filtered[indices[rejected]] = -float("inf")
         probabilities = torch.softmax(filtered, dim=-1)
+        # 모델이 낸 분포(temperature·top_k·top_p 적용 전 softmax). 절단 후 재정규화한 prob와 구분한다.
+        raw_probabilities = torch.softmax(raw, dim=-1)
         selected = (
             int(torch.argmax(raw))
             if temperature <= 0
@@ -445,16 +471,29 @@ class ReferenceRuntime:
                     "id": token_id,
                     "piece": self._piece(token_id),
                     "prob": probability,
+                    "raw_prob": float(raw_probabilities[token_id]),
                     "raw_logit": float(raw[token_id]),
                     "filtered_logit": float(filtered[token_id]),
                 }
             )
+        raw_top = raw_probabilities.topk(min(5, raw_probabilities.numel()))
         return selected, {
             "id": selected,
             "piece": self._piece(selected),
             "prob": float(probabilities[selected]),
+            "raw_prob": float(raw_probabilities[selected]),
+            "prob_basis": "renormalized_after_temperature_top_k_top_p",
+            "raw_prob_basis": "softmax_of_raw_logits_before_samplers",
             "raw_logit": float(raw[selected]),
             "candidates": candidates,
+            "raw_top": [
+                {
+                    "id": token_id,
+                    "piece": self._piece(token_id),
+                    "raw_prob": probability,
+                }
+                for token_id, probability in zip(raw_top.indices.tolist(), raw_top.values.tolist())
+            ],
             "temperature": temperature,
             "top_k": top_k,
             "top_p": top_p,
@@ -500,6 +539,8 @@ class ReferenceRuntime:
         records = []
         prefill_ms = 0.0
         decode_ms = 0.0
+        prefill_hook_ms = 0.0
+        decode_hook_ms = 0.0
         forward_tokens = 0
         generator = torch.Generator(device="cpu").manual_seed(
             int(payload.get("seed", 42))
@@ -561,6 +602,7 @@ class ReferenceRuntime:
                         },
                     )
                     pause_before = run.paused_seconds
+                    self._hook_ms = 0.0
                     started = time.perf_counter()
                     result = self.model(
                         input_ids=torch.tensor([ids], dtype=torch.long),
@@ -571,14 +613,17 @@ class ReferenceRuntime:
                         logits_to_keep=1,
                     )
                     elapsed = (time.perf_counter() - started) * 1000
-                    # 사용자 정지는 제외하지만 텐서 추출·hook 기록 비용은 포함한다.
+                    # 사용자 정지는 제외한다. 텐서 추출·hook 기록 비용은 포함되므로 따로 측정해 둘 다 남긴다.
                     elapsed = max(
                         0.0, elapsed - (run.paused_seconds - pause_before) * 1000
                     )
+                    hook_ms = min(self._hook_ms, elapsed)
                     if step == 0:
                         prefill_ms += elapsed
+                        prefill_hook_ms += hook_ms
                     else:
                         decode_ms += elapsed
+                        decode_hook_ms += hook_ms
                     forward_tokens += len(ids)
                     if use_kv:
                         self.cache = result.past_key_values
@@ -596,7 +641,10 @@ class ReferenceRuntime:
                             "step": step,
                             "phase": self._phase,
                             "observed_forward_ms": round(elapsed, 3),
+                            "observer_hook_ms": round(hook_ms, 3),
+                            "forward_ms_excluding_hooks": round(elapsed - hook_ms, 3),
                             "timing_basis": "forward_with_observer_hooks_excluding_user_pause",
+                            "timing_note": "observed_forward_ms는 model() 벽시간에서 사용자 정지를 뺀 값으로 hook(텐서 표본·이벤트 기록) 비용을 포함한다. observer_hook_ms는 hook 본문에서 잰 시간이며, 둘의 차이가 hook 밖의 계산 시간에 가깝다. 순수 커널 시간의 측정은 아니다.",
                             "user_pause_ms": round(
                                 (run.paused_seconds - pause_before) * 1000, 3
                             ),
@@ -647,14 +695,17 @@ class ReferenceRuntime:
                     "token": self.tokenizer.decode(
                         [record["id"]], skip_special_tokens=True
                     ),
-                    "logprob": math.log(max(record["prob"], 1e-45)),
+                    # llama.cpp와 같은 기준: 샘플러 적용 전 모델 분포의 로그 확률.
+                    "logprob": math.log(max(record.get("raw_prob", record["prob"]), 1e-45)),
+                    "renormalized_logprob": math.log(max(record["prob"], 1e-45)),
                     "top_logprobs": [
                         {
                             "id": item["id"],
                             "token": self.tokenizer.decode(
                                 [item["id"]], skip_special_tokens=True
                             ),
-                            "logprob": math.log(max(item["prob"], 1e-45)),
+                            "logprob": math.log(max(item.get("raw_prob", item["prob"]), 1e-45)),
+                            "renormalized_logprob": math.log(max(item["prob"], 1e-45)),
                         }
                         for item in record["candidates"]
                     ],
@@ -666,11 +717,17 @@ class ReferenceRuntime:
                 "cache_n": reuse,
                 "prompt_n": len(prompt_ids) - reuse,
                 "prompt_ms": round(prefill_ms, 3),
+                "prompt_hook_ms": round(prefill_hook_ms, 3),
+                "prompt_ms_excluding_hooks": round(prefill_ms - prefill_hook_ms, 3),
                 "predicted_n": len(generated),
                 "predicted_ms": round(decode_ms, 3),
+                "predicted_hook_ms": round(decode_hook_ms, 3),
+                "predicted_ms_excluding_hooks": round(decode_ms - decode_hook_ms, 3),
+                # decode forward는 n-1회다(마지막 토큰은 forward하지 않음). 분모가 그 횟수임을 명시한다.
                 "predicted_per_second": (len(generated) - 1) / (decode_ms / 1000)
                 if decode_ms
                 else 0.0,
+                "decode_forwards": max(0, len(generated) - 1),
                 "forward_tokens": forward_tokens,
             }
             return {
@@ -711,6 +768,8 @@ class ReferenceRuntime:
                 "_assembly": {
                     "source": "python_reference_decoder",
                     "observed_token_ids": len(generated),
+                    "observed_token_ids_basis": "생성한 토큰 수(logprobs 항목 수와 같음)",
+                    "logprob_basis": "softmax(raw logits) 기준. renormalized_logprob는 temperature·top_k·top_p 절단 후 재정규화 값",
                 },
             }
         except BaseException:

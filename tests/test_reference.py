@@ -153,3 +153,14 @@ class ReferenceTests(unittest.TestCase):
         )
         self.assertGreater(measured["observed_forward_ms"], 80)
         self.assertNotIn("compute_ms", measured)
+        # 관찰자 비용은 따로 잰다. 느린 관찰자(hook 안 emit)의 시간이 observer_hook_ms에 잡히고,
+        # hook을 뺀 forward 시간은 그만큼 작아야 한다.
+        self.assertGreater(measured["observer_hook_ms"], 80)
+        self.assertLess(measured["forward_ms_excluding_hooks"], measured["observed_forward_ms"])
+        self.assertAlmostEqual(
+            measured["observed_forward_ms"] - measured["observer_hook_ms"],
+            measured["forward_ms_excluding_hooks"],
+            places=2,
+        )
+        self.assertIn("prompt_hook_ms", result["timings"])
+        self.assertIn("prompt_ms_excluding_hooks", result["timings"])

@@ -178,5 +178,57 @@ class ObservationTests(unittest.TestCase):
         self.assertEqual(set(result["generation_diff"]), {"cache_prompt"})
 
 
+    def test_reference_hook_timer_excludes_user_pause_and_needs_no_torch(self):
+        # ⑦: hook 본문에서 쓴 시간만 누적하고 그 안의 사용자 정지는 뺀다(torch 없이 검사 가능한 부분).
+        from local_agent_lab.reference_engine import ReferenceRuntime
+
+        runtime = ReferenceRuntime(autoload=False)
+        run = Run("hook timer", "hook-timer")
+        runtime._run = run
+
+        def hook(module, inputs, output):
+            time.sleep(0.25)  # 그중 0.2초는 사용자 정지였다고 기록한다
+            run.paused_seconds += 0.2
+            return "ok"
+
+        wrapped = runtime._timed(hook)
+        self.assertEqual(wrapped(None, None, None), "ok")
+        self.assertGreaterEqual(runtime._hook_ms, 30)
+        self.assertLess(runtime._hook_ms, 150, "정지로 기록한 200ms는 hook 비용에 넣지 않는다")
+        runtime._run = None
+        before = runtime._hook_ms
+        wrapped(None, None, None)
+        self.assertEqual(runtime._hook_ms, before, "실행 중이 아니면 측정하지 않는다")
+
+
+    def test_installed_package_code_under_the_project_is_not_copied_into_snapshots(self):
+        # D-06: .venv 안의 torch/transformers 함수 본문이 소스 스냅샷(과 MIT 샘플)에 들어갔다.
+        import types
+
+        from local_agent_lab.trace import ROOT as PROJECT_ROOT, code_source
+
+        fake = PROJECT_ROOT / ".venv" / "Lib" / "site-packages" / "torchlike" / "module.py"
+        existed = fake.exists()
+        if not existed:
+            fake.parent.mkdir(parents=True, exist_ok=True)
+            fake.write_text("def inner():\n    return 1\n", encoding="utf-8")
+        try:
+            code = compile("def inner():\n    return 1\n", str(fake), "exec")
+            function_code = next(c for c in code.co_consts if isinstance(c, types.CodeType))
+            source = code_source(function_code)
+            self.assertTrue(source["external"])
+            self.assertEqual(source["code"], "")
+            self.assertTrue(source["file"].startswith("<external>/.venv/"))
+            self.assertEqual(source["function"], "inner")
+        finally:
+            if not existed:
+                fake.unlink()
+                for parent in (fake.parent, fake.parent.parent, fake.parent.parent.parent, fake.parent.parent.parent.parent):
+                    try:
+                        parent.rmdir()
+                    except OSError:
+                        break
+
+
 if __name__ == "__main__":
     unittest.main()

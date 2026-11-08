@@ -24,11 +24,36 @@ class RunStopped(Exception):
     pass
 
 
+EXTERNAL_MARKERS = {".venv", "venv", "site-packages", "dist-packages", "__pypackages__"}
+
+
+def external_source(path, code):
+    """프로젝트 안에 설치된 서드파티 코드(.venv 등)는 본문을 기록하지 않는다.
+
+    이전에는 .venv가 ROOT 아래라는 이유로 torch·transformers 함수 본문이 소스 스냅샷에 들어갔고,
+    MIT로 배포하는 샘플 기록에 다른 라이선스의 코드가 섞였다. 위치만 남기고 본문은 비운다.
+    """
+    parts = path.parts
+    marker = next((i for i, part in enumerate(parts) if part in EXTERNAL_MARKERS), None)
+    shown = "/".join(parts[marker:]) if marker is not None else path.name
+    return {
+        "file": "<external>/" + shown,
+        "function": code.co_name,
+        "qualified_name": code.co_qualname,
+        "start_line": code.co_firstlineno,
+        "code": "",
+        "external": True,
+        "note": "프로젝트 밖(설치된 패키지)의 코드입니다. 라이선스와 크기 때문에 본문은 기록하지 않습니다.",
+    }
+
+
 @lru_cache(maxsize=128)
 def code_source(code):
     path = Path(code.co_filename).resolve()
     if not path.is_relative_to(ROOT) or not path.is_file():
         return None
+    if any(part in EXTERNAL_MARKERS for part in path.relative_to(ROOT).parts):
+        return external_source(path, code)
     lines, start = inspect.getsourcelines(code)
     return {
         "file": str(path.relative_to(ROOT)),
