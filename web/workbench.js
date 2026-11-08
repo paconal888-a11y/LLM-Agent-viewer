@@ -534,7 +534,10 @@
   }
   function eventRow(e) {
     const actor = actors[e.actor] || actors.harness;
-    return `<button class="event ${e.id === state.events[state.cursor]?.id ? "selected" : ""} ${e.id > state.events[state.cursor]?.id ? "past" : ""}" data-event="${e.id}"><span class="actor ${esc(e.actor)}">${actor[0]}</span><span class="eventtext"><span class="eventtitle">${esc(eventName(e))}</span><span class="eventsub">${esc(pathOf(e) || e.source?.function || e.kind)}</span></span><span class="eventid">#${e.id}</span></button>`;
+    const selected = e.id === state.events[state.cursor]?.id,
+      failed = !!e.status && e.status !== "ok";
+    // 실패·경고 기록은 통과 기록과 같은 모양이어서는 안 된다(status는 기록에 이미 있는 값이다).
+    return `<button class="event ${selected ? "selected" : ""} ${e.id > state.events[state.cursor]?.id ? "past" : ""} ${failed ? "status-" + esc(e.status) : ""}" data-event="${e.id}"${selected ? ' aria-current="true"' : ""}><span class="actor ${esc(e.actor)}">${actor[0]}</span><span class="eventtext"><span class="eventtitle">${esc(eventName(e))}${failed ? `<em class="statusmark">${e.status === "error" ? "실패" : "주의"}</em>` : ""}</span><span class="eventsub">${esc(pathOf(e) || e.source?.function || e.kind)}</span></span><span class="eventid">#${e.id}</span></button>`;
   }
   function chapterGroups(events) {
     let call = 0;
@@ -542,11 +545,14 @@
     const perAgent = new Map();
     for (const item of state.events) {
       const id = item.agent_id || rootAgentId();
-      if (item.kind === "model.request")
+      // 대화 요약(compaction) 요청은 주 대화의 호출 번호를 늘리지 않는다.
+      if (item.kind === "model.request" && item.model_purpose !== "compaction")
         perAgent.set(id, (perAgent.get(id) || 0) + 1);
       calls.set(
         item.id,
-        item.output?.call ?? item.input?.call ?? perAgent.get(id) ?? 0,
+        item.model_purpose === "compaction"
+          ? 0
+          : (item.output?.call ?? item.input?.call ?? perAgent.get(id) ?? 0),
       );
     }
     const groups = [];
@@ -565,6 +571,7 @@
             : s;
       if (["mcp", "lsp"].includes(e.actor) && !e.parent && !call)
         key = "connect-" + e.actor;
+      if (e.model_purpose === "compaction") key = "compaction";
       let group = groups.at(-1);
       key += "-agent-" + (e.agent_id || rootAgentId());
       if (!group || group.key !== key) {
@@ -581,6 +588,41 @@
       group.events.push(e);
     }
     return groups;
+  }
+  function chapterTitle(g) {
+    // 묶음의 실제 내용으로 제목을 정한다. 실패한 검사나 보완 요청을 '응답과 이력 저장'으로 부르지 않는다.
+    const kinds = new Set(g.events.map((e) => e.kind));
+    if (g.key.startsWith("connect-"))
+      return (
+        g.key.slice(8).split("-agent-")[0].toUpperCase() + " 연결 준비 · 기능 검색"
+      );
+    if (g.key.startsWith("compaction")) return "대화 요약 요청 · 요약 전용 모델 호출";
+    if (g.key.startsWith("model-")) return `모델 호출 ${g.call} · 토큰과 계산`;
+    if (g.key.startsWith("tool-")) return "도구 실행 → 모델 입력에 결과 추가";
+    if (g.stage === "output") {
+      if (kinds.has("run.error")) return "완료 검사 · 오류로 종료";
+      if (g.events.some((e) => e.kind.startsWith("validation.") && e.status === "error"))
+        return "완료 검사 미충족";
+      return "완료 검사 · 응답과 이력 저장";
+    }
+    if (g.stage === "context" || g.key === "prepare") {
+      if (kinds.has("context.repair")) return "완료 조건 미충족 → 보완 요청을 모델 입력에 추가";
+      if (kinds.has("agent.review")) return "추가 점검 요청 → 모델 입력에 추가";
+      if (kinds.has("memory.feedback.recall")) return "이전 지적 재포함 → 모델 입력";
+    }
+    if (
+      g.stage === "read" &&
+      g.events.every((e) => (pathOf(e) || "").includes(".runs/"))
+    )
+      return "대화 저장소 파일 읽기";
+    return (
+      {
+        input: "브라우저 입력 → 하네스",
+        read: "작업 공간에서 파일 읽기",
+        context: "규칙·이력·스킬 로딩 → 모델 입력",
+        output: "완료 검사 · 응답과 이력 저장",
+      }[g.stage] || "실행 준비"
+    );
   }
   function modelRows(events) {
     let result = "",
@@ -648,22 +690,28 @@
     )
       return;
     const opened = state.openGroups || new Set();
-    const query = $("eventSearch").value.toLowerCase(),
+    const query = $("eventSearch").value.trim().toLowerCase(),
+      // 목록에 표시되는 이름(eventName)·함수명·에이전트 이름으로도 찾을 수 있어야 한다.
+      haystack = (e) =>
+        [
+          eventName(e),
+          e.title,
+          e.kind,
+          pathOf(e) || "",
+          e.output?.name || "",
+          e.input?.name || "",
+          e.source?.function || "",
+          e.agent_name || "",
+          e.status === "ok" ? "" : e.status || "",
+        ]
+          .join(" ")
+          .toLowerCase(),
       events = query
-        ? state.events.filter((e) =>
-            (
-              e.title +
-              " " +
-              e.kind +
-              " " +
-              (pathOf(e) || "") +
-              " " +
-              (e.output?.name || "")
-            )
-              .toLowerCase()
-              .includes(query),
-          )
+        ? state.events.filter((e) => haystack(e).includes(query))
         : state.events;
+    $("eventCount").textContent = query
+      ? `${events.length} / ${state.events.length} 기록`
+      : state.events.length + " 기록";
     const groups = chapterGroups(
       events.filter(
         (e) =>
@@ -678,26 +726,15 @@
               (e) => e.id === state.events[state.cursor]?.id,
             ),
             open = query || active || opened.has(g.key + "-" + i);
-          const title = g.key.startsWith("connect-")
-            ? g.key.slice(8).split("-agent-")[0].toUpperCase() +
-              " 연결 준비 · 기능 검색"
-            : g.key.startsWith("model-")
-              ? `모델 호출 ${g.call} · 토큰과 계산`
-              : g.key.startsWith("tool-")
-                ? `도구 실행 → 모델 입력에 결과 추가`
-                : {
-                    input: "브라우저 입력 → 하네스",
-                    read: "작업 공간에서 파일 읽기",
-                    context: "규칙·이력·스킬 로딩 → 모델 입력",
-                    output: "완료 검사 · 응답과 이력 저장",
-                  }[g.stage] || "실행 준비";
+          const title = chapterTitle(g);
           const label =
             g.agentId !== rootAgentId()
               ? g.agentName +
                 " · " +
                 (g.stage === "input" ? "하위 작업 → 독립 하네스" : title)
               : title;
-          return `<details class="chapter" data-group="${g.key}-${i}" ${open ? "open" : ""}><summary><span class="chaptericon">${String(i + 1).padStart(2, "0")}</span>${esc(label)}<small>${g.events.length} 단계</small></summary><div class="chapterbody">${g.key.startsWith("model-") ? modelRows(g.events) : g.events.map(eventRow).join("")}</div></details>`;
+          const failed = g.events.filter((e) => e.status === "error").length;
+          return `<details class="chapter ${failed ? "has-error" : ""}" data-group="${g.key}-${i}" ${open ? "open" : ""}><summary><span class="chaptericon">${String(i + 1).padStart(2, "0")}</span>${esc(label)}<small>${g.events.length} 단계${failed ? " · 실패 " + failed : ""}</small></summary><div class="chapterbody">${g.key.startsWith("model-") || g.key.startsWith("compaction") ? modelRows(g.events) : g.events.map(eventRow).join("")}</div></details>`;
         })
         .join("") || '<p class="note">일치하는 단계가 없습니다.</p>';
     // 새 기록 수신에도 사용자가 펼친 그룹을 보존한다.
@@ -833,6 +870,12 @@
     renderArchitecture();
     $("scrubber").value = state.cursor;
     $("position").textContent = state.cursor + 1 + " / " + state.events.length;
+    const current = state.events[state.cursor];
+    if (current)
+      $("scrubber").setAttribute(
+        "aria-valuetext",
+        `${state.cursor + 1} / ${state.events.length} · #${current.id} ${eventName(current)}`,
+      );
     store("selection", { id: state.run?.id, cursor: state.cursor });
     if (open) $("inspector").classList.add("open");
   }
@@ -901,9 +944,13 @@
     "run.error": "실행 오류",
   };
   function eventName(e) {
-    const title = eventNames[e.kind] || e.title;
-    return e.agent_id && e.agent_id !== rootAgentId()
-      ? e.agent_name + " · " + title
+    let title = eventNames[e.kind] || e.title || e.kind;
+    if (e.model_purpose === "compaction" && !title.startsWith("대화 요약"))
+      title = "대화 요약 · " + title;
+    // 주 기록에 비친 하위 에이전트 이벤트의 title에는 하네스가 이미 이름을 붙였다. 두 번 붙이지 않는다.
+    const prefix = (e.agent_name || "") + " · ";
+    return e.agent_id && e.agent_id !== rootAgentId() && !title.startsWith(prefix)
+      ? prefix + title
       : title;
   }
   function brief(value) {
@@ -970,6 +1017,13 @@
     }
     const definition = AgentArchitecture.definitions[id],
       node = AgentArchitecture.nodes.find((n) => n.id === id);
+    const upcoming = state.events.findIndex(
+      (e, i) =>
+        i > state.cursor &&
+        AgentArchitecture.locate(e).node === id &&
+        (state.agentFilter === "all" ||
+          (e.agent_id || rootAgentId()) === state.agentFilter),
+    );
     $("detailEmpty").classList.add("hidden");
     $("detailBody").classList.remove("hidden");
     $("sourcePeek").classList.add("hidden");
@@ -982,7 +1036,13 @@
     clearInspectionExtras();
     $("detailPath").classList.add("hidden");
     $("detailContent").innerHTML =
-      `<p class="note">현재 단계까지 이 구성 요소의 실행 기록이 없습니다.</p><button class="secondary" data-file="${definition[1]}">구현 파일 열기</button>`;
+      `<p class="note">현재 단계(${state.cursor + 1} / ${state.events.length})까지 이 구성 요소의 실행 기록이 없습니다.</p>${
+        upcoming >= 0
+          ? `<button class="secondary" data-event="${state.events[upcoming].id}">다음 기록으로 이동 · #${state.events[upcoming].id} ${esc(eventName(state.events[upcoming]))} →</button>`
+          : state.events.length
+            ? '<p class="note">이 실행 전체에 이 구성 요소의 기록이 없습니다.</p>'
+            : ""
+      }<button class="secondary" data-file="${definition[1]}">구현 파일 열기</button>`;
     document.querySelector(".detailtabs").classList.add("hidden");
     $("inspector").classList.add("open");
   }
@@ -1011,19 +1071,49 @@
     const input = request?.input?.messages || [],
       summary = data.summary?.text || "";
     state.memoryData = { data, input, summary };
+    const missing = !!data.missing,
+      count = (value) => (missing ? "—" : num(value ?? 0)),
+      corrupt = data.corrupt_lines?.length || 0,
+      notices = [
+        missing
+          ? "이 예제에는 원본 대화 저장소가 포함되지 않았습니다. 아래 수치는 측정값이 아닙니다(—). 새 대화에서 실행하거나 대화 요약 예제를 선택하세요."
+          : null,
+        corrupt
+          ? `원본 파일에서 해석하지 못한 줄 ${corrupt}개를 건너뛰었습니다(${data.corrupt_lines.map((c) => c.line + "행").join(", ")}). 아래 개수는 읽을 수 있던 기록만 셉니다.`
+          : null,
+        data.records_truncated
+          ? `원본 파일이 커서 끝부분 ${num(Math.round((data.archive_bytes || 0) / 1024))} KiB 중 최근 부분만 읽었습니다. 전체 개수가 아닙니다.`
+          : null,
+      ].filter(Boolean);
     $("memoryStorage").innerHTML =
-      `<div class="memory-session"><code>${esc(data.session_id || session)}</code><span>${data.records.length}개 완료 대화 · 가중치 재학습 없음</span><button class="quiet" data-file="demo_workspace/memory.json">요약 기준 수정</button></div>${data.missing ? '<p class="notice">이 예제에는 원본 대화 저장소가 포함되지 않았습니다. 새 대화에서 실행하거나 대화 요약 예제를 선택하세요.</p>' : ""}<div class="memory-check"><label for="memoryNeedle">문자열 대조</label><input id="memoryNeedle" placeholder="규칙·프로젝트 코드 등 확인할 값"/><div id="memoryCheckResult">원본·요약·실제 messages의 문자열 포함 여부를 확인합니다.</div></div><div class="storage-grid"><section class="storecard"><header><h2>대화 원본</h2><span>추가 저장 · 삭제 안 함</span></header><code class="storage-path">${esc(data.archive_path || "아직 저장된 파일 없음")}</code>${data.records.map((record, i) => `<details class="stored-turn"><summary><b>${i + 1}</b><span>${esc((record.messages.find((m) => m.role === "user")?.content || "").slice(0, 100))}</span><code>${esc(record.run_id)}</code></summary><pre>${esc(pretty(record.messages))}</pre></details>`).join("") || '<p class="note">완료한 대화가 없습니다.</p>'}</section><section class="storecard"><header><h2>세션 상태</h2><span>다음 요청에서 읽을 데이터</span></header><code class="storage-path">${esc(data.state_path || "이전 형식의 기록")}</code><dl><dt>최근 원문</dt><dd>${data.state.turns?.length || 0}개 대화</dd><dt>요약한 범위</dt><dd>처음 ${data.summary?.through_turn || 0}개 대화</dd><dt>저장된 지적</dt><dd>${data.state.feedback_ledger?.length || 0}개</dd></dl><details><summary>세션 JSON</summary><pre>${esc(pretty(data.state))}</pre></details></section><section class="storecard"><header><h2>모델이 만든 요약</h2><span>원문과 의미가 같다고 보증하지 않음</span></header><code class="storage-path">${esc(data.summary?.path || "저장된 요약 없음")}</code><div class="stored-summary">${esc(summary || "이 대화는 아직 요약하지 않았습니다.")}</div>${compressed ? `<p class="note">이 실행에서 ${compressed.output.before_characters}자 → ${compressed.output.after_characters}자. 토큰 수와 별개입니다.</p><button class="secondary" data-memory-event="${compressed.id}">요약 전후와 코드 보기</button>` : ""}</section><section class="storecard"><header><h2>선택한 실행의 모델 입력</h2><span>디스크에 있는 내용과 구분</span></header>${request ? `<p class="note">model.request #${request.id} · ${input.length}개 메시지</p><button class="secondary" data-memory-event="${request.id}">구조도에서 입력 보기</button><details><summary>전달한 messages 원문</summary><pre>${esc(pretty(input))}</pre></details>` : '<p class="note">선택한 실행에 모델 요청이 없습니다.</p>'}</section></div>`;
+      `<div class="memory-session"><code>${esc(data.session_id || session)}</code><span>${count(data.records.length)}개 완료 대화 · 가중치 재학습 없음</span><button class="quiet" data-file="demo_workspace/memory.json">요약 기준 수정</button></div>${notices.map((text) => `<p class="notice">${esc(text)}</p>`).join("")}<div class="memory-check"><label for="memoryNeedle">문자열 대조</label><input id="memoryNeedle" placeholder="규칙·프로젝트 코드 등 확인할 값"/><div id="memoryCheckResult">원본·요약·실제 messages의 문자열 포함 여부를 확인합니다.</div></div><div class="storage-grid"><section class="storecard"><header><h2>대화 원본</h2><span>추가 저장 · 삭제 안 함</span></header><code class="storage-path">${esc(missing ? "스냅샷 없음" : data.archive_path || "아직 저장된 파일 없음")}</code>${data.records.map((record, i) => `<details class="stored-turn"><summary><b>${i + 1}</b><span>${esc((record.messages.find((m) => m.role === "user")?.content || "").slice(0, 100))}</span><code>${esc(record.run_id)}</code></summary><pre>${esc(pretty(record.messages))}</pre></details>`).join("") || `<p class="note">${missing ? "저장소 스냅샷이 없어 표시할 수 없습니다." : "완료한 대화가 없습니다."}</p>`}</section><section class="storecard"><header><h2>세션 상태</h2><span>다음 요청에서 읽을 데이터</span></header><code class="storage-path">${esc(missing ? "스냅샷 없음" : data.state_path || "이전 형식의 기록 · 상태 파일 경로 없음")}</code><dl><dt>최근 원문</dt><dd>${count(data.state.turns?.length)}개 대화</dd><dt>요약한 범위</dt><dd>${missing ? "—" : "처음 " + num(data.summary?.through_turn || 0) + "개 대화"}</dd><dt>저장된 지적</dt><dd>${count(data.state.feedback_ledger?.length)}개</dd></dl><details><summary>세션 JSON</summary><pre>${esc(pretty(data.state))}</pre></details></section><section class="storecard"><header><h2>모델이 만든 요약</h2><span>원문과 의미가 같다고 보증하지 않음</span></header><code class="storage-path">${esc(missing ? "스냅샷 없음" : data.summary?.path || "저장된 요약 없음")}</code><div class="stored-summary">${esc(summary || (missing ? "스냅샷이 없어 요약 여부를 알 수 없습니다." : "이 대화는 아직 요약하지 않았습니다."))}</div>${compressed ? `<p class="note">이 실행에서 ${compressed.output.before_characters}자 → ${compressed.output.after_characters}자. 토큰 수와 별개입니다.</p><button class="secondary" data-memory-event="${compressed.id}">요약 전후와 코드 보기</button>` : ""}</section><section class="storecard"><header><h2>선택한 실행의 모델 입력</h2><span>디스크에 있는 내용과 구분</span></header>${request ? `<p class="note">model.request #${request.id} · ${input.length}개 메시지</p><button class="secondary" data-memory-event="${request.id}">구조도에서 입력 보기</button><details><summary>전달한 messages 원문</summary><pre>${esc(pretty(input))}</pre></details>` : '<p class="note">선택한 실행에 모델 요청이 없습니다.</p>'}</section></div>`;
+    // 문자열 대조는 JSON 직렬화 문자열이 아니라 저장된 본문(문자열 값)에서 찾는다.
+    // 직렬화 문자열에서는 따옴표·줄바꿈·한글이 이스케이프되어 실제로 있는 값이 '없음'으로 나왔다.
+    const strings = (value, out = []) => {
+      if (typeof value === "string") out.push(value);
+      else if (Array.isArray(value)) value.forEach((item) => strings(item, out));
+      else if (value && typeof value === "object")
+        Object.values(value).forEach((item) => strings(item, out));
+      return out;
+    };
+    const corpus = [
+      ["대화 원본", strings(data.records)],
+      ["요약", [summary]],
+      ["실제 messages", strings(input)],
+    ];
     $("memoryNeedle").oninput = () => {
       const query = $("memoryNeedle").value;
       $("memoryCheckResult").textContent = query
-        ? [
-            ["대화 원본", pretty(data.records)],
-            ["요약", summary],
-            ["실제 messages", pretty(input)],
-          ]
+        ? corpus
             .map(
-              ([label, text]) =>
-                label + ": " + (text.includes(query) ? "포함" : "없음"),
+              ([label, texts]) =>
+                label +
+                ": " +
+                (missing && label !== "실제 messages"
+                  ? "스냅샷 없음"
+                  : texts.some((text) => text.includes(query))
+                    ? "포함"
+                    : "없음"),
             )
             .join(" · ")
         : "문자열 포함 여부만 검사합니다. 의미나 정답을 자동 판정하지 않습니다.";
@@ -1045,8 +1135,11 @@
         `<strong>실제 저장 기록 재생 · ${esc(data.sample.title)}</strong><p>${esc(data.sample.description)}</p><small>지금 모델을 계산하는 화면이 아닙니다. ${esc(data.sample.redaction)}</small>`;
     $("requestSummary").classList.remove("hidden");
     $("summaryPrompt").textContent = data.prompt;
+    const promptTokens = data.totals?.prompt_tokens ?? data.usage?.prompt_tokens,
+      completionTokens =
+        data.totals?.completion_tokens ?? data.usage?.completion_tokens;
     $("summaryMeta").textContent =
-      `${data.conditions?.model || "로컬 모델"} · 주 모델 ${data.model_calls}회 · 주 도구 ${data.tool_calls}회${data.agents?.length ? " · 하위 " + data.agents.length + "개 / 전체 모델 " + data.totals.model_calls + "회" : ""}${data.implementation ? " · 하네스 " + data.implementation.version.slice(0, 10) : ""}`;
+      `${data.sample ? "저장 기록 재생 · 새 계산 아님 · " : ""}${data.conditions?.model || "로컬 모델"} · 주 모델 ${data.model_calls}회 · 주 도구 ${data.tool_calls}회${data.agents?.length ? " · 하위 " + data.agents.length + "개 / 전체 모델 " + data.totals.model_calls + "회" : ""} · 입력 ${num(promptTokens)} / 출력 ${num(completionTokens)} 토큰(실행기 보고${data.totals?.usage_missing_calls ? ", 미수집 호출 " + data.totals.usage_missing_calls + "회" : ""}) · 활동 ${num(data.active_seconds)}초${data.implementation ? " · 하네스 " + data.implementation.version.slice(0, 10) : ""}`;
     $("scrubber").max = Math.max(0, state.events.length - 1);
     $("eventCount").textContent = state.events.length + " 기록";
     $("runStatus").textContent =
@@ -1075,7 +1168,11 @@
     $("export").disabled = false;
     $("showAnswer").disabled = !data.answer && !data.error;
     $("showInput").disabled = !state.events.length;
-    $("showAnswer").classList.toggle("ready", !!data.answer);
+    $("showAnswer").classList.toggle(
+      "ready",
+      !!data.answer && data.status === "completed",
+    );
+    $("showAnswer").title = answerScope(data);
     $("saveFile").disabled = busy() || !state.file?.editable;
     $("undoFile").disabled =
       busy() || !state.file || !state.edits.has(state.file.path);
@@ -1084,13 +1181,7 @@
     if (state.live && state.events.length) select(state.events.length - 1);
     else if (oldCount !== state.events.length) renderTimeline();
     renderAnswer(data);
-    $("answerMeta").textContent = data.error
-      ? "완료되지 않은 실행"
-      : data.status === "completed"
-        ? data.requirements?.length
-          ? "지정한 완료 조건 통과"
-          : "실행 종료 · 실제 작업 결과는 기록에서 확인"
-        : "";
+    $("answerMeta").textContent = answerScope(data);
     $("metrics").innerHTML = [
       `전체 모델 ${data.totals?.model_calls ?? data.model_calls}회`,
       `전체 도구 ${data.totals?.tool_calls ?? data.tool_calls}회`,
@@ -1100,6 +1191,22 @@
     ]
       .map((s) => `<span>${s}</span>`)
       .join("");
+  }
+  function answerScope(data) {
+    // '통과'가 무엇을 검사한 결과인지 적는다. 도구·인자만 대조했는지, 결과 값까지 대조했는지는 완료 조건에 달려 있다.
+    if (!data) return "";
+    if (data.error) return "완료되지 않은 실행 · 아래 문구는 오류 기록입니다";
+    if (data.status !== "completed")
+      return data.status === "stopped" ? "중지된 실행 · 완료 판정 없음" : "";
+    const requirements = data.requirements || [];
+    if (!requirements.length)
+      return "완료 조건 미지정 · 수정 파일 검사만 확인 · 요청 내용의 이행 여부는 기록에서 확인";
+    const withResult = requirements.filter((r) => r.result && Object.keys(r.result).length).length;
+    return withResult === requirements.length
+      ? `완료 조건 ${requirements.length}개 통과 · 도구·인자·결과 값 대조`
+      : withResult
+        ? `완료 조건 ${requirements.length}개 통과 · 결과 값 대조 ${withResult}개, 나머지는 도구·인자만 대조`
+        : `완료 조건 ${requirements.length}개 통과 · 도구와 인자만 대조 · 요청한 값이 반영됐는지는 검사하지 않음`;
   }
   // BROWSER_RENDER_START
   function renderAnswer(data) {
@@ -1370,8 +1477,77 @@
       .map((value) => `<span data-heat="${value}" title="${value}"></span>`)
       .join("")}</div><p class="matrixnote">${esc(caption)}</p>`;
   }
+  function errorDiagnosis(e) {
+    // 실행 오류 한 화면에서 원인 후보를 기록으로 대조한다. 모두 이 실행의 기록에서 계산한 값이다.
+    const o = e.output || {};
+    const agent = e.agent_id || rootAgentId();
+    const mine = state.events.filter(
+      (item) => (item.agent_id || rootAgentId()) === agent && item.id < e.id,
+    );
+    const requests = mine.filter(
+      (item) => item.kind === "model.request" && item.model_purpose !== "compaction",
+    );
+    const last = requests.at(-1);
+    const exposed = (last?.input?.tools || []).map((tool) => tool.function?.name);
+    const required = [
+      ...new Set((state.run?.requirements || []).map((r) => r.tool).filter(Boolean)),
+    ];
+    const instructions = mine.filter((item) =>
+      ["context.requirements", "context.repair", "agent.review", "memory.feedback.recall"].includes(item.kind),
+    );
+    const dispatched = mine.filter((item) => item.kind === "tool.dispatch");
+    const results = mine.filter((item) => item.kind === "tool.result");
+    const failures = mine.filter((item) => item.kind === "tool.error");
+    const validation = mine.findLast((item) => item.kind === "validation.requirements");
+    const finalGate = mine.findLast((item) => item.kind === "validation.final");
+    const repeat = mine.findLast((item) => item.kind === "validation.repeat");
+    const responses = mine.filter((item) => item.kind === "model.response");
+    const row = (label, value, link) =>
+      `<div class="diagrow"><span>${esc(label)}</span><strong>${value}</strong>${link ? `<button class="quiet" data-event="${link}">#${link} →</button>` : ""}</div>`;
+    const rows = [
+      row("오류 문구(하네스 기록)", esc(o.error || o.message || state.run?.error || "—")),
+      o.type ? row("예외 위치", esc(`${o.type} · ${o.file || ""}:${o.line || ""} ${o.function || ""}`)) : "",
+      row(
+        "마지막 모델 요청에 공개한 도구",
+        last ? `${exposed.length}개` + (required.length ? ` · 필수 도구 ${required.map((name) => esc(name) + (exposed.includes(name) ? " 공개됨" : " 비공개")).join(", ")}` : "") : "모델 요청 없음",
+        last?.id,
+      ),
+      row(
+        "완료 조건·보완 지시의 모델 입력 포함",
+        instructions.length ? `${instructions.length}회 (${[...new Set(instructions.map((item) => eventNames[item.kind] || item.kind))].map(esc).join(", ")})` : "없음",
+        instructions.at(-1)?.id,
+      ),
+      row(
+        "모델의 도구 호출",
+        `요청 ${dispatched.length}회 · 성공 결과 ${results.length}개 · 실패 ${failures.length}개 · 모델 응답 ${responses.length}개`,
+        dispatched.at(-1)?.id ?? responses.at(-1)?.id,
+      ),
+      validation
+        ? row(
+            "완료 조건 검사(마지막)",
+            validation.output?.passed ? "통과" : `미충족 ${validation.output?.missing?.length || 0}개`,
+            validation.id,
+          )
+        : "",
+      finalGate
+        ? row(
+            "수정 파일 검사(마지막)",
+            finalGate.output?.passed ? "통과" : `미검사 파일 ${finalGate.output?.unchecked_files?.length || 0}개`,
+            finalGate.id,
+          )
+        : "",
+      repeat
+        ? row("같은 미검증 답변 반복", `${repeat.output?.streak || 0} / ${repeat.output?.limit || 0}회`, repeat.id)
+        : "",
+    ].join("");
+    return (
+      `<h3>이 실행의 기록으로 본 실패 경로</h3><div class="diagnosis">${rows}</div>` +
+      `<p class="note">위 값은 모두 이 기록에서 센 것입니다. 모델이 왜 그렇게 행동했는지는 기록이 말해 주지 않으며, 같은 조건으로 다시 실행해도 결과가 같다는 보장은 없습니다.</p>`
+    );
+  }
   function specialized(e) {
     const o = e.output || {};
+    if (e.kind === "run.error") return errorDiagnosis(e) + box("오류 기록 원본", o);
     if (
       e.kind === "tool.result" &&
       o.protocol === "lsp" &&
@@ -1435,18 +1611,38 @@
       return (
         stats([
           ["캐시 위치 수", num(c.tokens)],
-          ["실제 K/V 메모리", (c.bytes / 1048576).toFixed(2) + " MiB"],
+          ["계산한 K/V 메모리", (c.bytes / 1048576).toFixed(2) + " MiB"],
           ["이번 forward 입력", num(o.forward_input_tokens)],
-          ["누적 forward 입력", num(o.cumulative_forward_tokens)],
+          ["이 호출의 누적 forward 입력", num(o.cumulative_forward_tokens)],
           [
-            "forward 벽시간 (hook 포함)",
-            o.observed_forward_ms == null
-              ? "미기록"
-              : num(o.observed_forward_ms) + " ms",
+            o.observed_forward_ms != null
+              ? "forward 벽시간 (hook 포함)"
+              : o.compute_ms != null
+                ? "forward 벽시간 (compute_ms · 이전 형식, hook 포함)"
+                : "forward 벽시간",
+            o.observed_forward_ms != null
+              ? num(o.observed_forward_ms) + " ms"
+              : o.compute_ms != null
+                ? num(o.compute_ms) + " ms"
+                : "미기록(이전 형식)",
+          ],
+          [
+            "관측 hook 비용(텐서 표본·기록)",
+            o.observer_hook_ms != null ? num(o.observer_hook_ms) + " ms" : "미분리(이전 형식)",
+          ],
+          [
+            "hook 제외 forward",
+            o.forward_ms_excluding_hooks != null
+              ? num(o.forward_ms_excluding_hooks) + " ms"
+              : "미분리(이전 형식)",
           ],
           [
             "제외한 사용자 정지",
-            o.user_pause_ms == null ? "미기록" : num(o.user_pause_ms) + " ms",
+            o.user_pause_ms == null
+              ? o.compute_ms != null || o.observed_forward_ms != null
+                ? "0 ms 또는 미기록(이전 형식)"
+                : "미기록"
+              : num(o.user_pause_ms) + " ms",
           ],
         ]) +
         `<p class="note">${c.enabled ? "K/V 텐서의 numel × element_size를 합산했습니다. 가중치·임시 attention 메모리는 포함하지 않습니다." : "KV를 끈 실행입니다. 매 토큰마다 전체 접두부를 다시 계산합니다."}</p>` +
@@ -1573,6 +1769,17 @@
       value === true ? "일치" : value === false ? "불일치" : "미확인";
     const body = payload.messages
       .map((message, index) => {
+        const matches = AgentInspection.origins(
+          state.events,
+          request.index,
+          index,
+          rootAgentId(),
+        );
+        // 이전 형식 기록은 작성 주체(origin)를 남기지 않았다. 값이 일치하는 하네스 이벤트가 있으면 그 사실을 적고,
+        // 없으면 '미기록'으로 둔다. role=user라고 해서 사용자가 쓴 메시지로 표시하지 않는다.
+        const harnessMatch = matches.find(
+          (record) => !["model.response", "file.decode"].includes(record.event.kind),
+        );
         const labels = [
           ...new Set(
             segments
@@ -1582,7 +1789,9 @@
                   !part.origin &&
                   part.label === "모델 응답" &&
                   message.role === "user"
-                    ? "출처 미기록 (이전 기록)"
+                    ? harnessMatch
+                      ? `작성 주체 미기록(이전 형식) · 값 일치: 하네스 #${harnessMatch.event.id} ${eventName(harnessMatch.event)}`
+                      : "작성 주체 미기록(이전 형식 기록) · role=user가 사용자 작성을 뜻하지 않음"
                     : part.label;
                 return (
                   label +
@@ -1600,12 +1809,6 @@
               }),
           ),
         ];
-        const matches = AgentInspection.origins(
-          state.events,
-          request.index,
-          index,
-          rootAgentId(),
-        );
         const declared = AgentInspection.declaredOrigins(
           state.events,
           request.index,
@@ -1699,6 +1902,8 @@
     $("evidenceKind").textContent = evidence.label;
     $("evidenceKind").title = evidence.explanation;
     $("evidenceKind").dataset.evidence = evidence.type;
+    $("evidenceKind").setAttribute("aria-label", evidence.label + ". " + evidence.explanation);
+    $("evidenceKind").tabIndex = 0;
     $("detailTitle").textContent = eventName(e);
     $("detailKind").textContent = e.kind;
     const filePath = e.kind.startsWith("file.")
@@ -2327,10 +2532,13 @@
       if (b.dataset.memoryEvent) {
         view("journey");
         state.live = false;
-        select(
-          state.events.findIndex((e) => e.id === Number(b.dataset.memoryEvent)),
-          { open: true },
+        const at = state.events.findIndex(
+          (e) => e.id === Number(b.dataset.memoryEvent),
         );
+        // 저장소에서 온 이동은 대상에 맞는 탭을 연다. 이전 탭이 '모델 입력'이면 요약 결과 이벤트에서 다른 요청의 입력이 보였다.
+        state.tab = state.events[at]?.kind === "model.request" ? "input" : "change";
+        state.inputMessage = -1;
+        select(at, { open: true });
       }
       if (b.dataset.activity) {
         const action = b.dataset.activity,
@@ -2461,10 +2669,12 @@
       if (b.dataset.event) {
         state.live = false;
         stopPlay();
-        select(
-          state.events.findIndex((e) => e.id === Number(b.dataset.event)),
-          { open: true },
+        const at = state.events.findIndex(
+          (e) => e.id === Number(b.dataset.event),
         );
+        if (state.tab === "input" && state.events[at]?.kind !== "model.request")
+          state.tab = "change";
+        select(at, { open: true });
       }
       if (b.dataset.stage) {
         const index = state.events.findIndex(

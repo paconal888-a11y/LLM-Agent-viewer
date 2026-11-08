@@ -189,13 +189,15 @@
     events.slice(0, requestIndex).forEach((event, index) => {
       if (agentOf(event, root) !== agentOf(request, root)) return;
       let path = event.input?.path || event.output?.source_path || "";
+      // appended_message(완료 조건·보완 요청·점검 지시·지적 재포함·도구 결과)와 message(요약)를 가진
+      // 모든 하네스 이벤트를 출처 후보로 본다. kind를 열거하면 새 이벤트가 생길 때마다 링크가 빠졌다.
       const matches =
         event.kind === "file.decode"
           ? includesText(message, event.output?.text)
           : event.kind === "rules.wrap"
             ? includesText(message, event.output?.instruction_block)
-            : event.kind === "context.append"
-              ? same(message, event.output?.appended_message)
+            : event.output?.appended_message
+              ? same(message, event.output.appended_message)
               : event.kind === "memory.summary.include"
                 ? same(message, event.output?.message)
                 : event.kind === "model.response"
@@ -219,8 +221,9 @@
     return events
       .slice(0, requestIndex)
       .flatMap((event, index) =>
+        // 하위 에이전트 이벤트는 주 기록에서 child_event_id로 식별된다(agent_event_id는 발행되지 않는 필드였다).
         agentOf(event, root) === agentOf(request, root) &&
-        sources.has(event.agent_event_id ?? event.id)
+        sources.has(event.child_event_id ?? event.id)
           ? [{ event, index }]
           : [],
       );
@@ -235,7 +238,8 @@
           ? origin.output?.instruction_block
           : null;
     const message =
-      origin.kind === "context.append" ? origin.output?.appended_message : null;
+      origin.output?.appended_message ||
+      (origin.kind === "memory.summary.include" ? origin.output?.message : null);
     if (!text && !message) return [];
     return events.flatMap((event, index) => {
       if (
@@ -281,16 +285,25 @@
         explanation:
           "템플릿·tokenizer 진단 결과입니다. 생성 요청에서 보고한 값과는 별도로 대조합니다.",
       };
+    if (kind === "runtime.cache")
+      return {
+        label: "실행기 보고 + 하네스 대조",
+        type: "reported",
+        explanation:
+          "prompt_tokens·cached_tokens·timings는 실행기가 보고한 값이고, *_matches 필드는 하네스가 진단값과 대조한 계산값입니다. value_sources에 구분을 적었습니다. 외부 실행기의 내부 텐서를 직접 관찰한 값은 아닙니다.",
+      };
     if (
-      kind === "runtime.cache" ||
       kind === "runtime.slots" ||
-      kind === "runtime.info"
+      kind === "runtime.info" ||
+      kind === "runtime.prefill" ||
+      kind === "model.decode.report" ||
+      kind.startsWith("http.inference")
     )
       return {
         label: "실행기 보고",
         type: "reported",
         explanation:
-          "실행기가 반환한 설정·상태·사용량입니다. 외부 실행기의 내부 텐서를 직접 관찰한 값은 아닙니다.",
+          "실행기가 반환한 설정·상태·사용량·진행 보고입니다. 외부 실행기의 내부 텐서를 직접 관찰한 값은 아닙니다.",
       };
     if (
       kind === "model.stream.assemble" ||

@@ -12,22 +12,67 @@ const request = (id, messages, extra = {}) => ({
 });
 
 test("declared origins resolve child-local IDs without crossing agents or time", () => {
+  // 주 기록에 비친 하위 에이전트 이벤트는 child_event_id(하위 기록의 번호)로 식별된다.
+  // 하위 에이전트의 model.request가 적은 source_event_id는 그 번호를 가리킨다.
   const events = [
-    { id: 9, agent_id: "root", agent_event_id: 3 },
-    { id: 10, agent_id: "child", agent_event_id: 3 },
+    { id: 9, agent_id: "root", child_event_id: null },
+    { id: 10, agent_id: "child", child_event_id: 3 },
     request(11, [{ role: "user", content: "repair" }], {
       agent_id: "child",
+      child_event_id: 4,
       output: {
         segments: [{ message_index: 0, origin: "harness", source_event_id: 3 }],
       },
     }),
-    { id: 12, agent_id: "child", agent_event_id: 3 },
+    { id: 12, agent_id: "child", child_event_id: 3 },
   ];
   assert.deepEqual(
     inspection.declaredOrigins(events, 2, 0, "root").map((row) => row.event.id),
     [10],
   );
   assert.deepEqual(inspection.declaredOrigins(events, 2, 1, "root"), []);
+  // 주 에이전트 자신의 이벤트는 id로 식별된다.
+  const rootEvents = [
+    { id: 3, agent_id: "root", child_event_id: null },
+    request(4, [{ role: "user", content: "x" }], {
+      agent_id: "root",
+      output: { segments: [{ message_index: 0, source_event_id: 3 }] },
+    }),
+  ];
+  assert.deepEqual(
+    inspection.declaredOrigins(rootEvents, 1, 0, "root").map((row) => row.event.id),
+    [3],
+  );
+});
+
+test("every harness event that appends a message is linked to the requests that carry it", () => {
+  // 완료 조건 안내·보완 요청·점검 지시·지적 재포함은 context.append가 아닌 이벤트로 기록된다.
+  // 이전에는 kind를 열거해 context.append만 연결했기 때문에 '출처 없음'으로 보였다.
+  const requirement = { role: "user", content: "완료 조건: check_file을 실행하세요." };
+  const repair = { role: "user", content: "검사 결과가 없습니다. 다시 확인하세요." };
+  const review = { role: "user", content: "결과를 점검하세요." };
+  const recall = { role: "user", content: "이전 지적: 경로를 확인하세요." };
+  const summary = { role: "system", content: "요약: 이전 대화에서 파일을 읽었습니다." };
+  const events = [
+    { id: 1, kind: "context.requirements", output: { appended_message: requirement } },
+    { id: 2, kind: "memory.feedback.recall", output: { appended_message: recall } },
+    { id: 3, kind: "memory.summary.include", output: { message: summary } },
+    request(4, [summary, requirement, recall]),
+    { id: 5, kind: "context.repair", output: { appended_message: repair } },
+    { id: 6, kind: "agent.review", output: { appended_message: review } },
+    request(7, [summary, requirement, recall, repair, review]),
+  ];
+  assert.deepEqual(inspection.consumers(events, 0, "root").map((r) => r.event.id), [4, 7]);
+  assert.deepEqual(inspection.consumers(events, 1, "root")[0].indices, [2]);
+  assert.deepEqual(inspection.consumers(events, 2, "root").map((r) => r.event.id), [4, 7]);
+  assert.deepEqual(inspection.consumers(events, 4, "root").map((r) => r.event.id), [7]);
+  assert.deepEqual(inspection.consumers(events, 5, "root")[0].indices, [4]);
+  assert.equal(inspection.origins(events, 6, 0, "root")[0].event.kind, "memory.summary.include");
+  assert.equal(inspection.origins(events, 6, 1, "root")[0].event.kind, "context.requirements");
+  assert.equal(inspection.origins(events, 6, 3, "root")[0].event.kind, "context.repair");
+  assert.equal(inspection.origins(events, 6, 4, "root")[0].event.kind, "agent.review");
+  // 요청 이후의 이벤트는 출처가 될 수 없다.
+  assert.deepEqual(inspection.origins(events, 3, 1, "root").map((r) => r.event.id), [1]);
 });
 
 test("snapshot does not expose a future request, token count or response", () => {
@@ -264,6 +309,9 @@ test("measurement labels distinguish diagnostics, runtime reports and direct sam
     "diagnostic",
   );
   assert.equal(inspection.evidence({ kind: "runtime.cache" }).type, "reported");
+  assert.equal(inspection.evidence({ kind: "runtime.prefill" }).type, "reported");
+  assert.equal(inspection.evidence({ kind: "model.decode.report" }).type, "reported");
+  assert.equal(inspection.evidence({ kind: "http.inference.response" }).type, "reported");
   assert.equal(
     inspection.evidence({ kind: "reference.cache.write" }).type,
     "direct",

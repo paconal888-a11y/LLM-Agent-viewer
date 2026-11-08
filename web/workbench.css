@@ -853,6 +853,59 @@ p {
   font: 9px var(--mono);
   flex-shrink: 0;
 }
+/* 실패·경고 기록: 통과 기록과 같은 모양이면 완료 검사 실패가 보이지 않는다. */
+.event.status-error {
+  background: #fff4f2;
+  border-left: 3px solid #c0493a;
+}
+.event.status-warning {
+  background: #fff9ec;
+  border-left: 3px solid #b8862b;
+}
+.event .statusmark {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 9px;
+  line-height: 16px;
+  font-weight: 600;
+  font-style: normal;
+  color: #fff;
+  background: #c0493a;
+  vertical-align: 1px;
+}
+.event.status-warning .statusmark {
+  background: #b8862b;
+}
+.chapter.has-error > summary small {
+  color: #a83c2e;
+  font-weight: 600;
+}
+/* 실행 오류 한 화면 요약 */
+.diagnosis {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+.diagnosis .diagrow {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.6fr) 1fr auto;
+  gap: 8px;
+  align-items: start;
+  padding: 7px 9px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.diagnosis .diagrow span {
+  color: #5b6778;
+}
+.diagnosis .diagrow strong {
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
 .tokenstep {
   margin: 5px 0;
   background: #fff;
