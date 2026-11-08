@@ -4,13 +4,15 @@
 [![Version](https://img.shields.io/github/v/tag/paconal888-a11y/LLM-Agent-viewer?label=version&sort=semver)](https://github.com/paconal888-a11y/LLM-Agent-viewer/tags)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+[English](README.en.md) · 한국어
+
 **AI 에이전트가 실제로 무엇을 하는지 한 단계씩 들여다보고, 직접 고쳐서 측정하는 로컬 도구입니다.**
 
 프롬프트 한 줄이 규칙 파일 읽기, 입력 조립, 모델 호출, 도구 실행, 완료 판정으로 이어지는 과정을 실행 코드와 함께 기록합니다. 단계마다 코드가 정했는지, 모델이 골랐는지, 설정 파일에서 왔는지 구분해 보여 줍니다.
 
 ![강의를 따라 실제 기록의 모델 입력을 살펴보는 화면](docs/images/lesson-step.png)
 
-[시작하기](#시작하기) · [배울 수 있는 것](#배울-수-있는-것) · [사용법](docs/WALKTHROUGH.md) · [구조](docs/ARCHITECTURE.md) · [하네스 수정](docs/EXTENDING.md)
+**[웹 데모 바로 열기](https://paconal888-a11y.github.io/LLM-Agent-viewer/)** · [시작하기](#시작하기) · [배울 수 있는 것](#배울-수-있는-것) · [사용법](docs/WALKTHROUGH.md) · [구조](docs/ARCHITECTURE.md) · [하네스 수정](docs/EXTENDING.md)
 
 ## 왜 필요한가요
 
@@ -28,7 +30,9 @@
 
 ## 시작하기
 
-Windows x64, Git, [uv](https://docs.astral.sh/uv/getting-started/installation/)가 필요합니다. Python 3.12는 uv가 준비합니다.
+**설치 없이 보기:** [웹 데모](https://paconal888-a11y.github.io/LLM-Agent-viewer/)에서 14개 강의와 실제 기록을 바로 볼 수 있습니다. 저장된 기록을 재생하며 모델은 돌지 않습니다.
+
+**PC에서 실행하기:** Windows x64, Git, [uv](https://docs.astral.sh/uv/getting-started/installation/)가 필요합니다. Python 3.12는 uv가 준비합니다.
 
 ```powershell
 git clone https://github.com/paconal888-a11y/LLM-Agent-viewer.git
@@ -151,7 +155,7 @@ uv run --extra reference --extra integrations --offline python -m unittest disco
 node --test tests/architecture.test.cjs tests/inspection.test.cjs tests/editor.test.cjs tests/settings.test.cjs tests/export_search.test.cjs tests/lessons.test.cjs
 ```
 
-Node.js는 화면 코드 테스트에만 필요합니다. [이슈](https://github.com/paconal888-a11y/LLM-Agent-viewer/issues)에 재현 절차와 실행기 정보를 남기거나, 변경한 기능의 테스트와 함께 PR을 보내 주세요.
+웹 데모는 `python scripts/build_demo.py site`로 만들고, 태그를 올리면 릴리스 페이지와 함께 자동으로 갱신됩니다. Node.js는 화면 코드 테스트에만 필요합니다. [이슈](https://github.com/paconal888-a11y/LLM-Agent-viewer/issues)에 재현 절차와 실행기 정보를 남기거나, 변경한 기능의 테스트와 함께 PR을 보내 주세요.
 
 ## 라이선스
 
