@@ -1,0 +1,40 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: 변경 기록이 있는 태그의 릴리스 만들기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 오래된 태그부터 만들어 가장 높은 버전이 최신 릴리스가 되게 한다.
+          for tag in $(git tag --sort=v:refname); do
+            awk -v heading="## ${tag#v}" '$0 == heading {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
+            if [ -s notes.md ] && ! gh release view "$tag" > /dev/null 2>&1; then
+              gh release create "$tag" --title "$tag" --notes-file notes.md --verify-tag
+            fi
+          done
+      - name: 웹 데모 갱신
+        run: |
+          python scripts/build_demo.py site
+          git fetch origin gh-pages
+          git worktree add deploy origin/gh-pages
+          cd deploy
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r ../site/. .
+          git add -A
+          git diff --cached --quiet && exit 0
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "웹 데모 갱신: $GITHUB_REF_NAME"
+          git push origin HEAD:gh-pages

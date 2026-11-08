@@ -4,12 +4,12 @@ jobs:
   harness:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: python -m unittest discover -s tests -v
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
       - run: node --test tests/architecture.test.cjs tests/inspection.test.cjs tests/editor.test.cjs tests/settings.test.cjs tests/export_search.test.cjs tests/lessons.test.cjs
@@ -17,8 +17,8 @@ jobs:
     # 공식 설치 경로(Windows 런처)와 CRLF 체크아웃을 검증한다. test_launcher는 실제 Windows PowerShell을 실행한다.
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
       - run: uv sync --python 3.12 --extra integrations --locked
       - name: Python tests
         shell: pwsh
@@ -31,17 +31,17 @@ jobs:
             Select-String -Path test-output.txt -Pattern '^[A-Za-z_.]*(Error|Exception|Failure)\b' | Select-Object -First 15 | ForEach-Object { Write-Output "::warning::$($_.Line)" }
           }
           exit $code
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
       - run: node --test tests/architecture.test.cjs tests/inspection.test.cjs tests/editor.test.cjs tests/settings.test.cjs tests/export_search.test.cjs tests/lessons.test.cjs
   reference:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v10.3.3
       - run: uv sync --extra reference --extra integrations --locked
       - run: uv run --extra reference --extra integrations --offline python -m unittest discover -s tests -v
