@@ -216,7 +216,50 @@ class Application:
             with run.condition:
                 run.condition.notify_all()
             return
-        worker = threading.Thread(target=self.harness.execute, args=(run,), daemon=True)
+        harness = self.harness
+
+        def guarded():
+            # 루프의 try 바깥(편집한 harness.py의 Harness.execute 등)에서 예외가 나면 아무도 잡지 않아
+            # 실행이 영구 running으로 남고 저장·복원·새 실행이 모두 막혔다. 여기서 상태를 확정한다.
+            try:
+                harness.execute(run)
+            except BaseException as error:  # noqa: BLE001 - 어떤 예외든 실행 상태를 닫아야 한다.
+                import traceback
+
+                frames = traceback.extract_tb(error.__traceback__)
+                last = frames[-1] if frames else None
+                detail = {
+                    "type": type(error).__name__,
+                    "message": str(error),
+                    "file": last.filename if last else None,
+                    "line": last.lineno if last else None,
+                    "function": last.name if last else None,
+                }
+                with run.lock:
+                    if run.status in {"running", "paused", "stopping"}:
+                        run.status = "failed"
+                        run.error = (
+                            "하네스 스레드가 예외로 끝났습니다: "
+                            + detail["type"]
+                            + ": "
+                            + detail["message"]
+                        )
+                        run.finished = time.perf_counter()
+                try:
+                    run.record_interrupted(
+                        "run.error",
+                        "하네스 스레드 예외",
+                        "에이전트 루프 바깥에서 난 예외입니다. 편집한 코드의 해당 파일·줄을 확인하고 되돌리거나 고치세요.",
+                        category="output",
+                        output=detail,
+                    )
+                    run.save(harness.state_dir / "traces")
+                except Exception:  # noqa: BLE001 - 기록 실패가 상태 확정을 막지 않게 한다.
+                    pass
+                with run.condition:
+                    run.condition.notify_all()
+
+        worker = threading.Thread(target=guarded, daemon=True)
         run.emit(
             "thread.dispatch",
             "실행 스레드와 하네스 연결",

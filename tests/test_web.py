@@ -145,6 +145,30 @@ class WebTests(unittest.TestCase):
         self.assertEqual(version["version"], manifest["version"])
         self.assertEqual(version["files"], manifest["files"])
 
+    def test_worker_thread_exception_outside_the_loop_finalizes_the_run(self):
+        # W-01: Harness.execute 자체가 예외를 던지면 실행이 영구 running으로 남아 모든 쓰기가 막혔다.
+        import time
+
+        class Broken(Harness):
+            def execute(self, run):
+                raise AttributeError("'Run' object has no attribute 'promt'")
+
+        self.app.harness = Broken(self.app.harness.workspace, self.app.harness.state_dir, runtime=FixtureRuntime())
+        run = self.app.start("깨진 하네스", "broken", False)
+        deadline = time.monotonic() + 3
+        while run.status == "running" and time.monotonic() < deadline:
+            time.sleep(0.02)
+        self.assertEqual(run.status, "failed")
+        self.assertIn("promt", run.error)
+        self.assertIsNone(self.request("/api/activity")["run"])
+        failure = next(e for e in run.events if e["kind"] == "run.error")
+        self.assertEqual(failure["output"]["type"], "AttributeError")
+        self.assertTrue(failure["output"]["file"].endswith("test_web.py"))
+        self.assertTrue((self.root / ".runs" / "traces" / (run.id + ".json")).exists())
+        # 잠금이 풀려 편집·새 실행이 다시 가능하다.
+        self.assertTrue(self.request("/api/project/check", {"path": "demo_workspace/AGENTS.md", "text": "# 규칙\n"})["passed"])
+        self.assertFalse(self.app.busy())
+
     def test_project_edit_is_blocked_during_active_run(self):
         run = Run("paused", "web-test")
         run.status = "paused"
