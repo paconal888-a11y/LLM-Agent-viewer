@@ -6,12 +6,16 @@ import argparse
 import gzip
 import json
 import mimetypes
+import os
 import threading
 import time
 import urllib.parse
+import uuid
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from . import app_version
 from .harness import Harness, workspace_path
 from .runtime import RuntimeFailure
 from .trace import ROOT, Run, expand_sources, pack_sources
@@ -63,8 +67,21 @@ class Application:
         self.backends = {
             getattr(self.harness.runtime, "backend", "llama"): self.harness.runtime
         }
+        # 런처·중지 스크립트가 "같은 프로젝트의 같은 버전이 띄운 이 인스턴스"인지 확인할 식별 정보.
+        self.identity = {
+            "app": "Agent Lens",
+            "version": app_version(),
+            "project_root": str(ROOT),
+            "instance": uuid.uuid4().hex[:12],
+            "pid": os.getpid(),
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "samples_only": bool(samples_only),
+        }
 
     def health(self):
+        return {**self.identity, **self.runtime_health()}
+
+    def runtime_health(self):
         if self.samples_only:
             return {
                 "connected": False,
@@ -409,7 +426,7 @@ def make_handler(app):
                 path = parsed.path
                 query = urllib.parse.parse_qs(parsed.query)
                 if path == "/api/status":
-                    self.send(200, app.health())
+                    self.send(200, {**app.health(), "port": self.server.server_port})
                 elif path == "/api/activity":
                     self.send(200, app.activity())
                 elif path == "/api/memory":

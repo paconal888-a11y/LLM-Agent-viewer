@@ -89,6 +89,27 @@ class WebTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             app.start("hello", "sample", False)
 
+    def test_status_identifies_the_app_instance_for_launcher_and_stop_scripts(self):
+        import os
+
+        from local_agent_lab import app_version
+
+        status = self.request("/api/status")
+        self.assertEqual(status["app"], "Agent Lens")
+        self.assertEqual(status["version"], app_version())
+        self.assertNotEqual(status["version"], "unknown")
+        self.assertEqual(Path(status["project_root"]), ROOT)
+        self.assertEqual(status["pid"], os.getpid())
+        self.assertEqual(status["port"], self.server.server_port)
+        self.assertEqual(len(status["instance"]), 12)
+        self.assertFalse(status["samples_only"])
+        self.assertEqual(status["instance"], self.request("/api/status")["instance"])
+        sample = Application(self.app.harness, samples_only=True).health()
+        self.assertEqual(sample["mode"], "sample")
+        self.assertTrue(sample["samples_only"])
+        self.assertEqual(sample["project_root"], str(ROOT))
+        self.assertNotEqual(sample["instance"], status["instance"])
+
     def test_project_edit_is_blocked_during_active_run(self):
         run = Run("paused", "web-test")
         run.status = "paused"
