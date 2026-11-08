@@ -309,7 +309,7 @@
     document.body.classList.toggle("has-activity", !!run || !!experiment);
     if (run || experiment)
       $("activityBar").innerHTML =
-        `<span class="activity-dot"></span><strong>${experiment ? "비교" + " " + esc(experiment.phase) : run.status === "paused" ? "단계 대기" : run.status === "stopping" ? "중지 중" : "실행 중"}</strong><span class="activity-prompt">${esc(run?.prompt || "구성 비교")}</span><button data-activity="open">실행 열기</button>${run?.status === "paused" && !experiment ? '<button data-activity="next">다음 단계</button><button data-activity="continue">계속</button>' : ""}<button data-activity="stop" class="danger" ${run?.status === "stopping" ? "disabled" : ""}>중지</button>`;
+        `<span class="activity-dot"></span><strong>${experiment ? "비교" + " " + esc(experiment.phase) : run.status === "paused" ? "단계 대기" : run.status === "stopping" ? "중지 중 · 실행 중인 도구가 끝나야 멈춥니다. 오래 걸리면 Stop-AgentLens.cmd로 앱을 종료하세요" : "실행 중"}</strong><span class="activity-prompt">${esc(run?.prompt || "구성 비교")}</span><button data-activity="open">실행 열기</button>${run?.status === "paused" && !experiment ? '<button data-activity="next">다음 단계</button><button data-activity="continue">계속</button>' : ""}<button data-activity="stop" class="danger" ${run?.status === "stopping" ? "disabled" : ""}>중지</button>`;
     $("run").disabled = busy() || !state.health.connected;
     $("startCompare").disabled = busy() || !state.health.connected;
     $("backend").disabled = busy() || state.health.mode === "sample";
@@ -362,6 +362,7 @@
       renderLessons();
       window.history.replaceState(null, "", "#/lessons");
     } else if (name !== "journey") window.history.replaceState(null, "", location.pathname);
+    else if (!state.lesson) window.history.replaceState(null, "", runAddress());
     renderCoach();
     if (name === "memory") loadMemory().catch((e) => toast(e.message));
     if (name === "feedback") {
@@ -372,6 +373,12 @@
         $("feedbackRun").value = state.run.id;
       loadFeedback().catch((e) => toast(e.message));
     }
+  }
+  function runAddress() {
+    const current = state.events[state.cursor];
+    return state.run?.id && current
+      ? "#/run/" + encodeURIComponent(state.run.id) + "/" + current.id
+      : location.pathname;
   }
   function featureUI() {
     if (!features.tools) features.skills = false;
@@ -446,7 +453,7 @@
     $("run").disabled = !state.health.connected || busy();
     $("run").title =
       state.health.mode === "sample"
-        ? "저장 기록 재생 모드에서는 실행할 수 없습니다. 실제 실행은 Start-AgentLens.ps1로 시작하세요."
+        ? "저장 기록 재생 모드에서는 실행할 수 없습니다. 실제 실행은 Start-AgentLens.cmd로 시작하세요."
         : "";
     if (!busy()) {
       const serverBackend = state.health.backend || "llama";
@@ -461,6 +468,8 @@
       updateBackend();
     }
     $("startCompare").disabled = !state.health.connected || busy();
+    $("startCompare").title =
+      state.health.mode === "sample" ? "저장 기록 재생 모드에서는 비교 실험을 실행할 수 없습니다." : "";
     $("backend").disabled = busy() || state.health.mode === "sample";
     $("sampleComposerNote").classList.toggle("hidden", state.health.mode !== "sample");
     document.body.classList.toggle("demo", !!state.health.demo);
@@ -468,7 +477,7 @@
       $("connection").textContent = "샘플 기록 · 모델 실행 없음";
       $("backend").disabled = true;
       $("backendNote").textContent =
-        "샘플 보기 모드입니다. 실제 실행은 Start-AgentLens.ps1로 일반 모드를 시작하세요.";
+        "샘플 보기 모드입니다. 실제 실행은 Start-AgentLens.cmd로 일반 모드를 시작하세요.";
     }
   }
   function stage(event) {
@@ -562,6 +571,7 @@
     for (const item of state.events) {
       const id = item.agent_id || rootAgentId();
       // 대화 요약(compaction) 요청은 주 대화의 호출 번호를 늘리지 않는다.
+      if (item.kind === "run.resume") perAgent.set(id, item.output.next_call - 1);
       if (item.kind === "model.request" && item.model_purpose !== "compaction")
         perAgent.set(id, (perAgent.get(id) || 0) + 1);
       calls.set(
@@ -625,6 +635,10 @@
       if (kinds.has("context.repair")) return "완료 조건 미충족 → 보완 요청을 모델 입력에 추가";
       if (kinds.has("agent.review")) return "추가 점검 요청 → 모델 입력에 추가";
       if (kinds.has("memory.feedback.recall")) return "이전 지적 재포함 → 모델 입력";
+      if ((kinds.has("context.check") || kinds.has("checkpoint.save")) && !kinds.has("context.assemble"))
+        return kinds.has("context.prune") || kinds.has("context.compact.result")
+          ? "입력 크기 확인 → 줄이기"
+          : "입력 크기 확인 · 상태 저장";
     }
     if (
       g.stage === "read" &&
@@ -892,7 +906,10 @@
         b.style.flexGrow = parts[i].characters || 1;
         b.style.background = colors[i % colors.length];
         b.onclick = () => {
-          $("detailContent").innerHTML = box(parts[i].label, parts[i].text);
+          $("detailContent").innerHTML = box(
+            parts[i].label,
+            parts[i].text ?? "본문은 모델 입력 탭에서 확인할 수 있습니다.",
+          );
           $("inspector").classList.add("open");
         };
       },
@@ -922,12 +939,8 @@
     store("selection", { id: state.run?.id, cursor: state.cursor });
     if (open) $("inspector").classList.add("open");
     renderCoach();
-    if (!state.lesson && state.view === "journey" && state.run?.id && current)
-      window.history.replaceState(
-        null,
-        "",
-        "#/run/" + encodeURIComponent(state.run.id) + "/" + current.id,
-      );
+    if (!state.lesson && state.view === "journey" && current)
+      window.history.replaceState(null, "", runAddress());
   }
   // 강의: 실제 저장 기록의 단계를 순서대로 열어 준다. 새 계산을 만들지 않는다.
   function lessonProgress() {
@@ -964,7 +977,7 @@
       ticket = (state.lessonTicket || 0) + 1;
     state.lessonTicket = ticket;
     state.lesson = { id, step: index };
-    if (state.run?.id !== run || !state.events.length) await loadRun(run);
+    if (state.run?.id !== run || !state.events.length) await loadRun(run, { keepLesson: true });
     if (ticket !== state.lessonTicket) return;
     view("journey");
     state.agentFilter = "all";
@@ -1004,8 +1017,9 @@
       resume = progress.last && AgentLessons.byId(progress.last.id),
       first = all.find((lesson) => !progress.done[lesson.id]) || all[0],
       target = resume && !progress.done[resume.id] ? resume : first,
-      step = target === resume ? progress.last.step : 0,
-      sample = state.health.mode === "sample";
+      step = target === resume && finished !== all.length ? progress.last.step : 0,
+      sample = state.health.mode === "sample",
+      connected = !!state.health.connected;
     $("lessonsView").innerHTML =
       `<div class="lessons"><header class="lessonhero"><h1>에이전트가 실제로 하는 일을 기록으로 배웁니다</h1><p>프롬프트 한 줄이 파일 읽기, 모델 호출, 도구 실행, 완료 판정으로 이어지는 과정을 단계별로 따라갑니다. 모든 강의는 실제 로컬 모델을 돌려 저장한 기록이며, 모델을 설치하지 않아도 볼 수 있습니다.</p><div class="lessonactions"><button class="primary" data-lesson="${target.id}" data-step="${step}">${finished === all.length ? "처음부터 다시 보기" : finished || (resume && step) ? `이어서: ${target.number}강 ${esc(target.title)}` : "1강부터 시작"}</button><span>${finished} / ${all.length}강 완료</span></div></header>` +
       `<section class="ownerlegend" aria-label="결정 주체 표시"><h2>기록을 읽는 기준: 누가 정했나</h2><p>모든 단계에 이 표시가 붙습니다. 무엇을 고쳐야 결과가 달라지는지 알려 주는 표시입니다.</p><div>${AgentLessons.owners.map(([key, label, note]) => `<article><span class="decision-kind" data-owner="${key}">${esc(label)}</span><small>${esc(note)}</small></article>`).join("")}</div></section>` +
@@ -1021,7 +1035,7 @@
               .join("")}</div></section>`,
         )
         .join("") +
-      `<section class="lessonrun"><h2>직접 실행해 보기</h2><p>${state.health.demo ? "이 페이지는 저장 기록을 재생하는 웹 데모입니다. 직접 프롬프트를 실행하고 하네스를 고쳐 보려면 Windows PC에 설치하세요. 모델도 PC에서 돌아갑니다." : sample ? "지금은 샘플 보기 모드입니다. 직접 프롬프트를 실행하려면 <code>Start-AgentLens.ps1</code>을 일반 모드로 시작하세요. 첫 실행에 모델을 내려받습니다." : "로컬 모델이 연결되어 있습니다. 구조 · 실행 화면에서 요청을 실행하고, 하네스 파일을 고친 뒤 다시 측정할 수 있습니다."}</p>${state.health.demo ? `<a class="secondary lessonlink" href="${esc(state.health.repository)}" target="_blank" rel="noopener">설치 안내 보기 ↗</a>` : `<button class="secondary" data-view="${sample ? "learn" : "journey"}">${sample ? "구성 설명 보기" : "실행 화면으로"}</button>`}</section>` +
+      `<section class="lessonrun"><h2>직접 실행해 보기</h2><p>${state.health.demo ? "이 페이지는 저장 기록을 재생하는 웹 데모입니다. 직접 프롬프트를 실행하고 하네스를 고쳐 보려면 Windows PC에 설치하세요. 모델도 PC에서 돌아갑니다." : sample ? "지금은 샘플 보기 모드입니다. 직접 프롬프트를 실행하려면 <code>Start-AgentLens.cmd</code>를 일반 모드로 시작하세요. 첫 실행에 모델을 내려받습니다." : connected ? "로컬 모델이 연결되어 있습니다. 구조 · 실행 화면에서 요청을 실행하고, 하네스 파일을 고친 뒤 다시 측정할 수 있습니다." : "모델 연결을 기다리는 중입니다. 연결되면 구조 · 실행 화면에서 요청을 실행할 수 있습니다."}</p>${state.health.demo ? `<a class="secondary lessonlink" href="${esc(state.health.repository)}" target="_blank" rel="noopener">설치 안내 보기 ↗</a>` : `<button class="secondary" data-view="${sample ? "learn" : "journey"}">${sample ? "구성 설명 보기" : "실행 화면으로"}</button>`}</section>` +
       `<details class="lessonglossary"><summary>용어</summary><dl>${AgentLessons.glossary.map(([term, text]) => `<dt>${esc(term)}</dt><dd>${esc(text)}</dd>`).join("")}</dl></details></div>`;
   }
   async function route() {
@@ -1071,6 +1085,8 @@
     "context.compact.start": "작업 중간 요약 시작",
     "context.compact.result": "작업 요약으로 입력 교체",
     "context.compact.failed": "작업 중간 요약 실패",
+    "memory.compaction.failed": "이전 대화 요약 실패",
+    "rules.directory.skipped": "폴더 규칙을 읽지 못해 건너뜀",
     "checkpoint.save": "이어갈 상태 저장",
     "checkpoint.failed": "상태 저장 실패",
     "run.resume": "저장 상태에서 이어서 실행",
@@ -1312,11 +1328,10 @@
         `<strong>실제 저장 기록 재생 · ${esc(data.sample.title)}</strong><p>${esc(data.sample.description)}</p><small>지금 모델을 계산하는 화면이 아닙니다. ${esc(data.sample.redaction)}</small>`;
     $("requestSummary").classList.remove("hidden");
     $("summaryPrompt").textContent = data.prompt;
-    const promptTokens = data.totals?.prompt_tokens ?? data.usage?.prompt_tokens,
-      completionTokens =
-        data.totals?.completion_tokens ?? data.usage?.completion_tokens;
+    const promptTokens = tokenTotal(data, "prompt_tokens"),
+      completionTokens = tokenTotal(data, "completion_tokens");
     $("summaryMeta").textContent =
-      `${data.sample ? "저장 기록 재생 · 새 계산 아님 · " : ""}${data.resumed_from ? "중단된 실행에서 이어감 · " : ""}${data.conditions?.model || "로컬 모델"} · 주 모델 ${data.model_calls}회 · 주 도구 ${data.tool_calls}회${data.agents?.length ? " · 하위 " + data.agents.length + "개 / 전체 모델 " + data.totals.model_calls + "회" : ""} · 입력 ${num(promptTokens)} / 출력 ${num(completionTokens)} 토큰(실행기 보고${data.totals?.usage_missing_calls ? ", 미수집 호출 " + data.totals.usage_missing_calls + "회" : ""}) · 활동 ${num(data.active_seconds)}초${data.implementation ? " · 하네스 " + data.implementation.version.slice(0, 10) : ""}`;
+      `${data.sample ? "저장 기록 재생 · 새 계산 아님 · " : ""}${data.resumed_from ? "중단된 실행에서 이어감 · " : ""}주 모델 ${data.model_calls}회 · 주 도구 ${data.tool_calls}회${data.agents?.length ? " · 하위 " + data.agents.length + "개 / 전체 모델 " + data.totals.model_calls + "회" : ""} · 입력 ${num(promptTokens)} / 출력 ${num(completionTokens)} 토큰(실행기 보고${data.totals?.usage_missing_calls ? ", 미수집 호출 " + data.totals.usage_missing_calls + "회" : ""}) · 활동 ${num(data.active_seconds)}초 · ${data.conditions?.model || "로컬 모델"}${data.implementation ? " · 하네스 " + data.implementation.version.slice(0, 10) : ""}`;
     // 구조도 화면(focus)에서는 한 줄로 잘리므로 전체 문구를 title 로도 둔다.
     $("summaryMeta").title = $("summaryMeta").textContent;
     $("scrubber").max = Math.max(0, state.events.length - 1);
@@ -1347,9 +1362,12 @@
     $("export").disabled = false;
     $("showAnswer").disabled = !data.answer && !data.error;
     $("showInput").disabled = !state.events.length;
+    // 초록 표시는 코드가 결과 값까지 대조한 실행에만 쓴다. 도구 호출만 본 '완료'와 구분한다.
     $("showAnswer").classList.toggle(
       "ready",
-      !!data.answer && data.status === "completed",
+      !!data.answer &&
+        data.status === "completed" &&
+        (data.requirements || []).some((r) => r.result && Object.keys(r.result).length),
     );
     $("showAnswer").title = answerScope(data);
     $("saveFile").disabled = busy() || !state.file?.editable;
@@ -1364,14 +1382,17 @@
     $("metrics").innerHTML = [
       `전체 모델 ${data.totals?.model_calls ?? data.model_calls}회`,
       `전체 도구 ${data.totals?.tool_calls ?? data.tool_calls}회`,
-      `입력 ${num(data.totals?.prompt_tokens ?? data.usage?.prompt_tokens)}토큰`,
-      `출력 ${num(data.totals?.completion_tokens ?? data.usage?.completion_tokens)}토큰`,
+      `입력 ${num(promptTokens)}토큰`,
+      `출력 ${num(completionTokens)}토큰`,
       `활동 ${num(data.active_seconds)}초`,
     ]
       .map((s) => `<span>${s}</span>`)
       .join("");
     // 학습 흐름 탭은 실행 상태(검사 결과·완료 판정)를 함께 보여 주므로 새 기록이 오면 다시 그린다.
     if (state.tab === "learn" && !state.live) renderDetail();
+  }
+  function tokenTotal(data, key) {
+    return data.totals && key in data.totals ? data.totals[key] : data.usage?.[key];
   }
   function resumeUI(data) {
     // 저장 상태가 남아 있는 실행에만 이어가기를 보여 준다. 샘플 재생에는 저장 상태가 없다.
@@ -1475,7 +1496,8 @@
       state.timer = setTimeout(() => poll(id), 2000);
     }
   }
-  async function loadRun(id) {
+  async function loadRun(id, { keepLesson = false } = {}) {
+    if (!keepLesson) endLesson();
     state.agentFilter = "all";
     const generation = (state.generation || 0) + 1;
     state.generation = generation;
@@ -1493,7 +1515,16 @@
     state.openSteps = new Set();
     state.run = { id, status: "loading" };
     $("runStatus").textContent = "기록 불러오는 중";
-    const data = await api("/api/runs/" + id + "?compact=1");
+    let data;
+    try {
+      data = await api("/api/runs/" + id + "?compact=1");
+    } catch (error) {
+      if (generation === state.generation) {
+        state.run = null;
+        $("runStatus").textContent = "대기";
+      }
+      throw error;
+    }
     if (generation !== state.generation) return;
     state.agentFilter =
       data.mode === "team" ? data.sample?.source_run_id || id : "all";
@@ -2034,7 +2065,16 @@
           ["선택 토큰 ID", o.id],
           ["선택 방식", o.strategy],
         ]) +
-        `<h3>실제 후보 분포 · 상위 ${o.candidates?.length || 0}개</h3>` +
+        (o.raw_top?.length
+          ? `<h3>샘플러 적용 전 분포 · 상위 ${o.raw_top.length}개</h3>` +
+            bars(
+              o.raw_top.map((c) => ({
+                label: piece(c.piece) + " · " + c.id,
+                value: c.raw_prob,
+              })),
+            )
+          : "") +
+        `<h3>${o.raw_top?.length ? "샘플러 적용 후(재정규화)" : "실제 후보 분포"} · 상위 ${o.candidates?.length || 0}개</h3>` +
         bars(
           (o.candidates || []).map((c) => ({
             label: piece(c.piece) + " · " + c.id,
@@ -2532,6 +2572,8 @@
       file = await api("/api/project/file?path=" + encodeURIComponent(path));
       if (state.fileTicket !== ticket) return;
     }
+    // 샘플 보기 모드는 서버가 저장을 거부하므로 처음부터 읽기 전용으로 보여 준다.
+    if (state.health?.mode === "sample") file = { ...file, editable: false };
     state.file = file;
     if (state.drafts.get(path) === file.text) state.drafts.delete(path);
     view("editor");
@@ -3057,10 +3099,7 @@
         }
       }
       if (b.dataset.file) await openFile(b.dataset.file);
-      if (b.dataset.run) {
-        endLesson();
-        await loadRun(b.dataset.run);
-      }
+      if (b.dataset.run) await loadRun(b.dataset.run);
       if (b.dataset.tool) {
         const tool = state.catalog.tools.find((t) => t.name === b.dataset.tool);
         if (tool) {
@@ -3672,7 +3711,7 @@
         : '<p class="note">가져온 설정은 restoreNote에 복원 범위와 달라진 조건을 적습니다. 실행은 직접 누르세요.</p>'
     }</section>`;
     body.innerHTML =
-      `<div class="learningbody"><header class="learninghead"><strong>학습 흐름</strong><span>예측 → 증거 확인 → 원인 설명 → 한 조건 수정 → 재검증</span><small>${esc(stateLabel)}</small></header>` +
+      `<div class="learningbody"><header class="learninghead"><strong>원인 찾기</strong><span>예측 → 증거 확인 → 원인 설명 → 한 조건 수정 → 재검증</span><small>${esc(stateLabel)}</small></header>` +
       step1 +
       step2 +
       step3 +
@@ -3758,7 +3797,9 @@
       ? "저장 기록"
       : "모델 응답";
     $("detailKind").textContent = "";
-    $("detailExplanation").textContent = "";
+    $("detailExplanation").textContent = answerScope(state.run);
+    $("detailExplanation").classList.remove("hidden");
+    $("decisionNote").textContent = "";
     $("detailIndex").textContent = "";
     $("detailContent").innerHTML = '<div class="answer-readout"></div>';
     $("detailContent").firstChild.textContent =
@@ -3789,13 +3830,14 @@
     restored.push("작업 방식");
     $("prompt").value = run.prompt || "";
     restored.push("요청");
-    $("requirements").value = JSON.stringify(run.requirements || [], null, 2);
-    restored.push("완료 조건 " + (run.requirements || []).length + "개");
+    const asked = run.request || run;
+    $("requirements").value = JSON.stringify(asked.requirements || [], null, 2);
+    restored.push("완료 조건 " + (asked.requirements || []).length + "개");
     Object.keys(features).forEach(
-      (key) => (features[key] = run.features?.[key] ?? false),
+      (key) => (features[key] = asked.features?.[key] ?? false),
     );
     restored.push("하네스 구성");
-    $("stepMode").checked = run.step_mode === true;
+    $("stepMode").checked = (run.request ? run.request.step : run.step_mode) === true;
     restored.push("단계 정지");
     if (run.sample) issues.push("세션: 재생 기록의 대화 상태는 이 PC에 없어 현재 세션 유지");
     else if (typeof run.session_id === "string" && /^[a-zA-Z0-9_-]{1,64}$/.test(run.session_id)) {
@@ -3856,7 +3898,7 @@
       featureUI();
     }
     $("modeNote").textContent = {
-      single: "한 대화에서 모델과 도구를 반복 호출합니다. 최대 8회 호출합니다.",
+      single: "한 대화에서 모델과 도구를 반복 호출합니다. 호출 한도는 기본 8회이고 agent-lens.json으로 바꿀 수 있습니다.",
       plan: "자료를 확인하고 계획을 작성합니다. 쓰기 스위치를 켰어도 하네스가 파일 수정 도구를 비공개로 바꿉니다.",
       deep: "같은 에이전트가 최대 16회 작업하고 최종 답변을 한 번 더 점검합니다. 모델 자체의 추론 강도를 바꾸는 설정은 아닙니다.",
       team: "주 에이전트가 작업을 나누고 최대 3개의 독립 하위 대화가 결과를 돌려줍니다. 같은 로컬 모델의 계산 차례를 공유합니다.",

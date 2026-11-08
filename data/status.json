@@ -1,1 +1,1 @@
-{"app":"Agent Lens","version":"0.6.0","samples_only":true,"connected":false,"loading":false,"mode":"sample","backend":"llama","model":"샘플 기록","runtime":"기록 재생","base_url":"모델 실행 없음","demo":true,"repository":"https://github.com/paconal888-a11y/LLM-Agent-viewer"}
+{"app":"Agent Lens","version":"0.6.1","samples_only":true,"connected":false,"loading":false,"mode":"sample","backend":"llama","model":"샘플 기록","runtime":"기록 재생","base_url":"모델 실행 없음","demo":true,"repository":"https://github.com/paconal888-a11y/LLM-Agent-viewer"}
