@@ -65,9 +65,33 @@ test("numbers quoted in lesson text match the recorded events", () => {
   assert.deepEqual([save.bytes, save.messages], [13465, 4]);
   assert.equal(events("resume-continued").find((e) => e.kind === "run.resume").output.restored_messages, 6);
   assert.equal(events("turn-compaction").find((e) => e.kind === "context.prune").output.pruned[0].original_characters, 723);
+  const firstRequest = events("verified-write").find((e) => e.kind === "model.request").input;
+  assert.deepEqual([firstRequest.messages.length, firstRequest.tools.length], [4, 6]);
+  const summary = events("compaction").find((e) => e.kind === "memory.compaction.result").output;
+  assert.deepEqual([summary.before_characters, summary.after_characters], [2488, 73]);
+  const budget = events("turn-compaction").find((e) => e.kind === "context.check").input;
+  assert.equal(budget.threshold_tokens, 1250);
+  assert.deepEqual(events("tensors").find((e) => e.kind === "reference.embedding").output.tensor_shape, [1, 995, 1024]);
   const cacheWrites = events("tensors").filter((e) => e.kind === "reference.cache.write");
   assert.equal(cacheWrites[0].output.forward_input_tokens, 995);
   assert.equal(cacheWrites[1].output.forward_input_tokens, 1);
+});
+
+test("steps inside one recording move forward, and the team lesson ends on the main agent", () => {
+  for (const lesson of course.lessons) {
+    const method = lesson.id === "method";
+    let previous = { slug: null, at: -1 };
+    for (const step of lesson.steps) {
+      const slug = step.sample || lesson.sample,
+        at = course.locate(events(slug), step);
+      // 14강은 증상에서 원인으로 거슬러 올라가므로 순서를 검사하지 않는다.
+      if (!method && slug === previous.slug) assert.ok(at > previous.at, lesson.id + " " + step.title);
+      previous = { slug, at };
+    }
+  }
+  const team = course.byId("team"),
+    last = team.steps.at(-1);
+  assert.equal(events("team")[course.locate(events("team"), last)].agent_name, "주 에이전트");
 });
 
 test("locate counts matches, from the end when negative, and reports misses", () => {

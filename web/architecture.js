@@ -598,7 +598,13 @@
       "mcp",
       "lsp",
     ])
-      if (run && effectiveFeatures?.[feature] === false) disabled.add(feature);
+      if (
+        run &&
+        effectiveFeatures?.[feature] === false &&
+        // 이어가기 상태 저장은 대화 이력 스위치와 별개로 이 칸에 표시한다.
+        !(feature === "memory" && relevant.some((e) => e.kind.startsWith("checkpoint.")))
+      )
+        disabled.add(feature);
     if (run && !effectiveFeatures?.tools) {
       disabled.add("tools");
       disabled.add("gate");
