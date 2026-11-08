@@ -16,7 +16,11 @@ function Get-VerifiedFile([string]$Url, [string]$Destination, [string]$SHA256) {
     Get-Command curl.exe -ErrorAction Stop | Out-Null
     $partialPath = $Destination + '.part'
     Write-Host "Downloading: $Url"
-    & curl.exe --location --fail --retry 2 --output $partialPath $Url
+    # Windows PowerShell 5.1 turns curl's progress on stderr into error records when the caller redirects
+    # stream 2 (2> or 2>&1). Under 'Stop' that would abort the download, so success is judged by the exit code.
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & curl.exe --location --fail --retry 2 --output $partialPath $Url } finally { $ErrorActionPreference = $previousPreference }
     if ($LASTEXITCODE -ne 0) { throw 'Download failed.' }
     $actualHash = (Get-FileHash -LiteralPath $partialPath -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actualHash -ne $SHA256) { throw "SHA256 mismatch: $partialPath" }

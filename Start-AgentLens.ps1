@@ -65,18 +65,26 @@ function Get-LogTail {
     if (Test-Path -LiteralPath $stderrLog) { return ((Get-Content -LiteralPath $stderrLog -Tail 20) -join "`n") }
     return ''
 }
+function Invoke-Native([string]$FilePath, [string[]]$Arguments) {
+    # Windows PowerShell 5.1은 호출자가 이 스크립트에 2> 또는 2>&1을 붙이면 네이티브 명령의 stderr 줄을 오류 레코드로 바꾼다.
+    # 'Stop'에서는 uv의 정상 진행 메시지("Resolved 53 packages")만으로 스크립트가 끝나므로 실행 구간만 Continue로 두고,
+    # 성공 여부는 호출 뒤의 $LASTEXITCODE로 판정한다. 없는 명령은 지금처럼 바로 오류로 끝낸다.
+    Get-Command $FilePath -ErrorAction Stop | Out-Null
+    $ErrorActionPreference = 'Continue'
+    & $FilePath @Arguments
+}
 
 if (-not $SamplesOnly -and $Backend -eq 'llama' -and (-not (Test-Path -LiteralPath $runtimeExe) -or -not (Test-Path -LiteralPath $modelFile))) {
     & (Join-Path $projectDir 'scripts\setup-runtime.ps1')
 }
 Push-Location -LiteralPath $projectDir
 try {
-    if ($SamplesOnly) { & uv sync --python 3.12 --inexact --locked --system-certs }
-    elseif ($Backend -eq 'reference') { & uv sync --python 3.12 --extra reference --extra integrations --locked --system-certs }
-    else { & uv sync --python 3.12 --extra integrations --inexact --locked --system-certs }
+    if ($SamplesOnly) { Invoke-Native 'uv' @('sync', '--python', '3.12', '--inexact', '--locked', '--system-certs') }
+    elseif ($Backend -eq 'reference') { Invoke-Native 'uv' @('sync', '--python', '3.12', '--extra', 'reference', '--extra', 'integrations', '--locked', '--system-certs') }
+    else { Invoke-Native 'uv' @('sync', '--python', '3.12', '--extra', 'integrations', '--inexact', '--locked', '--system-certs') }
     if ($LASTEXITCODE -ne 0) { throw 'Python environment setup failed.' }
     if (-not $SamplesOnly -and $Backend -eq 'reference') {
-        & (Join-Path $projectDir '.venv\Scripts\python.exe') (Join-Path $projectDir 'scripts\setup_reference.py')
+        Invoke-Native (Join-Path $projectDir '.venv\Scripts\python.exe') @((Join-Path $projectDir 'scripts\setup_reference.py'))
         if ($LASTEXITCODE -ne 0) { throw 'Reference model setup failed.' }
     }
     $expectedVersion = Get-ExpectedVersion
