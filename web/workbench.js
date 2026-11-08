@@ -2205,7 +2205,8 @@
     $("editState").textContent =
       (file.editable ? "편집 가능" : "읽기 전용") +
       " · SHA " +
-      file.sha256.slice(0, 10);
+      file.sha256.slice(0, 10) +
+      fileFormatLabel(file.file_format);
     $("diff").classList.add("hidden");
     $("editMessage").textContent = "";
     const component = state.catalog.components.find(
@@ -2216,6 +2217,16 @@
       : `<strong>${path.startsWith("demo_workspace/") ? "모델이 읽거나 도구가 작업하는 실제 파일" : "실행에 사용되는 소스"}</strong><p>수정 전후의 차이와 다음 실행 기록을 함께 확인하세요.</p>`;
     editorLines();
     highlightFiles();
+  }
+  function fileFormatLabel(format) {
+    if (!format) return "";
+    const newline =
+      { crlf: "CRLF", lf: "LF", cr: "CR" }[format.newline] || "줄바꿈 없음";
+    return (
+      " · " +
+      (format.mixed ? "줄바꿈 혼합(많은 쪽 " + newline + ")" : newline) +
+      (format.bom ? " · BOM" : "")
+    );
   }
   function editorLines() {
     $("lineNumbers").textContent = Array.from(
@@ -2296,16 +2307,21 @@
     else state.drafts.set(path, currentText);
     state.file.text = submitted.text;
     state.file.sha256 = r.sha256;
+    state.file.file_format = r.file_format;
     $("undoFile").disabled = false;
     $("editState").textContent =
       (currentText === submitted.text ? "저장됨" : "추가 편집 미저장") +
       " · SHA " +
-      r.sha256.slice(0, 10);
+      r.sha256.slice(0, 10) +
+      fileFormatLabel(r.file_format);
     editMessage(
       r.applies +
         (currentText === submitted.text
           ? " 이전 내용도 로컬에 보관했습니다."
-          : " 저장을 누른 뒤 입력한 내용은 아직 저장하지 않았습니다."),
+          : " 저장을 누른 뒤 입력한 내용은 아직 저장하지 않았습니다.") +
+        (r.newline_unified
+          ? " 이 파일은 줄바꿈이 섞여 있어 많은 쪽으로 통일했습니다. 되돌리면 원본 바이트로 복원합니다."
+          : ""),
     );
   }
   async function undoFile() {

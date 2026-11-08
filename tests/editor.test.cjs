@@ -36,7 +36,7 @@ function setup() {
     editorLines() {},
     highlightFiles() {},
   });
-  for (const name of ["openFile", "saveFile", "editMessage"]) {
+  for (const name of ["openFile", "saveFile", "editMessage", "fileFormatLabel"]) {
     const start = source.search(new RegExp(`  (?:async )?function ${name}\\(`));
     const rest = source.slice(start + 1);
     const end = rest.search(/\n  (?:async )?function /);
@@ -50,6 +50,29 @@ const saved = {
   edit_id: "edit-a",
   applies: "다음 실행에 적용",
 };
+
+test("file format is shown on save and a unified mixed file is reported", async () => {
+  const { state, $, pending, sandbox } = setup();
+  const done = sandbox.saveFile();
+  pending[0].resolve({
+    ...saved,
+    file_format: { newline: "crlf", mixed: false, bom: true },
+    newline_unified: true,
+  });
+  await done;
+  assert.equal(state.file.file_format.newline, "crlf");
+  assert.match($("editState").textContent, /CRLF · BOM/);
+  assert.match($("editMessage").textContent, /많은 쪽으로 통일/);
+  assert.equal(
+    sandbox.fileFormatLabel({ newline: "lf", mixed: true, bom: false }),
+    " · 줄바꿈 혼합(많은 쪽 LF)",
+  );
+  assert.equal(
+    sandbox.fileFormatLabel({ newline: null, mixed: false, bom: false }),
+    " · 줄바꿈 없음",
+  );
+  assert.equal(sandbox.fileFormatLabel(undefined), "");
+});
 
 test("typing during a delayed save stays dirty against submitted text", async () => {
   const { state, $, pending, sandbox } = setup();

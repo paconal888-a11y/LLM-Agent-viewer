@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import codecs
 import hashlib
 import importlib
 import json
@@ -69,6 +70,35 @@ def current_manifest(root=ROOT, workspace=None):
 
 def sha(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def normalize_newlines(text):
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def decode_source(raw):
+    """파일 바이트를 편집기용 텍스트(LF·BOM 없음)와, 저장 때 되살릴 줄바꿈·BOM 형식으로 나눈다."""
+    bom = raw.startswith(codecs.BOM_UTF8)
+    decoded = raw[len(codecs.BOM_UTF8) :].decode("utf-8") if bom else raw.decode("utf-8")
+    crlf = decoded.count("\r\n")
+    counts = {
+        "crlf": crlf,
+        "lf": decoded.count("\n") - crlf,
+        "cr": decoded.count("\r") - crlf,
+    }
+    present = [name for name, count in counts.items() if count]
+    return normalize_newlines(decoded), {
+        "newline": max(present, key=counts.get) if present else None,
+        "mixed": len(present) > 1,
+        "bom": bom,
+    }
+
+
+def encode_source(text, file_format):
+    """편집기 텍스트를 파일의 원래 줄바꿈·BOM으로 되돌린다. 줄바꿈이 없던 파일에 새 줄이 생기면 LF로 쓴다."""
+    newline = {"crlf": "\r\n", "cr": "\r"}.get(file_format["newline"], "\n")
+    body = normalize_newlines(text).replace("\n", newline)
+    return (codecs.BOM_UTF8 if file_format["bom"] else b"") + body.encode("utf-8")
 
 
 def check_text(path, text):
@@ -281,20 +311,22 @@ class ProjectFiles:
             path = self.state_dir / "code" / version / relative
             if not path.is_file():
                 raise ValueError("저장된 코드 버전이 없습니다.")
-        text = path.read_text(encoding="utf-8-sig")
+        text, file_format = decode_source(path.read_bytes())
         return {
             "path": relative,
             "text": text,
             "sha256": sha(text),
             "version": version,
+            "file_format": file_format,
             "editable": not version
             and (relative in EDITABLE_CODE or relative.startswith("demo_workspace/")),
         }
 
-    def save(self, relative, text, expected_sha):
+    def save(self, relative, text, expected_sha, exact_bytes=None):
         with self.lock:
             path = self.resolve(relative, write=True)
-            current = path.read_text(encoding="utf-8-sig")
+            before = path.read_bytes()
+            current, file_format = decode_source(before)
             if sha(current) != expected_sha:
                 raise ValueError(
                     "파일이 다른 곳에서 변경되었습니다. 다시 불러온 뒤 수정 내용을 확인하세요."
@@ -302,9 +334,15 @@ class ProjectFiles:
             check = check_text(relative, text)
             if not check["passed"]:
                 return {"saved": False, "validation": check}
+            text = normalize_newlines(text)
+            # 편집기는 LF 텍스트만 다룬다. 쓸 때 원래 줄바꿈·BOM을 되살려 내용 없는 바이트 변경을 만들지 않는다.
+            payload = (
+                encode_source(text, file_format) if exact_bytes is None else exact_bytes
+            )
             edit_id = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:8]
             backup = self.state_dir / "edits" / edit_id
             backup.mkdir(parents=True, exist_ok=True)
+            (backup / "before.bin").write_bytes(before)
             (backup / "before.txt").write_text(current, encoding="utf-8")
             (backup / "after.txt").write_text(text, encoding="utf-8")
             (backup / "edit.json").write_text(
@@ -322,7 +360,7 @@ class ProjectFiles:
                 path.name + ".agent-lens-" + uuid.uuid4().hex[:6] + ".tmp"
             )
             try:
-                temporary.write_text(text, encoding="utf-8")
+                temporary.write_bytes(payload)
                 os.replace(temporary, path)
             finally:
                 if temporary.exists():
@@ -333,6 +371,8 @@ class ProjectFiles:
                 "sha256": sha(text),
                 "edit_id": edit_id,
                 "validation": check,
+                "file_format": decode_source(payload)[1],
+                "newline_unified": file_format["mixed"] and exact_bytes is None,
                 "applies": "다음 실행부터 반영됩니다."
                 if relative in EDITABLE_CODE
                 else "다음 파일 읽기부터 반영됩니다.",
@@ -346,4 +386,11 @@ class ProjectFiles:
             raise ValueError("수정 기록을 찾을 수 없습니다: " + edit_id)
         metadata = json.loads((directory / "edit.json").read_text(encoding="utf-8"))
         original = (directory / "before.txt").read_text(encoding="utf-8")
-        return self.save(metadata["path"], original, expected_sha)
+        # 이전 버전이 만든 수정 기록에는 원본 바이트가 없다. 그때는 현재 파일의 줄바꿈·BOM으로 복원한다.
+        exact = directory / "before.bin"
+        return self.save(
+            metadata["path"],
+            original,
+            expected_sha,
+            exact_bytes=exact.read_bytes() if exact.is_file() else None,
+        )
