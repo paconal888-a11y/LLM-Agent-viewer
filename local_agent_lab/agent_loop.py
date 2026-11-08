@@ -369,7 +369,10 @@ def execute(harness, run):
                         },
                         pause=False,
                     )
-                run.save(harness.state_dir / "traces")
+                try:
+                    run.save(harness.state_dir / "traces")
+                except OSError:
+                    pass  # 다음 저장 지점에서 다시 시도한다. 기록 저장 실패가 실행을 멈추면 안 된다.
             streaming = hasattr(harness.runtime, "stream_json") and run.engine["stream"]
             payload = {
                 "model": harness.model,

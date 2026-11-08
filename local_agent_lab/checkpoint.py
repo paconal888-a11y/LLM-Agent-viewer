@@ -1,10 +1,11 @@
 """중단된 실행을 이어가기 위한 상태 저장. 모델 내부 상태가 아니라 하네스가 가진 대화와 진행 상태만 저장한다."""
 
 import json
-import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+
+from .trace import replace_file
 
 FORMAT = "agent-lens-checkpoint/1"
 RESUMABLE_STATUSES = {"stopped", "failed", "interrupted"}
@@ -47,7 +48,7 @@ def save_checkpoint(state_dir, run, turn):
     temporary = path.with_suffix("." + uuid.uuid4().hex[:8] + ".tmp")
     try:
         temporary.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
-        os.replace(temporary, path)
+        replace_file(temporary, path)
     finally:
         if temporary.exists():
             temporary.unlink()

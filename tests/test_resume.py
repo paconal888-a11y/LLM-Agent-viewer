@@ -63,7 +63,7 @@ class ResumeTests(unittest.TestCase):
                         return
                 except (OSError, ValueError):
                     pass
-            time.sleep(0.01)
+            time.sleep(0.05)
         self.fail("실행이 제한 시간 안에 끝나지 않았습니다.")
 
     def start(self, app, prompt="요청", **kwargs):

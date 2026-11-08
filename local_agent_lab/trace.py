@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import inspect
 import json
+import os
 import threading
 import time
 import uuid
@@ -148,6 +149,18 @@ def expand_sources(snapshot):
     for event in snapshot["events"]:
         event["source"] = expand(event.get("source"))
     return snapshot
+
+
+def replace_file(source, target):
+    """Windows는 다른 스레드가 대상 파일을 읽는 동안 교체를 거부한다. 잠깐 기다렸다가 다시 시도한다."""
+    for attempt in range(25):
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            if attempt == 24:
+                raise
+            time.sleep(0.02)
 
 
 class Run:
@@ -475,7 +488,7 @@ class Run:
                     ),
                     encoding="utf-8",
                 )
-                temporary.replace(path)
+                replace_file(temporary, path)
             finally:
                 if temporary.exists():
                     temporary.unlink()
