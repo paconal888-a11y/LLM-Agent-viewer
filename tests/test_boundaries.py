@@ -9,7 +9,7 @@ from pathlib import Path
 
 from local_agent_lab.agent_loop import unexpected_location
 from local_agent_lab.features import normalize_requirements
-from local_agent_lab.harness import Harness, tools_for
+from local_agent_lab.harness import Harness, discover_skills, execute_tool, tools_for
 from local_agent_lab.integrations import prepare as prepare_integrations, close_all
 from local_agent_lab.policy import contains_value, same_argument, validate_tool_call
 from local_agent_lab.runtime import RuntimeFailure
@@ -58,6 +58,26 @@ class CompletionValueTests(unittest.TestCase):
                 link = base / "real" / ".." / "real"
             context = ToolContext(None, link, [], set(), 0, "x")
             self.assertEqual(context.workspace, (base / "real").resolve())
+
+    def test_skill_scan_and_tool_calls_accept_an_unresolved_workspace(self):
+        # 앱은 Harness에서 경로를 해석하지만, 직접 호출하는 경로도 같은 기준이어야 한다.
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder).resolve()
+            shutil.copytree(ROOT / "demo_workspace", base / "workspace")
+            (base / "other").mkdir()
+            unresolved = base / "other" / ".." / "workspace"
+            run = Run("x", "s", features={"writes": True})
+            self.assertEqual(len(discover_skills(run, unresolved)), 2)
+            result = json.loads(
+                execute_tool(
+                    run,
+                    unresolved,
+                    [],
+                    tool_call("write_file", path="notes/new.md", content="x"),
+                    set(),
+                )["content"]
+            )
+            self.assertEqual(result["path"], "notes/new.md")
 
     def test_path_named_arguments_of_mcp_tools_stay_inside_the_workspace(self):
         # 이름이 path인 인자만 작업 공간 검사를 받는다. 다른 이름은 서버가 직접 제한해야 한다(EXTENDING.md).

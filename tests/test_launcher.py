@@ -160,7 +160,9 @@ if ($found) { "found=$found" } else { 'found=none' }
         (complete / "runtime" / "llama-server.exe").write_bytes(b"exe")
         (complete / "models" / "model.gguf").write_bytes(b"gguf")
         before = sorted(str(p) for p in self.root.rglob("*"))
-        self.assertEqual(self.find_packaged(*required), f"found={complete}")
+        # 임시 폴더가 8.3 짧은 이름이면 PowerShell이 긴 이름으로 돌려준다.
+        found = self.find_packaged(*required).removeprefix("found=")
+        self.assertEqual(Path(found).resolve(), complete.resolve())
         after = [p for p in sorted(str(p) for p in self.root.rglob("*")) if "probe.ps1" not in p]
         self.assertEqual([p for p in before if "probe.ps1" not in p], after)
 

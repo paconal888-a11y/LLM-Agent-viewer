@@ -29,6 +29,7 @@ from .context_memory import (
 
 
 def execute_tool(run, workspace, catalog, call, active_skills):
+    workspace = workspace.resolve()
     parent = run.emit(
         "tool.dispatch",
         "모델의 도구 요청 수신",

@@ -161,6 +161,8 @@ def parse_skill_metadata(text):
 
 
 def discover_skills(run, workspace):
+    # workspace_path는 해석된 경로를 돌려준다. 비교 기준을 맞추지 않으면 8.3 짧은 이름·링크 경로에서 실패한다.
+    workspace = workspace.resolve()
     paths = sorted((workspace / "skills").glob("*/SKILL.md"))
     run.emit(
         "skills.scan",
