@@ -1,6 +1,6 @@
-# 비슷한 제품과 참조한 설계
+# 관련 프로젝트와 명세
 
-2026-11-08에 확인한 공식 자료입니다. 기존 제품의 모든 기능을 재현하는 것이 아니라, 사용자가 직접 고치며 실행 경계를 배우는 데 필요한 부분을 골랐습니다.
+설계와 프로토콜 구현에 참고한 자료입니다. 확인일: 2026-11-08.
 
 ## 비슷한 제품
 
@@ -10,9 +10,7 @@
 | [Langfuse Observability](https://langfuse.com/docs/observability/overview) | 프롬프트·응답·도구·토큰·시간을 trace로 관찰 | 모델 설치 없이 볼 수 있는 실제 기록과, 선택 레이어의 실제 텐서·KV 표본 |
 | [OpenCode MCP 연결](https://docs.opencode.ai/docs/mcp-servers/) | MCP 서버의 도구를 모델에 공개하여 작업 확장 | 도구 발견 → schema 변환 → 입력 증가 → 원본 JSON-RPC → 결과 재주입을 전후 비교 |
 
-공개 OpenCode 문서는 회사에서 사용하는 CodeMate 결합 제품의 비공개 구현을 설명하는 근거가 아닙니다.
-
-## 참조하여 실제로 넣은 것
+## 하네스 구성
 
 [Deep Agents](https://docs.langchain.com/oss/python/deepagents/overview)는 파일 시스템·계획·컨텍스트·스킬 등을 하네스의 구성으로 설명합니다. 이 프로젝트에는 다음처럼 작은 단위로 넣었습니다.
 
@@ -28,7 +26,7 @@
 
 모드는 [공개 OpenCode의 primary/subagent](https://docs.opencode.ai/docs/agents/), [OmO OpenCode판의 역할·도구 제한](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/packages/omo-opencode/src/agents/AGENTS.md), [Deep Agents의 독립 하위 컨텍스트](https://docs.langchain.com/oss/python/deepagents/subagents)를 참고했습니다. 이 프로젝트의 실제 경계와 차이는 [모드 설명](MODES.md)에 있습니다.
 
-자동 장기 요약·벡터 검색·임의 셸·브라우저 조작·격리 실행 환경은 아직 구현하지 않았습니다. 계획이나 하위 에이전트가 생겼다고 자율 실행 능력 전체가 완성된 것은 아닙니다.
+대화 요약은 완료한 원문을 다음 요청 전에 처리합니다. 벡터 검색, 임의 셸, 브라우저 조작, OS 격리 실행은 지원하지 않습니다.
 
 ## 프로토콜과 추론의 기준 자료
 

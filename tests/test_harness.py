@@ -336,7 +336,12 @@ class HarnessTests(unittest.TestCase):
             if route.endswith("completions")
         ]
         self.assertEqual(calls[1]["messages"][-1]["role"], "tool")
-        self.assertIn("관찰 가능한 에이전트", calls[1]["messages"][-1]["content"])
+        tool_result = json.loads(calls[1]["messages"][-1]["content"])
+        self.assertEqual(tool_result["path"], "notes/agent-guide.md")
+        self.assertEqual(
+            tool_result["content"],
+            (self.workspace / "notes/agent-guide.md").read_bytes().decode("utf-8-sig"),
+        )
         restored = harness.load_history(Run("다음 질문", "test-session"))
         self.assertEqual(restored["excerpt"], "요약 결과")
         self.assertIsNotNone(self.run.finished)
