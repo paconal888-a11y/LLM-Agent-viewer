@@ -38,12 +38,17 @@ class RedactionTests(unittest.TestCase):
         harness.execute(run)
         return run.snapshot(compact=True), secret
 
+    @staticmethod
+    def in_json(path):
+        """JSON 본문 안에서 경로가 보이는 형태. Windows 경로는 역슬래시가 이스케이프되어 들어간다."""
+        return json.dumps(str(path), ensure_ascii=False)[1:-1]
+
     def test_share_copy_redacts_nested_json_strings_and_sources_without_touching_the_original(self):
         snapshot, secret = self.real_snapshot()
         original = copy.deepcopy(snapshot)
         encoded = json.dumps(snapshot, ensure_ascii=False)
         self.assertIn(secret, encoded)
-        self.assertIn(str(self.workspace), encoded)
+        self.assertIn(self.in_json(self.workspace), encoded)
         shared = redaction.share_copy(
             snapshot, workspace=self.workspace, home=self.home, user="fundt"
         )
@@ -52,10 +57,10 @@ class RedactionTests(unittest.TestCase):
         self.assertNotIn(secret, shared_text)
         self.assertNotIn("person@example.com", shared_text)
         self.assertNotIn("10.0.0.7", shared_text)
-        self.assertNotIn(str(self.workspace), shared_text)
-        self.assertNotIn(str(ROOT), shared_text)
+        self.assertNotIn(self.in_json(self.workspace), shared_text)
+        self.assertNotIn(self.in_json(ROOT), shared_text)
         # JSON 문자열 안에 JSON으로 다시 들어간 경로(이스케이프된 역슬래시 포함)도 치환된다.
-        self.assertNotIn(str(self.workspace).replace("\\", "\\\\"), shared_text)
+        self.assertNotIn(self.in_json(str(self.workspace).replace("\\", "\\\\")), shared_text)
         self.assertIn("<WORKSPACE>", shared_text)
         self.assertEqual(
             redaction.Redactor(home=self.home, user="x").text(str(ROOT) + "/web/x.js " + str(ROOT).replace("\\", "\\\\")),

@@ -1,8 +1,10 @@
-Set-StrictMode -Version Latest
+﻿Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $pidFile = Join-Path $PSScriptRoot '.local\processes.json'
 if (-not (Test-Path -LiteralPath $pidFile)) { Write-Host 'No Agent Lens process record.'; return }
-$owned = Get-Content -LiteralPath $pidFile -Raw | ConvertFrom-Json
+# processes.json은 BOM 없는 UTF-8로 기록된다. Windows PowerShell 5.1의 Get-Content는 BOM이 없으면 ANSI로 읽어
+# 한글 경로가 깨지고, 그러면 실행 파일 경로 대조가 실패해 우리 프로세스를 'PID 재사용'으로 잘못 판정한다.
+$owned = [System.IO.File]::ReadAllText($pidFile, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
 function Get-Prop($object, [string]$name, $default = $null) {
     if ($null -eq $object) { return $default }
     if ($object.PSObject.Properties.Name -contains $name) { return $object.$name }

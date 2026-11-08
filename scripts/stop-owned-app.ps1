@@ -1,4 +1,4 @@
-param([int]$AppProcessId, [string]$StartedAt = '')
+﻿param([int]$AppProcessId, [string]$StartedAt = '')
 $appInfo = Get-CimInstance Win32_Process -Filter "ProcessId=$AppProcessId"
 if (-not $appInfo -or $appInfo.CommandLine -notlike '*local_agent_lab.web*') { return }
 if ($StartedAt -ne '') {

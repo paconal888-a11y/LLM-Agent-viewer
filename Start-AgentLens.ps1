@@ -84,7 +84,8 @@ try {
     $pidFile = Join-Path $localDir 'processes.json'
     if (Test-Path -LiteralPath $pidFile) {
         try {
-            $previous = Get-Content -LiteralPath $pidFile -Raw | ConvertFrom-Json
+            # BOM 없는 UTF-8 기록을 Windows PowerShell 5.1에서도 올바르게 읽는다(Get-Content는 ANSI로 읽어 한글 경로가 깨진다).
+            $previous = [System.IO.File]::ReadAllText($pidFile, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
             $owned.engine = Get-Prop $previous 'engine'
             $owned.app = Get-Prop $previous 'app'
         } catch { }
