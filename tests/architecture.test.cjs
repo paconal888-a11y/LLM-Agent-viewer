@@ -45,6 +45,13 @@ test("every event mapping points to an existing component and edge", () => {
 });
 
 test("protocol direction, file ownership and summary requests are distinct", () => {
+  assert.equal(graph.locate({ kind: "context.check" }).node, "compaction");
+  assert.equal(graph.locate({ kind: "context.prune" }).node, "compaction");
+  assert.deepEqual(graph.locate({ kind: "context.compact.result" }).edges, ["compact-context"]);
+  assert.equal(graph.locate({ kind: "checkpoint.save" }).node, "memory");
+  assert.equal(graph.locate({ kind: "config.resolve" }).node, "loop");
+  assert.equal(graph.locate({ kind: "run.resume" }).node, "loop");
+  assert.equal(graph.locate({ kind: "rules.directory" }).node, "rules");
   assert.deepEqual(graph.locate({ kind: "mcp.send" }).edges, ["tool-mcp"]);
   assert.deepEqual(graph.locate({ kind: "mcp.receive" }).edges, ["mcp-tool"]);
   assert.deepEqual(graph.locate({ kind: "lsp.receive" }).edges, ["lsp-tool"]);

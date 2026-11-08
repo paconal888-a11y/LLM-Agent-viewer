@@ -52,6 +52,7 @@
       rules: true,
       memory: true,
       compaction: false,
+      turn_compaction: true,
       skills: true,
       tools: true,
       commands: true,
@@ -65,6 +66,7 @@
       rules: "AGENTS.md",
       memory: "대화 이력",
       compaction: "이전 대화 요약",
+      turn_compaction: "실행 중 압축",
       skills: "스킬",
       tools: "도구",
       commands: "/명령어",
@@ -929,6 +931,17 @@
     "input.receive": "하네스 진입",
     "request.route": "실행 함수 호출",
     "config.apply": "설정 적용",
+    "config.resolve": "설정 파일 계층에서 값 결정",
+    "rules.resolve": "규칙 파일 적용 순서 결정",
+    "rules.directory": "폴더 규칙을 입력에 추가",
+    "context.check": "모델 입력 크기 확인",
+    "context.prune": "오래된 도구 결과 본문 생략",
+    "context.compact.start": "작업 중간 요약 시작",
+    "context.compact.result": "작업 요약으로 입력 교체",
+    "context.compact.failed": "작업 중간 요약 실패",
+    "checkpoint.save": "이어갈 상태 저장",
+    "checkpoint.failed": "상태 저장 실패",
+    "run.resume": "저장 상태에서 이어서 실행",
     "file.resolve": "경로 확인",
     "file.exists": "파일 존재 확인",
     "file.open": "파일 열기",
@@ -1160,6 +1173,7 @@
         .map((e) => ({ ...e, source: hydrate(e.source) })),
     );
     state.run = data;
+    resumeUI(data);
     $("sampleBanner").classList.toggle("hidden", !data.sample);
     if (data.sample)
       $("sampleBanner").innerHTML =
@@ -1170,7 +1184,7 @@
       completionTokens =
         data.totals?.completion_tokens ?? data.usage?.completion_tokens;
     $("summaryMeta").textContent =
-      `${data.sample ? "저장 기록 재생 · 새 계산 아님 · " : ""}${data.conditions?.model || "로컬 모델"} · 주 모델 ${data.model_calls}회 · 주 도구 ${data.tool_calls}회${data.agents?.length ? " · 하위 " + data.agents.length + "개 / 전체 모델 " + data.totals.model_calls + "회" : ""} · 입력 ${num(promptTokens)} / 출력 ${num(completionTokens)} 토큰(실행기 보고${data.totals?.usage_missing_calls ? ", 미수집 호출 " + data.totals.usage_missing_calls + "회" : ""}) · 활동 ${num(data.active_seconds)}초${data.implementation ? " · 하네스 " + data.implementation.version.slice(0, 10) : ""}`;
+      `${data.sample ? "저장 기록 재생 · 새 계산 아님 · " : ""}${data.resumed_from ? "중단된 실행에서 이어감 · " : ""}${data.conditions?.model || "로컬 모델"} · 주 모델 ${data.model_calls}회 · 주 도구 ${data.tool_calls}회${data.agents?.length ? " · 하위 " + data.agents.length + "개 / 전체 모델 " + data.totals.model_calls + "회" : ""} · 입력 ${num(promptTokens)} / 출력 ${num(completionTokens)} 토큰(실행기 보고${data.totals?.usage_missing_calls ? ", 미수집 호출 " + data.totals.usage_missing_calls + "회" : ""}) · 활동 ${num(data.active_seconds)}초${data.implementation ? " · 하네스 " + data.implementation.version.slice(0, 10) : ""}`;
     // 구조도 화면(focus)에서는 한 줄로 잘리므로 전체 문구를 title 로도 둔다.
     $("summaryMeta").title = $("summaryMeta").textContent;
     $("scrubber").max = Math.max(0, state.events.length - 1);
@@ -1226,6 +1240,42 @@
       .join("");
     // 학습 흐름 탭은 실행 상태(검사 결과·완료 판정)를 함께 보여 주므로 새 기록이 오면 다시 그린다.
     if (state.tab === "learn" && !state.live) renderDetail();
+  }
+  function resumeUI(data) {
+    // 저장 상태가 남아 있는 실행에만 이어가기를 보여 준다. 샘플 재생에는 저장 상태가 없다.
+    const info = data.sample || state.health.mode === "sample" ? null : data.resume;
+    $("resumeBanner").classList.toggle("hidden", !info);
+    if (!info) {
+      $("resumeBanner").innerHTML = "";
+      return;
+    }
+    const exhausted = info.budget_left === 0;
+    $("resumeBanner").innerHTML =
+      `<div><strong>${info.next_call}번째 모델 호출부터 이어갈 수 있습니다</strong><small>저장된 메시지 ${info.messages}개 · 남은 호출 ${info.budget_left}회. 대화와 진행 상태만 저장되므로 다음 응답이 중단 전과 같다고 보장하지 않습니다.</small></div>` +
+      `<div class="resumeactions"><label>추가 호출 <input id="resumeExtra" type="number" min="${exhausted ? 1 : 0}" max="8" step="1" value="${exhausted ? 4 : 0}"></label><button id="resumeRun" class="primary" type="button">이어서 실행</button></div>`;
+  }
+  async function resumeRun() {
+    if (busy()) throw Error("진행 중인 작업이 끝난 뒤 이어서 실행하세요.");
+    const extra = Number($("resumeExtra").value);
+    if (!Number.isInteger(extra) || extra < 0 || extra > 8)
+      throw Error("추가 호출 수는 0~8 정수입니다.");
+    const data = await api("/api/runs/" + state.run.id + "/resume", {
+      extra_model_calls: extra,
+      step: $("stepMode").checked,
+    });
+    state.generation = (state.generation || 0) + 1;
+    stopPlay();
+    state.events = [];
+    state.agentFilter = "all";
+    state.sources = {};
+    state.run = { id: data.id, status: "running" };
+    state.live = true;
+    state.timelineRendered = false;
+    state.cursor = -1;
+    state.openGroups = new Set();
+    state.openSteps = new Set();
+    $("journeyView").classList.add("focus");
+    await poll(data.id);
   }
   function answerScope(data) {
     // '통과'가 무엇을 검사한 결과인지 적는다. 도구·인자만 대조했는지, 결과 값까지 대조했는지는 완료 조건에 달려 있다.
@@ -1587,6 +1637,120 @@
   function specialized(e) {
     const o = e.output || {};
     if (e.kind === "run.error") return errorDiagnosis(e) + box("오류 기록 원본", o);
+    if (e.kind === "config.resolve") {
+      const rows = o.settings || [],
+        layer = (name) =>
+          ({
+            default: "코드 기본값",
+            user: "사용자 층",
+            project: "프로젝트 층",
+            mode: "실행 모드",
+          })[name] || name;
+      return (
+        stats([
+          ["설정 항목", rows.length],
+          ["기본값을 덮어쓴 항목", rows.filter((r) => r.layers?.length > 1).length],
+        ]) +
+        `<h3>어느 층의 값이 적용됐나</h3><table class="exporttable"><thead><tr><th>설정</th><th>적용 값</th><th>결정한 층</th></tr></thead><tbody>${rows
+          .map(
+            (r) =>
+              `<tr><th><code>${esc(r.key)}</code></th><td><code>${esc(JSON.stringify(r.value))}</code></td><td>${esc(layer(r.layer))}${r.layers?.length > 1 ? `<br /><small>${r.layers.map((item) => esc(layer(item.layer) + " " + JSON.stringify(item.value))).join(" → ")}</small>` : ""}</td></tr>`,
+          )
+          .join("")}</tbody></table>` +
+        box("찾아 본 설정 파일", e.input?.files)
+      );
+    }
+    if (e.kind === "rules.resolve") {
+      const order = o.order || [];
+      return (
+        `<h3>system 메시지에 넣은 순서</h3>${
+          order.length
+            ? `<table class="exporttable"><thead><tr><th>번호</th><th>층</th><th>파일</th></tr></thead><tbody>${order
+                .map(
+                  (r) =>
+                    `<tr><th>${esc(r.precedence)}</th><td>${r.scope === "user" ? "사용자 층" : r.scope === "project" ? "프로젝트 층" : esc(r.scope)}</td><td><code>${esc(r.source)}</code></td></tr>`,
+                )
+                .join("")}</tbody></table>`
+            : '<p class="note">찾은 규칙 파일이 없습니다.</p>'
+        }` +
+        (o.conflict_instruction
+          ? box("모델에 전달한 충돌 처리 문장", o.conflict_instruction)
+          : '<p class="note">규칙 파일이 하나 이하라 충돌 처리 문장을 넣지 않았습니다.</p>') +
+        '<p class="note">코드는 순서와 안내 문장만 정합니다. 모델이 실제로 그 순서를 따랐는지는 답변과 비교해 확인해야 합니다.</p>'
+      );
+    }
+    if (e.kind === "context.check") {
+      const threshold = e.input?.threshold_tokens,
+        windowTokens = e.input?.window_tokens,
+        used = o.estimated_tokens,
+        percent = threshold ? Math.min(100, Math.round((used / threshold) * 100)) : null;
+      return (
+        stats([
+          ["추정 입력 토큰", num(used)],
+          ["줄이기 시작하는 기준", threshold == null ? "미확인" : num(threshold)],
+          ["컨텍스트 창", windowTokens == null ? "미확인" : num(windowTokens)],
+          ["판정", o.needed ? "줄임" : "그대로 전송"],
+        ]) +
+        (percent == null
+          ? ""
+          : `<div class="sizemeter ${o.needed ? "over" : ""}" role="img" aria-label="기준 대비 ${percent}%"><i style="width:${percent}%"></i></div>`) +
+        `<p class="note">${esc(o.estimate_basis)}. 호출 전에 계산한 추정값이며, 실제 토큰 수는 뒤따르는 모델 응답의 usage로 확인합니다. 창 크기 출처: ${esc(e.input?.window_source)}, 기준 출처: ${esc(e.input?.threshold_source)}.</p>`
+      );
+    }
+    if (e.kind === "context.prune")
+      return (
+        stats([
+          ["본문을 뺀 도구 결과", (o.pruned || []).length],
+          ["기준 글자 수", num(o.characters_limit)],
+        ]) +
+        box("대상 메시지 위치와 원래 글자 수", o.pruned) +
+        '<p class="note">모델을 부르지 않는 결정적 단계입니다. 대화 기록의 원본은 그대로 있고 이번에 보낼 입력만 달라집니다.</p>'
+      );
+    if (e.kind === "context.compact.result")
+      return (
+        stats([
+          ["대체한 메시지", o.replaced_messages],
+          ["요약 글자 수", num([...(o.summary || "")].length)],
+        ]) +
+        box("모델이 쓴 요약", o.summary) +
+        '<p class="note">이 요약 앞의 메시지는 모델 입력에서 빠지지만 대화 기록에는 남습니다. 요약이 모든 사실을 보존했는지는 코드가 보증하지 않습니다. 바로 앞의 요약 요청과 다음 모델 입력을 비교해 보세요.</p>'
+      );
+    if (e.kind === "checkpoint.save")
+      return (
+        stats([
+          ["저장 크기", num(o.bytes) + " 바이트"],
+          ["저장한 메시지", o.messages],
+          ["이어서 시작할 호출", o.next_call],
+        ]) +
+        box("저장 위치", o.path) +
+        '<p class="note">모델의 내부 계산 상태(KV 캐시 등)는 저장하지 않습니다. 저장되는 것은 대화와 진행 상태입니다.</p>'
+      );
+    if (e.kind === "run.resume") {
+      const warnings = [
+        ...(o.unanswered_tool_calls?.length
+          ? [`결과를 받지 못한 도구 요청: ${o.unanswered_tool_calls.join(", ")} · 다시 실행하지 않고 '결과 미확인'으로 모델에 알렸습니다.`]
+          : []),
+        ...(o.workspace_changed_files?.length
+          ? [`중단 뒤 바뀐 파일: ${o.workspace_changed_files.join(", ")} · 모델에 알렸습니다.`]
+          : []),
+        ...(o.harness_code_changed
+          ? ["저장 뒤 하네스 코드가 바뀌었습니다. 이어지는 동작이 중단 전과 다를 수 있습니다."]
+          : []),
+      ];
+      return (
+        stats([
+          ["복원한 메시지", o.restored_messages],
+          ["지금까지 모델 호출", o.model_calls_so_far],
+          ["지금까지 도구 호출", o.tool_calls_so_far],
+          ["이어서 시작할 호출", o.next_call + " / " + o.last_call],
+        ]) +
+        warnings.map((text) => `<div class="diagnostic"><strong>${esc(text)}</strong></div>`).join("") +
+        (e.input?.resumed_from
+          ? `<button class="secondary" data-run="${esc(e.input.resumed_from)}">중단된 원래 실행 열기 ↗</button>`
+          : "") +
+        '<p class="note">복원한 것은 하네스의 대화와 진행 상태입니다. 규칙 파일을 다시 읽거나 입력을 다시 조립하지 않습니다.</p>'
+      );
+    }
     if (
       e.kind === "tool.result" &&
       o.protocol === "lsp" &&
@@ -2211,7 +2375,7 @@
         .slice(0, 8)
         .map(
           (r) =>
-            `<button data-run="${r.id}">${esc(r.prompt.slice(0, 42))}<small>${{ completed: "완료", failed: "오류", stopped: "중지", running: "실행 중", paused: "정지" }[r.status] || r.status} · ${num(r.event_count)}단계</small></button>`,
+            `<button data-run="${r.id}">${esc(r.prompt.slice(0, 42))}<small>${{ completed: "완료", failed: "오류", stopped: "중지", running: "실행 중", paused: "정지", interrupted: "중단" }[r.status] || r.status} · ${num(r.event_count)}단계${r.resume ? " · 이어갈 수 있음" : ""}</small></button>`,
         )
         .join("") || '<p class="note">아직 실행 기록이 없습니다.</p>';
   }
@@ -2868,6 +3032,7 @@
           "skills",
           "tools",
           "commands",
+          "turn_compaction",
         ].includes(k)),
     );
     featureUI();
@@ -2880,6 +3045,9 @@
     if (!$("useKv").checked) $("prefixCache").checked = false;
   };
   $("prompt").oninput = observeInput;
+  $("resumeBanner").onclick = action(async (e) => {
+    if (e.target.closest("#resumeRun")) await resumeRun();
+  });
   $("promptForm").onsubmit = action(submit);
   $("prompt").onkeydown = action((e) => {
     if (e.ctrlKey && e.key === "Enter") return submit(e);

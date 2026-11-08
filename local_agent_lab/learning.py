@@ -12,6 +12,39 @@ EXPLANATIONS = {
             "change": "이전 대화 요약 스위치, demo_workspace/memory.json",
         },
     },
+    "turn_compaction": {
+        "purpose": "한 요청을 처리하는 도중 입력이 커지면 오래된 도구 결과의 본문을 빼고, 그래도 크면 앞선 작업을 모델로 요약해 입력만 줄입니다.",
+        "when": "모델을 부르기 직전마다 입력 크기를 추정해 기준과 비교합니다. 기준은 agent-lens.json의 context 항목입니다. 대화 기록 원본은 그대로 두고 보낼 입력만 바꿉니다.",
+        "edit_path": "local_agent_lab/compaction.py",
+        "exercise": "agent-lens.json에서 context.compact_at_tokens를 낮춘 뒤 긴 파일을 여러 개 읽게 해 보세요. context.check·prune·compact 기록과 다음 모델 입력을 비교하고, 요약 뒤에 사라진 사실이 있는지 확인하세요.",
+        "decided": {
+            "code": "언제 줄일지, 무엇을 남길지, 몇 번까지 요약할지",
+            "model": "요약 문장의 내용. 무엇이 중요하다고 쓸지는 모델이 고릅니다.",
+            "change": "실행 중 압축 스위치, demo_workspace/agent-lens.json, local_agent_lab/compaction.py",
+        },
+    },
+    "settings": {
+        "purpose": "코드 기본값 위에 사용자 층과 프로젝트 층의 agent-lens.json을 차례로 덮어써 실행에 쓸 설정을 정합니다.",
+        "when": "요청을 시작할 때 한 번 읽습니다. 키마다 어느 층의 값이 적용됐는지 config.resolve 기록에 남습니다. 허용 범위를 벗어난 값은 실행 전에 거부합니다.",
+        "edit_path": "demo_workspace/agent-lens.json",
+        "exercise": "loop.max_model_calls를 프로젝트 층에 적고 실행해 config.resolve의 층별 값과 실제 호출 예산을 확인하세요.",
+        "decided": {
+            "code": "읽는 순서, 나중 층이 이긴다는 규칙, 허용 범위",
+            "model": "없음. 모델은 설정 파일을 보지 않습니다.",
+            "change": "demo_workspace/agent-lens.json, demo_workspace/.user-home/agent-lens.json",
+        },
+    },
+    "checkpoint": {
+        "purpose": "모델을 부르기 전과 도구 결과를 받은 뒤 대화와 진행 상태를 파일에 저장해, 멈춘 실행을 다음 호출부터 이어갈 수 있게 합니다.",
+        "when": "중지·오류·서버 재시작으로 끝난 실행에 저장 상태가 남아 있으면 이어서 실행할 수 있습니다. 끝까지 완료하면 저장 상태를 지웁니다. 모델의 내부 계산 상태는 저장하지 않습니다.",
+        "edit_path": "local_agent_lab/checkpoint.py",
+        "exercise": "도구를 부른 뒤 실행을 중지하고 이어서 실행하세요. run.resume 기록과 다음 모델 입력을 중단 전 입력과 비교하세요.",
+        "decided": {
+            "code": "무엇을 언제 저장할지, 결과 없는 도구 요청을 어떻게 알릴지",
+            "model": "복원된 입력을 받아 다시 계산합니다. 중단 전과 같은 답을 낸다는 보장은 없습니다.",
+            "change": "local_agent_lab/checkpoint.py, local_agent_lab/agent_loop.py",
+        },
+    },
     "agents": {
         "purpose": "모드에 따라 실제 역할 지침·권한·예산·대화 구조를 바꿉니다.",
         "when": "계획은 쓰기를 막고, 집중은 같은 대화에서 추가 점검하며, 위임은 별도 작업자와 messages를 생성합니다. 같은 가중치를 사용해도 같은 대화는 아닙니다.",
@@ -58,11 +91,11 @@ EXPLANATIONS = {
     },
     "rules": {
         "purpose": "하네스가 정해진 파일을 읽어 모델의 system 메시지에 넣는 프로젝트 지침입니다.",
-        "when": "매 요청에 AGENTS.md, 없으면 agent.md를 찾습니다. 모델이 파일명을 저절로 아는 것은 아닙니다.",
+        "when": "매 요청에 사용자 층(.user-home)과 프로젝트 층에서 AGENTS.md, 없으면 agent.md를 찾아 넣습니다. 하위 폴더의 규칙은 파일 도구가 그 폴더를 건드린 뒤 추가합니다. 모델이 파일명을 저절로 아는 것은 아닙니다.",
         "edit_path": "demo_workspace/AGENTS.md",
         "exercise": "답변 언어 규칙을 바꾸고 입력 지침과 실제 응답을 비교하세요.",
         "decided": {
-            "code": "AGENTS.md, 없으면 agent.md를 찾아 system 메시지에 넣는 규칙",
+            "code": "AGENTS.md, 없으면 agent.md를 찾는 순서, 층별 우선순위, system 메시지에 넣는 규칙",
             "model": "지침을 실제로 따를지",
             "change": "AGENTS.md 내용과 스위치",
         },

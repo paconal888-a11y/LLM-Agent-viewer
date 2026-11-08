@@ -41,13 +41,19 @@ def catalog(active=None, run=None):
     loop = importlib.import_module(prefix + ".agent_loop")
     policy = importlib.import_module(prefix + ".policy")
     inference = importlib.import_module(prefix + ".inference")
+    context = importlib.import_module(prefix + ".context")
+    compaction = importlib.import_module(prefix + ".compaction")
+    checkpoint = importlib.import_module(prefix + ".checkpoint")
     from . import integrations, orchestration, context_memory
 
     definitions = [
         ("loop", "실행 루프", loop.execute, None),
+        ("settings", "설정 계층", context.resolve_settings, None),
         ("rules", "규칙 로더", harness.discover_rules, "rules"),
         ("memory", "이력 복원", harness.Harness.load_history, "memory"),
         ("compaction", "이전 대화 요약", context_memory.prepare, "compaction"),
+        ("turn_compaction", "실행 중 압축", compaction.prepare_input, "turn_compaction"),
+        ("checkpoint", "실행 재개", checkpoint.save_checkpoint, None),
         ("skills", "스킬 검색", harness.discover_skills, "skills"),
         ("commands", "커맨드 확장", harness.expand_command, "commands"),
         ("context", "입력 조립", harness.build_context, None),

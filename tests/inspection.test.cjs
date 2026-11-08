@@ -14,11 +14,11 @@ const request = (id, messages, extra = {}) => ({
 test("decision owner separates what the model chose from code, settings and the runtime", () => {
   const owner = (kind, extra = {}, events = []) =>
     inspection.decision({ kind, ...extra }, events).owner;
-  for (const kind of ["model.response", "model.stream", "output.answer", "tool.dispatch", "memory.compaction.result"])
+  for (const kind of ["model.response", "model.stream", "output.answer", "tool.dispatch", "memory.compaction.result", "context.compact.result"])
     assert.equal(owner(kind), "model", kind);
-  for (const kind of ["validation.requirements", "validation.final", "tool.validate", "tool.result", "context.append", "context.repair", "model.request", "run.complete"])
+  for (const kind of ["validation.requirements", "validation.final", "tool.validate", "tool.result", "context.append", "context.repair", "model.request", "run.complete", "context.check", "context.prune", "checkpoint.save", "run.resume"])
     assert.equal(owner(kind), "code", kind);
-  for (const kind of ["config.apply", "rules.wrap", "skills.catalog", "command.expand", "rules.disabled", "context.requirements", "mcp.tool.filtered"])
+  for (const kind of ["config.apply", "config.resolve", "rules.wrap", "rules.resolve", "rules.directory", "skills.catalog", "command.expand", "rules.disabled", "context.requirements", "mcp.tool.filtered"])
     assert.equal(owner(kind), "config", kind);
   for (const kind of ["runtime.cache", "model.tokenize", "reference.attention", "http.inference.send"])
     assert.equal(owner(kind), "runtime", kind);

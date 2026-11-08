@@ -6,7 +6,7 @@
     ["api", 218, 75, 140, 62, "요청 수신", "HTTP · 작업 스레드"],
     ["reader", 218, 175, 140, 62, "파일 로더", "경로 · 읽기 · UTF-8"],
     ["context", 420, 75, 174, 62, "입력 구성", "system · user · tool"],
-    ["compaction", 420, 170, 174, 46, "대화 요약", "이전 원문 → 요약"],
+    ["compaction", 420, 170, 174, 46, "컨텍스트 압축", "크기 확인 · 생략 · 요약"],
     ["rules", 24, 225, 148, 46, "AGENTS.md", "프로젝트 규칙"],
     ["memory", 24, 284, 148, 46, "대화 · resume", "저장한 맥락"],
     ["skills", 24, 343, 148, 46, "skills/", "목록 → 본문"],
@@ -80,8 +80,8 @@
   ]);
   const definitions = {
     compaction: [
-      "이전 대화가 기준을 넘으면 원본 일부를 로컬 모델로 요약하고 파일에 저장합니다. 원본은 남으며 요약이 다음 messages에 들어갑니다.",
-      "local_agent_lab/context_memory.py",
+      "입력이 커지면 줄입니다. 요청 사이에는 이전 대화를 요약해 저장하고, 요청 처리 중에는 오래된 도구 결과의 본문을 빼거나 앞선 작업을 요약합니다. 원본은 남고 모델에 보낼 입력만 달라집니다.",
+      "local_agent_lab/compaction.py",
     ],
     browser: [
       "브라우저가 입력 문자열과 실행 설정을 JSON으로 전송합니다.",
@@ -100,7 +100,7 @@
       "demo_workspace/AGENTS.md",
     ],
     memory: [
-      "저장된 대화와 resume.md를 선택해 다시 입력합니다. 텍스트 이력과 KV 캐시는 별개입니다.",
+      "저장된 대화와 resume.md를 선택해 다시 입력합니다. 중단된 실행을 이어가기 위한 상태 파일도 여기에 속합니다. 텍스트 이력과 KV 캐시는 별개입니다.",
       "local_agent_lab/harness.py",
     ],
     skills: [
@@ -188,6 +188,13 @@
       };
     if (k === "memory.summary.include")
       return { node: "context", edges: ["compact-context"] };
+    if (k === "context.check" || k === "context.prune")
+      return { node: "compaction", edges: [] };
+    if (k === "context.compact.result")
+      return { node: "compaction", edges: ["compact-context"] };
+    if (k.startsWith("context.compact"))
+      return { node: "compaction", edges: [] };
+    if (k.startsWith("checkpoint.")) return { node: "memory", edges: [] };
     if (k === "model.request" && e.model_purpose === "compaction")
       return { node: "compaction", edges: ["compact-model"] };
     if (k.startsWith("mcp."))
@@ -292,6 +299,8 @@
       k === "agent.review" ||
       k === "agent.mode" ||
       k === "config.apply" ||
+      k === "config.resolve" ||
+      k === "run.resume" ||
       k === "harness.modules"
     )
       return { node: "loop", edges: [] };
@@ -390,6 +399,8 @@
     if (k === "agent.queue") return "모델 차례 대기";
     if (k === "agent.mode") return o.label || o.mode;
     if (k === "tool.result") return e.title.replace(/ 실행 결과$/, "");
+    if (k === "context.check")
+      return (o.estimated_tokens ?? "") + " 토큰 추정";
     return (
       {
         "file.resolve": "경로 확인",
@@ -407,6 +418,15 @@
         "agent.join": "하위 보고 수집",
         "browser.render": "본문 반영",
         "validation.requirements": "완료 조건 확인",
+        "config.resolve": "층별 값 결정",
+        "rules.resolve": "규칙 순서 결정",
+        "rules.directory": "폴더 규칙 추가",
+        "context.prune": "도구 결과 본문 생략",
+        "context.compact.start": "앞선 작업 요약 중",
+        "context.compact.result": "요약으로 입력 교체",
+        "context.compact.failed": "요약 실패 · 원문 유지",
+        "checkpoint.save": "상태 저장",
+        "run.resume": "저장 상태 복원",
       }[k] ||
       e?.kind ||
       ""
@@ -568,7 +588,8 @@
       relevant.findLast((e) => e.kind === "agent.mode")?.output?.mode ||
       run?.mode;
     const disabled = new Set();
-    if (run && !effectiveFeatures?.compaction) disabled.add("compaction");
+    if (run && !effectiveFeatures?.compaction && !effectiveFeatures?.turn_compaction)
+      disabled.add("compaction");
     for (const feature of [
       "rules",
       "memory",

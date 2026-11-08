@@ -48,7 +48,7 @@ function setup({ manifest } = {}) {
     assert.ok(nodes.has(id), "unknown control " + id);
     return nodes.get(id);
   };
-  const features = { rules: true, memory: true, compaction: false, skills: true, tools: true, commands: true, writes: false, mcp: false, lsp: false, feedback_recall: false, planning: false };
+  const features = { rules: true, memory: true, compaction: false, turn_compaction: true, skills: true, tools: true, commands: true, writes: false, mcp: false, lsp: false, feedback_recall: false, planning: false };
   const state = { session: "session-x", ready: true };
   const sandbox = vm.createContext({
     $,

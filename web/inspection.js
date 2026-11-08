@@ -377,6 +377,21 @@
         "model",
         "요약 문장은 모델이 썼습니다. 언제 무엇을 요약할지는 코드와 memory.json이 정합니다.",
       );
+    if (kind === "context.compact.result")
+      return owner(
+        "model",
+        "요약 문장은 모델이 썼습니다. 언제 줄일지, 무엇을 남길지는 코드와 agent-lens.json이 정합니다.",
+      );
+    if (kind === "run.resume")
+      return owner(
+        "code",
+        "이어가기를 누른 것은 사용자입니다. 무엇을 복원하고 어디서 시작할지는 저장 파일과 checkpoint.py 코드가 정합니다.",
+      );
+    if (kind === "config.resolve")
+      return owner(
+        "config",
+        "값은 설정 파일에서 옵니다. 파일을 읽는 순서와 나중 층이 이긴다는 규칙은 코드입니다. 모델은 참여하지 않습니다.",
+      );
     if (kind.startsWith("file.")) {
       const parent = events.find((item) => item.id === event.parent);
       return parent?.kind === "tool.dispatch"
@@ -408,7 +423,7 @@
         "실행 설정·스위치·완료 조건·설정 파일에서 정해진 값입니다. 코드를 고치지 않고 바꿀 수 있습니다.",
       );
     if (
-      ["rules.wrap", "skills.catalog", "skills.scan", "skills.metadata", "command.expand"].includes(kind)
+      ["rules.wrap", "rules.resolve", "rules.directory", "skills.catalog", "skills.scan", "skills.metadata", "command.expand"].includes(kind)
     )
       return owner(
         "config",
