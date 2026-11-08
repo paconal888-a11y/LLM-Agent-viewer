@@ -110,6 +110,29 @@ class WebTests(unittest.TestCase):
         self.assertEqual(sample["project_root"], str(ROOT))
         self.assertNotEqual(sample["instance"], status["instance"])
 
+    def test_export_preview_and_share_copy_endpoints(self):
+        preview = self.request("/api/runs/sample-summary-reuse/export/preview")
+        self.assertIn("counts", preview)
+        self.assertEqual(preview["event_count"], 79)
+        self.assertTrue(preview["options"]["paths"])
+        self.assertGreaterEqual(preview["includes"]["model_requests"], 1)
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(
+            self.url + "/api/runs/sample-summary-reuse/export/share?omit_sources=1", timeout=5
+        ) as reply:
+            self.assertIn("attachment", reply.headers["Content-Disposition"])
+            self.assertIn("-share.json", reply.headers["Content-Disposition"])
+            shared = json.load(reply)
+        self.assertTrue(shared["share"]["redacted"])
+        self.assertFalse(shared["share"]["options"]["omit_file_text"])
+        self.assertTrue(shared["share"]["options"]["omit_sources"])
+        self.assertTrue(all(v["code"] == "<OMITTED SOURCE>" for v in shared["source_snapshots"].values()))
+        self.assertEqual(shared["id"], "sample-summary-reuse")
+        self.assertEqual(shared["sample"]["source_run_id"], "cce2190999264fbb")
+        raw = self.request("/api/runs/sample-summary-reuse/export")
+        self.assertNotIn("share", raw)
+        self.assertNotEqual(raw["source_snapshots"], shared["source_snapshots"])
+
     def test_project_edit_is_blocked_during_active_run(self):
         run = Run("paused", "web-test")
         run.status = "paused"

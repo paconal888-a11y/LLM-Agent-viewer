@@ -488,6 +488,29 @@ def make_handler(app):
                             "content": file_path.read_text(encoding="utf-8-sig"),
                         },
                     )
+                elif path.startswith("/api/runs/") and (
+                    path.endswith("/export/preview") or path.endswith("/export/share")
+                ):
+                    from . import redaction
+
+                    run_id = path.split("/")[3]
+                    snapshot = app.get_run(run_id, 0, compact=True)
+                    options = redaction.parse_options(query)
+                    if path.endswith("/export/preview"):
+                        self.send(
+                            200,
+                            redaction.preview(
+                                snapshot, options, workspace=app.harness.workspace
+                            ),
+                        )
+                    else:
+                        self.send(
+                            200,
+                            redaction.share_copy(
+                                snapshot, options, workspace=app.harness.workspace
+                            ),
+                            attachment=f"agent-lens-{run_id}-share.json",
+                        )
                 elif path.startswith("/api/runs/"):
                     run_id = path.split("/")[3]
                     after = max(0, int(query.get("after", ["0"])[0]))
