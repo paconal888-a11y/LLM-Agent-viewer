@@ -906,7 +906,10 @@
         b.style.flexGrow = parts[i].characters || 1;
         b.style.background = colors[i % colors.length];
         b.onclick = () => {
-          $("detailContent").innerHTML = box(parts[i].label, parts[i].text);
+          $("detailContent").innerHTML = box(
+            parts[i].label,
+            parts[i].text ?? "본문은 모델 입력 탭에서 확인할 수 있습니다.",
+          );
           $("inspector").classList.add("open");
         };
       },
@@ -1083,6 +1086,7 @@
     "context.compact.result": "작업 요약으로 입력 교체",
     "context.compact.failed": "작업 중간 요약 실패",
     "memory.compaction.failed": "이전 대화 요약 실패",
+    "rules.directory.skipped": "폴더 규칙을 읽지 못해 건너뜀",
     "checkpoint.save": "이어갈 상태 저장",
     "checkpoint.failed": "상태 저장 실패",
     "run.resume": "저장 상태에서 이어서 실행",

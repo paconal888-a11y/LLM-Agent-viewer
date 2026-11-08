@@ -17,7 +17,7 @@ def workspace_path(workspace, relative):
 
 
 def read_traced(
-    run, path, category, *, reason, parent=None, required=True, max_bytes=65536
+    run, path, category, *, reason, parent=None, required=True, max_bytes=65536, store_text=True
 ):
     """파일시스템 호출과 디코딩을 각각 실제 실행한 뒤 결과를 기록한다."""
     run.emit(
@@ -94,7 +94,12 @@ def read_traced(
         "이 원문이 이후 지침·참고 자료·도구 결과 중 어디에 들어가는지 추적합니다.",
         category=category,
         input={"path": str(path), "encoding": "utf-8-sig", "byte_count": len(raw)},
-        output={"text": text, "characters": len(text), "lines": len(text.splitlines())},
+        # 대화 원본처럼 큰 파일은 기록이 불어나지 않게 본문 없이 크기와 해시만 남긴다.
+        output={
+            **({"text": text} if store_text else {"text_omitted": True, "sha256": hashlib.sha256(raw).hexdigest()}),
+            "characters": len(text),
+            "lines": len(text.splitlines()),
+        },
         parent=parent,
     )
     return text

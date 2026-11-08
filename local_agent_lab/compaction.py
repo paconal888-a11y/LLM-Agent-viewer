@@ -25,6 +25,7 @@ def new_view(work_start):
         "summary_end": work_start,
         "summary_event": None,
         "summaries": 0,
+        "pinned": [],
         "pruned": {},
         "measure": None,
     }
@@ -46,6 +47,10 @@ def input_view(messages, view):
     if view["summary"]:
         result.append(summary_message(view))
         origin.append("summary")
+        # 폴더 규칙은 다시 읽히지 않으므로 요약에 묻히지 않게 그대로 보낸다.
+        for index in view.get("pinned", []):
+            result.append(messages[index])
+            origin.append(index)
     for index in range(end, len(messages)):
         result.append(view["pruned"].get(str(index)) or messages[index])
         origin.append(index)
@@ -166,26 +171,47 @@ def prune_tool_results(run, messages, view, limit, end):
     return pruned
 
 
-def summary_source(messages, view, start, end):
+def summary_source(messages, view, start, end, skip=()):
+    """요약에 줄 원문과, 한도 안에 들어간 마지막 위치를 돌려준다. 잘린 메시지를 요약된 것으로 치지 않는다."""
     lines = []
+    size = 0
     if view["summary"]:
         lines.append("[이전 요약]\n" + view["summary"])
+        size = len(lines[0])
+    covered = start
     for index in range(start, end):
+        if index in skip:
+            covered = index + 1
+            continue
         # 생략 자리표시자가 아니라 원본을 읽는다. 자리표시자를 요약하면 그 사실이 영구히 사라진다.
         message = messages[index]
-        body = message.get("content") or json.dumps(
-            message.get("tool_calls", []), ensure_ascii=False
-        )
+        body = message.get("content") or ""
+        if message.get("tool_calls"):
+            body = (body + "\n" if body else "") + json.dumps(message["tool_calls"], ensure_ascii=False)
         if len(body) > SUMMARY_MESSAGE_CHARACTERS:
             body = body[:SUMMARY_MESSAGE_CHARACTERS] + f"… [생략 {len(body) - SUMMARY_MESSAGE_CHARACTERS}자]"
-        lines.append(f"[{message['role']}]\n{body}")
-    return "\n\n".join(lines)[:SUMMARY_INPUT_CHARACTERS]
+        entry = f"[{message['role']}]\n{body}"
+        if size + len(entry) + 2 > SUMMARY_INPUT_CHARACTERS and covered > start:
+            break
+        lines.append(entry)
+        size += len(entry) + 2
+        covered = index + 1
+    return "\n\n".join(lines), covered
 
 
 def summarize(harness, run, messages, view, end):
     """앞선 작업을 별도 모델 호출로 요약한다. 실패해도 답변 루프는 멈추지 않는다."""
     start = view["summary_end"]
-    source = summary_source(messages, view, start, end)
+    rules = {
+        part["message_index"]
+        for part in run.context_segments
+        if part.get("label") == "폴더 규칙" and start <= part["message_index"] < end
+    }
+    _, covered = summary_source(messages, view, start, end, rules)
+    end = safe_end(messages, covered, start) if covered < len(messages) else covered
+    if end <= start:
+        return False
+    source, _ = summary_source(messages, view, start, end, rules)
     run.emit(
         "context.compact.start",
         "작업 중간 요약 시작",
@@ -247,6 +273,8 @@ def summarize(harness, run, messages, view, end):
             raise RuntimeFailure("요약 응답이 비었거나 출력 한도·도구 요청으로 끝났습니다.")
     except (RuntimeFailure, KeyError, IndexError, TypeError) as error:
         run.model_purpose = "answer"
+        # 실패도 시도로 센다. 세지 않으면 매 호출마다 같은 요약을 다시 시도한다.
+        view["summaries"] += 1
         run.emit(
             "context.compact.failed",
             "작업 중간 요약 실패 · 원문으로 계속",
@@ -261,6 +289,7 @@ def summarize(harness, run, messages, view, end):
     for key in [k for k in view["pruned"] if view["work_start"] <= int(k) < end]:
         del view["pruned"][key]
     view.update(summary=text, summary_end=end, summaries=view["summaries"] + 1)
+    view.setdefault("pinned", []).extend(sorted(rules))
     event_id = run.emit(
         "context.compact.result",
         "작업 요약을 다음 입력에 사용",
@@ -310,9 +339,11 @@ def prepare_input(harness, run, messages, tools, view):
     )
     if not needed:
         return request, origin
+    # 마지막 assistant 뒤의 도구 결과는 모델이 아직 보지 못했으므로 줄이지 않는다.
+    seen = max((i for i, m in enumerate(messages) if m["role"] == "assistant"), default=0)
     end = safe_end(
         messages,
-        max(view["summary_end"], len(messages) - settings["context.keep_recent_messages"]),
+        max(view["summary_end"], min(seen, len(messages) - settings["context.keep_recent_messages"])),
         view["summary_end"],
     )
     prune_tool_results(run, messages, view, settings["context.prune_tool_characters"], end)

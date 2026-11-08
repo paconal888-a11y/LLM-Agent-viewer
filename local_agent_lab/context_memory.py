@@ -7,6 +7,7 @@ import os
 import time
 import uuid
 from .files import read_traced
+from .trace import json_text, replace_file
 from .runtime import RuntimeFailure
 from .orchestration import inference_turn
 from .inference import preview_input, generate, audit_response, input_fingerprint
@@ -62,7 +63,7 @@ _LINE_BREAKERS = {"\u2028": "\\u2028", "\u2029": "\\u2029", "\u0085": "\\u0085"}
 
 
 def archive_line(record):
-    text = json.dumps(record, ensure_ascii=False, allow_nan=False)
+    text = json_text(record, allow_nan=False)
     for raw, escaped in _LINE_BREAKERS.items():
         text = text.replace(raw, escaped)
     return text + "\n"
@@ -104,6 +105,7 @@ def load_archive(harness, session_id, run=None, history=None, *, tail_bytes=None
             "memory",
             reason="아직 요약하지 않은 원본 대화를 선택합니다.",
             max_bytes=ARCHIVE_LIMIT,
+            store_text=False,
         )
     else:
         text = path.read_text(encoding="utf-8")
@@ -131,10 +133,8 @@ def write_state(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + "." + uuid.uuid4().hex[:8] + ".tmp")
     try:
-        temporary.write_text(
-            json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-        os.replace(temporary, path)
+        temporary.write_text(json_text(value, indent=2), encoding="utf-8")
+        replace_file(temporary, path)
     finally:
         if temporary.exists():
             temporary.unlink()

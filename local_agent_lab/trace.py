@@ -151,6 +151,16 @@ def expand_sources(snapshot):
     return snapshot
 
 
+def json_text(value, **options):
+    """저장할 JSON 문자열. 모델 출력의 짝 없는 서로게이트는 UTF-8로 쓸 수 없어 이스케이프한다."""
+    text = json.dumps(value, ensure_ascii=False, **options)
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return json.dumps(value, ensure_ascii=True, **options)
+    return text
+
+
 def replace_file(source, target):
     """Windows는 다른 스레드가 대상 파일을 읽는 동안 교체를 거부한다. 잠깐 기다렸다가 다시 시도한다."""
     for attempt in range(25):
@@ -294,6 +304,7 @@ class Run:
         agent_name=None,
         child_event_id=None,
         child_elapsed_ms=None,
+        model_purpose=None,
     ):
         frame = inspect.currentframe().f_back
         source = source_override or source_location(frame)
@@ -318,7 +329,7 @@ class Run:
                 "agent_name": agent_name or self.agent_name,
                 "child_event_id": child_event_id,
                 "child_elapsed_ms": child_elapsed_ms,
-                "model_purpose": self.model_purpose,
+                "model_purpose": model_purpose or self.model_purpose,
             }
             self.events.append(event)
             self.condition.notify_all()
@@ -356,6 +367,7 @@ class Run:
                 agent_name=self.agent_name,
                 child_event_id=event["id"],
                 child_elapsed_ms=event["elapsed_ms"],
+                model_purpose=self.model_purpose,
             )
             self.parent_event_ids[event["id"]] = mirrored
             inherited = self.parent_run.paused_seconds - parent_pause_before
@@ -484,10 +496,7 @@ class Run:
             temporary = path.with_suffix("." + uuid.uuid4().hex[:8] + ".tmp")
             try:
                 temporary.write_text(
-                    json.dumps(
-                        self.snapshot(compact=True), ensure_ascii=False, indent=2
-                    ),
-                    encoding="utf-8",
+                    json_text(self.snapshot(compact=True), indent=2), encoding="utf-8"
                 )
                 replace_file(temporary, path)
             finally:

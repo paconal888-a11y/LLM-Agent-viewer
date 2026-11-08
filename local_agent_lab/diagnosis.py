@@ -166,7 +166,10 @@ def _information_checks(requests, events, requirements):
     first = requests[0] if requests else None
     planned = _last(events, "context.requirements")
     if requirements and first:
-        included = planned and (planned.get("output") or {}).get("appended_message") in _messages(first)
+        # 재개한 실행에는 추가 이벤트가 없으므로 실제 messages의 문구로도 확인한다.
+        included = (planned and (planned.get("output") or {}).get("appended_message") in _messages(first)) or any(
+            "이 요청의 완료 조건입니다" in str(message.get("content") or "") for message in _messages(first)
+        )
         checks.append(
             _check("information", "requirements_in_input", "완료 조건이 모델 입력에 들어갔는가",
                    "pass" if included else "fail",
@@ -230,7 +233,7 @@ def _arguments(event):
         return raw
 
 
-def _model_checks(requests, events, requirements):
+def _model_checks(requests, events, requirements, resumed=False):
     checks = []
     dispatched = [e for e in events if e["kind"] == "tool.dispatch"]
     validated = {e.get("parent") for e in events if e["kind"] == "tool.validate"}
@@ -247,7 +250,13 @@ def _model_checks(requests, events, requirements):
     for event in dispatched:
         name = ((event.get("input") or {}).get("function") or {}).get("name")
         calls.setdefault(name, []).append(event)
-    if requirements and requests:
+    if resumed and requirements and requests:
+        # 재개 전의 호출은 이 기록에 없어 '호출하지 않음'을 판정할 수 없다. 남은 조건은 완료 검사 결과로 본다.
+        checks.append(
+            _check("model", "required_tool_called", "모델이 필수 도구를 호출했는가", "warn",
+                   "이어서 실행한 기록이라 재개 전의 도구 호출은 여기에 없습니다.", requests[-1])
+        )
+    elif requirements and requests:
         exposed = _tool_names(requests[-1])
         uncalled = sorted(
             {r["tool"] for r in requirements if r["tool"] in exposed and r["tool"] not in calls}
@@ -355,7 +364,7 @@ def diagnose(snapshot):
         "runtime": _runtime_checks(requests, responses, events, error_text, error_event, status == "stopped"),
         "harness": _harness_checks(requests, events, requirements, error_text, error_event),
         "information": _information_checks(requests, events, requirements),
-        "model": _model_checks(requests, events, requirements),
+        "model": _model_checks(requests, events, requirements, bool(snapshot.get("resumed_from"))),
     }
     layers = [
         {

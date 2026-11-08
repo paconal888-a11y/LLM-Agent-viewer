@@ -164,6 +164,72 @@ class CompactionLoopTests(unittest.TestCase):
         self.assertEqual(check["input"]["window_tokens"], 1000)
         self.assertEqual(check["input"]["threshold_tokens"], 500)
 
+    def write_settings(self, **context):
+        (self.workspace / "agent-lens.json").write_text(
+            json.dumps({"loop": {"max_model_calls": 12}, "context": context}), encoding="utf-8"
+        )
+
+    def test_summary_only_replaces_what_fit_in_its_input(self):
+        # 한도에서 잘린 메시지까지 요약된 것으로 처리해 사실이 사라졌다.
+        self.write_settings(compact_at_tokens=5500, keep_recent_messages=2, prune_tool_characters=60000, max_summaries=1)
+        class Summarizing(FixtureRuntime):
+            def request(inner, route, payload=None):
+                if route.endswith("completions") and payload.get("tools") == []:
+                    inner.requests.append((route, payload))
+                    return reply({"content": "요약"})
+                return super().request(route, payload)
+
+        runtime = Summarizing(*[self.read() for _ in range(8)], reply({"content": "끝"}))
+        harness = Harness(self.workspace, self.root / "state", runtime=runtime)
+        run = Run("큰 문서를 읽어줘", "compact")
+        harness.execute(run)
+        self.assertEqual(run.status, "completed", run.error)
+        start = self.kinds(run, "context.compact.start")[0]
+        first, last = start["input"]["source_range"]
+        tool_entries = start["input"]["source_text"].count("[tool]")
+        self.assertGreater(tool_entries, 0)
+        self.assertLessEqual(len(start["input"]["source_text"]), 8000)
+        result = self.kinds(run, "context.compact.result")[0]
+        self.assertEqual(result["output"]["replaced_messages"], last - first)
+        final = completions(runtime)[-1]["messages"]
+        self.assertGreater(sum(1 for m in final if m["role"] == "tool"), 1)
+
+    def test_folder_rules_survive_a_summary(self):
+        self.settings(compact_at_tokens=200, keep_recent_messages=2, prune_tool_characters=200)
+        memo = reply({"tool_calls": [tool_call("read_file", path="rules-demo/memo.md")]})
+        run, runtime = self.execute(memo, self.add(), reply({"content": "요약"}), reply({"content": "끝"}))
+        self.assertEqual(run.status, "completed", run.error)
+        self.assertTrue(self.kinds(run, "context.compact.result"))
+        final = json.dumps(completions(runtime)[-1]["messages"], ensure_ascii=False)
+        self.assertIn("rules-demo 규칙 적용", final)
+
+    def test_a_tool_result_the_model_has_not_seen_is_not_pruned(self):
+        (self.workspace / "deep" / "inner").mkdir(parents=True)
+        (self.workspace / "deep" / "AGENTS.md").write_text("바깥 규칙", encoding="utf-8")
+        (self.workspace / "deep" / "inner" / "AGENTS.md").write_text("안쪽 규칙", encoding="utf-8")
+        (self.workspace / "deep" / "inner" / "big.md").write_text("새 문서 " * 400, encoding="utf-8")
+        self.settings(compact_at_tokens=200, keep_recent_messages=2, prune_tool_characters=200, max_summaries=0)
+        read = reply({"tool_calls": [tool_call("read_file", path="deep/inner/big.md")]})
+        run, runtime = self.execute(read, reply({"content": "끝"}))
+        self.assertEqual(run.status, "completed", run.error)
+        self.assertIn("새 문서 새 문서", json.dumps(completions(runtime)[1]["messages"], ensure_ascii=False))
+
+    def test_failed_summaries_are_not_retried_forever(self):
+        self.write_settings(compact_at_tokens=200, keep_recent_messages=2, prune_tool_characters=200, max_summaries=1)
+        cut = reply({"content": "잘림"})
+        cut["choices"][0]["finish_reason"] = "length"
+        run, runtime = self.execute(self.read(), self.add(), cut, self.add(3, 4), reply({"content": "끝"}))
+        self.assertEqual(run.status, "completed", run.error)
+        self.assertEqual(len(self.kinds(run, "context.compact.failed")), 1)
+
+    def test_model_input_records_stay_small_with_large_tool_results(self):
+        run, _ = self.execute(*[self.read() for _ in range(3)], reply({"content": "끝"}))
+        appended = self.kinds(run, "context.append")[-1]["output"]["segments"]
+        self.assertTrue(all("text" not in part for part in appended))
+        request = self.kinds(run, "model.request")[-1]["output"]["segments"]
+        whole = [p for p in request if p.get("role") == "tool"]
+        self.assertTrue(whole and all("text" not in p for p in whole))
+
     def test_segments_describe_the_request_that_was_actually_sent(self):
         self.settings(compact_at_tokens=200, keep_recent_messages=2, prune_tool_characters=200)
         run, _ = self.execute(self.read(), self.add(), reply({"content": "요약"}), reply({"content": "끝"}))

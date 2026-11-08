@@ -212,13 +212,26 @@ def load_directory_rules(run, workspace, paths, loaded, messages):
             loaded.add(folder)
             for name in settings["rules.file_names"]:
                 relative = f"{folder}/{name}"
-                text = read_traced(
-                    run,
-                    workspace_path(workspace, relative),
-                    "rules",
-                    reason=f"도구가 {path}에 닿아 그 폴더의 규칙 파일을 찾습니다.",
-                    required=False,
-                )
+                try:
+                    text = read_traced(
+                        run,
+                        workspace_path(workspace, relative),
+                        "rules",
+                        reason=f"도구가 {path}에 닿아 그 폴더의 규칙 파일을 찾습니다.",
+                        required=False,
+                    )
+                except (ValueError, OSError) as error:
+                    # 형식이 맞지 않는 규칙 파일이 이미 끝난 도구 실행까지 실패로 만들면 안 된다.
+                    run.emit(
+                        "rules.directory.skipped",
+                        "폴더 규칙을 읽지 못해 건너뜀",
+                        "파일 형식이나 크기 문제로 이 규칙은 입력에 넣지 않습니다.",
+                        category="rules",
+                        status="warning",
+                        input={"source": relative},
+                        output={"error": str(error)},
+                    )
+                    continue
                 if not text.strip():
                     continue
                 before = len(messages)
@@ -661,7 +674,8 @@ def tools_for(run):
     )
 
 
-def describe_context(run, messages, tools, parts=None):
+def describe_context(run, messages, tools, parts=None, keep="all"):
+    """입력 구성. keep='parts'는 여러 조각으로 나뉜 메시지의 본문만, 'none'은 본문 없이 기록해 큰 대화에서 기록이 불어나지 않게 한다."""
     segments = list(run.context_segments if parts is None else parts)
     covered = {part["message_index"] for part in segments}
     for index, message in enumerate(messages):
@@ -692,7 +706,19 @@ def describe_context(run, messages, tools, parts=None):
                 "text": text,
             }
         )
-    return segments
+    if keep == "all":
+        return segments
+
+    def whole(part):
+        index = part["message_index"]
+        return index is None or (index < len(messages) and messages[index].get("content") == part.get("text"))
+
+    return [
+        {key: value for key, value in part.items() if key != "text"}
+        if keep == "none" or whole(part)
+        else part
+        for part in segments
+    ]
 
 
 def record_message(run, messages, index, origin, reason, source_event_id=None):

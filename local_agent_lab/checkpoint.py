@@ -1,11 +1,12 @@
 """중단된 실행을 이어가기 위한 상태 저장. 모델 내부 상태가 아니라 하네스가 가진 대화와 진행 상태만 저장한다."""
 
 import json
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .trace import replace_file
+from .trace import json_text, replace_file
 
 FORMAT = "agent-lens-checkpoint/1"
 RESUMABLE_STATUSES = {"stopped", "failed", "interrupted"}
@@ -47,7 +48,7 @@ def save_checkpoint(state_dir, run, turn):
     }
     temporary = path.with_suffix("." + uuid.uuid4().hex[:8] + ".tmp")
     try:
-        temporary.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
+        temporary.write_text(json_text(record), encoding="utf-8")
         replace_file(temporary, path)
     finally:
         if temporary.exists():
@@ -65,11 +66,21 @@ def load_checkpoint(state_dir, run_id):
     return record
 
 
+def remove_file(path):
+    """다른 프로그램이 열고 있으면 Windows에서 지울 수 없다. 정리 실패가 끝난 실행의 결과를 바꾸면 안 된다."""
+    for delay in (0.05, 0.2, 0):
+        try:
+            path.unlink(missing_ok=True)
+            return True
+        except PermissionError:
+            time.sleep(delay)
+        except OSError:
+            return False
+    return False
+
+
 def discard_checkpoint(state_dir, run_id):
-    try:
-        checkpoint_path(state_dir, run_id).unlink()
-    except FileNotFoundError:
-        pass
+    return remove_file(checkpoint_path(state_dir, run_id))
 
 
 def resume_summary(state_dir, run_id, status):
@@ -93,4 +104,4 @@ def trim_checkpoints(state_dir, keep=KEEP_FILES):
     folder = Path(state_dir) / "checkpoints"
     files = sorted(folder.glob("*.json"), key=lambda item: item.stat().st_mtime)
     for item in files[:-keep]:
-        item.unlink(missing_ok=True)
+        remove_file(item)

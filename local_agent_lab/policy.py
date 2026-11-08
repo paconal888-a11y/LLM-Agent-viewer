@@ -115,8 +115,10 @@ def validate_tool_call(run, workspace, allowed, call, parent):
         if not valid:
             raise ValueError("인자 형식이 올바르지 않습니다: " + key)
     path = workspace_path(workspace, args["path"]) if "path" in args else None
+    # Windows는 이름 끝의 점과 공백을 버리므로 같은 이름으로 맞춘 뒤 비교한다.
+    plain = lambda part: part.rstrip(" .").casefold()
     if name == "write_file" and (
-        path.name.casefold()
+        plain(path.name)
         in {
             "agents.md",
             "agent.md",
@@ -125,9 +127,10 @@ def validate_tool_call(run, workspace, allowed, call, parent):
             "agents.json",
             "memory.json",
             "agent-lens.json",
+            *(item.casefold() for item in run.settings.get("rules.file_names", [])),
         }
         or any(
-            part.casefold() in {"skills", "commands", ".user-home"}
+            plain(part) in {"skills", "commands", ".user-home"}
             for part in path.relative_to(workspace).parts
         )
     ):
@@ -244,7 +247,12 @@ def requirement_gate(run, successful):
                 if item["name"] == required["tool"]
                 and all(
                     same_argument(
-                        required["tool"], key, item["arguments"].get(key), value
+                        required["tool"],
+                        key,
+                        item["arguments"].get(
+                            key, "." if (required["tool"], key) == ("search_text", "path") else None
+                        ),
+                        value,
                     )
                     for key, value in required["arguments"].items()
                 )

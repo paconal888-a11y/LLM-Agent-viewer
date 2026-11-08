@@ -7,6 +7,7 @@ from pathlib import Path
 from .trace import RunStopped
 from .runtime import RuntimeFailure
 from .features import workspace_signature
+from .files import workspace_path
 from .context import (
     expand_command,
     build_context,
@@ -27,7 +28,7 @@ from .compaction import new_view, prepare_input, remember_measure, view_segments
 from .checkpoint import discard_checkpoint, save_checkpoint, trim_checkpoints
 from .feedback import recall_and_audit
 from .context_memory import prepare as prepare_memory
-from .orchestration import prepare as prepare_agents, inference_turn
+from .orchestration import prepare as prepare_agents, announce_mode, inference_turn
 from .inference import (
     preview_input,
     observe_engine,
@@ -83,6 +84,31 @@ def close_open_tool_calls(run, messages):
     return open_calls
 
 
+def require_kv_support(harness, run):
+    if not run.engine["use_kv"] and not hasattr(harness.runtime, "generate_observed"):
+        raise ValueError("생성 중 KV를 끄는 실험은 교육용 Python 실행기에서 지원합니다.")
+
+
+def skills_in_input(request):
+    """입력에 본문이 남아 있는 스킬. 요약이나 생략으로 빠진 본문은 활성으로 기록하지 않는다."""
+    names = {}
+    for message in request:
+        for call in message.get("tool_calls") or []:
+            function = call.get("function") or {}
+            if function.get("name") == "load_skill":
+                try:
+                    names[call.get("id")] = json.loads(function.get("arguments") or "{}").get("name")
+                except ValueError:
+                    pass
+    return {
+        names[m["tool_call_id"]]
+        for m in request
+        if m["role"] == "tool"
+        and m.get("tool_call_id") in names
+        and "omitted_by_harness" not in (m.get("content") or "")
+    }
+
+
 def resume_turn(harness, run):
     """저장된 대화와 진행 상태를 복원한다. 규칙·이력을 다시 읽지 않고 저장 당시의 입력에서 이어간다."""
     saved = run.checkpoint
@@ -102,9 +128,40 @@ def resume_turn(harness, run):
     for key in ("requirements", "conditions", "settings", "max_model_calls", "model_calls",
                 "tool_calls", "usage", "usage_reports", "plan", "context_segments", "turn_message_offset"):
         setattr(run, key, saved[key])
+    announce_mode(run)
     run.delegation_used = saved["delegation_used"]
+    # 이벤트 번호는 원래 실행의 것이라 이 기록에서는 다른 이벤트를 가리킨다.
+    run.context_segments = [
+        {**part, "source_event_id": None, "restored_from": run.resumed_from} for part in run.context_segments
+    ]
+    # 이어서 실행하는 동안 쓰는 실행기를 기록한다. 저장 당시의 값을 사실처럼 남기지 않는다.
+    require_kv_support(harness, run)
+    runtime_before = {key: run.conditions.get(key) for key in ("model", "base_url", "backend")}
+    runtime_now = {
+        "model": harness.model,
+        "base_url": harness.runtime.base_url,
+        "backend": getattr(harness.runtime, "backend", "llama"),
+    }
+    limit = min(run.engine["max_tokens"], getattr(harness.runtime, "max_output_tokens", 1536))
+    run.conditions.update(runtime_now, max_tokens=limit)
+    if "effective_generation_config" in run.conditions:
+        run.conditions["effective_generation_config"]["max_tokens"] = limit
+    runtime_changed = runtime_before != runtime_now
     messages = saved["messages"]
     open_calls = close_open_tool_calls(run, messages)
+    run.tool_calls += len(open_calls)
+    dirty = set(saved["dirty"])
+    for call in open_calls:
+        # 쓰기가 끝났는지 모르면 검사 대상으로 남긴다. 그래야 완료 검사를 건너뛰지 않는다.
+        if call.get("function", {}).get("name") == "write_file":
+            try:
+                path = json.loads(call["function"]["arguments"])["path"]
+                dirty.add(workspace_path(harness.workspace, path).relative_to(harness.workspace).as_posix())
+            except (ValueError, KeyError, TypeError):
+                pass
+    # 폴더 규칙을 읽던 중에 멈췄으면 그 규칙을 지금 넣는다.
+    rule_folders = set(saved["rule_folders"])
+    load_directory_rules(run, harness.workspace, saved.get("touched", []), rule_folders, messages)
     current = workspace_signature(harness.workspace)
     known = {item["path"]: item["sha256"] for item in saved["workspace"]["files"]}
     now = {item["path"]: item["sha256"] for item in current["files"]}
@@ -129,7 +186,7 @@ def resume_turn(harness, run):
         "저장된 상태에서 이어서 실행",
         "하네스가 가진 대화와 진행 상태만 복원했습니다. 모델의 내부 계산 상태는 저장하지 않으므로 다음 응답이 중단 전에 나올 응답과 같다고 보장하지 않습니다.",
         category="memory",
-        status="warning" if open_calls or changed or code_changed else "ok",
+        status="warning" if open_calls or changed or code_changed or runtime_changed else "ok",
         input={"resumed_from": run.resumed_from, "saved_at": saved["saved_at"]},
         output={
             "restored_messages": len(messages),
@@ -140,6 +197,7 @@ def resume_turn(harness, run):
             "unanswered_tool_calls": [c.get("function", {}).get("name") for c in open_calls],
             "workspace_changed_files": changed[:20],
             "harness_code_changed": code_changed,
+            "runtime_changed": {"before": runtime_before, "now": runtime_now} if runtime_changed else None,
         },
     )
     return {
@@ -148,10 +206,10 @@ def resume_turn(harness, run):
         "history": harness.load_history(run),
         "initial_count": saved["initial_count"],
         "active_skills": set(saved["active_skills"]),
-        "rule_folders": set(saved["rule_folders"]),
-        "dirty": set(saved["dirty"]),
+        "rule_folders": rule_folders,
+        "dirty": dirty,
         "checked": set(saved["checked"]),
-        "successful": saved["successful"],
+        "successful": [{**item, "event_id": None, "restored_from": run.resumed_from} for item in saved["successful"]],
         # 반복 검사는 새로 시작한다. 이전에 막힌 실행을 이어가자마자 다시 막히지 않게 한다.
         "rejected": [],
         "reviewed": saved["reviewed"],
@@ -206,12 +264,7 @@ def start_turn(harness, run):
         },
         "workspace": workspace_signature(harness.workspace),
     }
-    if not run.engine["use_kv"] and not hasattr(
-        harness.runtime, "generate_observed"
-    ):
-        raise ValueError(
-            "생성 중 KV를 끄는 실험은 교육용 Python 실행기에서 지원합니다."
-        )
+    require_kv_support(harness, run)
     prepare_agents(run, harness)
     settings = resolve_settings(
         run,
@@ -222,6 +275,7 @@ def start_turn(harness, run):
         else None,
     )
     run.max_model_calls = settings["loop.max_model_calls"]
+    announce_mode(run)
     run.emit(
         "config.apply",
         "실제 실행에 적용할 하네스 구성",
@@ -303,12 +357,16 @@ def execute(harness, run):
             getattr(harness.runtime, "max_output_tokens", 1536),
         )
         workspace_state = {"files": []}
+        touched = turn.get("touched", [])
 
         def checkpoint(next_iteration):
             """다음에 이어갈 지점을 저장한다. 저장 실패가 실행을 멈추지는 않는다."""
+            nonlocal workspace_state
             if run.parent_run:
                 return None
             try:
+                # 저장 시점의 파일 상태와 비교해야 에이전트 자신의 쓰기가 외부 변경으로 보이지 않는다.
+                workspace_state = workspace_signature(harness.workspace)
                 saved = save_checkpoint(
                     harness.state_dir,
                     run,
@@ -326,9 +384,10 @@ def execute(harness, run):
                         "next_iteration": next_iteration,
                         "last_iteration": last_iteration,
                         "workspace": workspace_state,
+                        "touched": touched,
                     },
                 )
-            except OSError as error:
+            except (OSError, ValueError, TypeError) as error:
                 run.emit(
                     "checkpoint.failed",
                     "실행 상태 저장 실패",
@@ -358,7 +417,6 @@ def execute(harness, run):
             )
             if not run.parent_run:
                 # 이 호출을 시작하기 전의 상태를 저장한다. 여기서 끊기면 같은 호출부터 이어간다.
-                workspace_state = workspace_signature(harness.workspace)
                 saved = checkpoint(iteration)
                 if saved:
                     run.emit(
@@ -376,7 +434,7 @@ def execute(harness, run):
                     )
                 try:
                     run.save(harness.state_dir / "traces")
-                except OSError:
+                except (OSError, ValueError, TypeError):
                     pass  # 다음 저장 지점에서 다시 시도한다. 기록 저장 실패가 실행을 멈추면 안 된다.
             streaming = hasattr(harness.runtime, "stream_json") and run.engine["stream"]
             payload = {
@@ -446,12 +504,13 @@ def execute(harness, run):
                     if direct
                     else harness.runtime.base_url + "/v1/chat/completions",
                     "serialized_body_bytes": len(json.dumps(payload).encode("utf-8")),
-                    "active_skills": sorted(active_skills),
+                    "active_skills": sorted(active_skills & skills_in_input(request_messages)),
                     "segments": describe_context(
                         run,
                         request_messages,
                         allowed_tools,
                         view_segments(run, request_messages, request_origin, view),
+                        keep="parts",
                     ),
                     "message_count": len(request_messages),
                     "transcript_message_count": len(messages),
@@ -597,6 +656,8 @@ def execute(harness, run):
                     category="output",
                     output={"answer": answer},
                 )
+                # 이력을 쓴 뒤 중단되면 이어서 실행할 때 같은 대화가 두 번 저장되므로 저장 상태를 먼저 지운다.
+                discard_checkpoint(harness.state_dir, run.id)
                 harness.save_history(run, history, messages[initial_count:])
                 run.emit(
                     "run.complete",
@@ -613,11 +674,24 @@ def execute(harness, run):
                 )
                 with run.lock:
                     run.status = "completed"
-                discard_checkpoint(harness.state_dir, run.id)
                 break
             if not isinstance(calls, list) or len(calls) > 6:
                 raise RuntimeFailure(
                     "한 응답의 도구 호출 수가 허용 범위를 벗어났습니다."
+                )
+            # 저장하기 전에 형식을 확인한다. 잘못된 응답이 저장되면 재개할 때마다 같은 오류가 난다.
+            for call in calls:
+                if (
+                    not isinstance(call, dict)
+                    or not isinstance(call.get("id"), str)
+                    or call.get("type") != "function"
+                    or not isinstance(call.get("function"), dict)
+                ):
+                    raise RuntimeFailure("모델의 도구 호출 형식이 올바르지 않습니다.")
+            seen_ids = [c.get("id") for c in calls]
+            if len(seen_ids) != len(set(seen_ids)):
+                raise RuntimeFailure(
+                    "모델이 같은 tool_call id를 두 번 사용했습니다. 결과와 요청을 짝지을 수 없어 실행하지 않습니다."
                 )
             messages.append(message)
             record_message(
@@ -628,21 +702,9 @@ def execute(harness, run):
                 "모델 도구 요청",
                 response_event,
             )
-            checkpoint(iteration + 1)
-            seen_ids = [c.get("id") for c in calls if isinstance(c, dict)]
-            if len(seen_ids) != len(set(seen_ids)):
-                raise RuntimeFailure(
-                    "모델이 같은 tool_call id를 두 번 사용했습니다. 결과와 요청을 짝지을 수 없어 실행하지 않습니다."
-                )
             touched = []
+            checkpoint(iteration + 1)
             for call in calls:
-                if (
-                    not isinstance(call, dict)
-                    or not isinstance(call.get("id"), str)
-                    or call.get("type") != "function"
-                    or not isinstance(call.get("function"), dict)
-                ):
-                    raise RuntimeFailure("모델의 도구 호출 형식이 올바르지 않습니다.")
                 run.tool_calls += 1
                 result_message = harness.dispatch_tool(
                     run, catalog, call, active_skills
@@ -678,6 +740,8 @@ def execute(harness, run):
                 record_message(
                     run, messages, before, "tool", "도구 결과", run.events[-1]["id"]
                 )
+                # 이 단계에서 멈춰도 받은 결과와 수정 파일 목록을 잃지 않게 기록 전에 저장한다.
+                checkpoint(iteration + 1)
                 event_id = run.emit(
                     "context.append",
                     "도구 결과를 다음 모델 입력에 추가",
@@ -687,10 +751,9 @@ def execute(harness, run):
                     output={
                         "appended_message": result_message,
                         "message_count_after": len(messages),
-                        "segments": describe_context(run, messages, allowed_tools),
+                        "segments": describe_context(run, messages, allowed_tools, keep="none"),
                     },
                 )
-                checkpoint(iteration + 1)
             load_directory_rules(
                 run, harness.workspace, touched, rule_folders, messages
             )

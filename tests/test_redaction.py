@@ -97,6 +97,15 @@ class RedactionTests(unittest.TestCase):
         self.assertTrue(report["options"]["paths"])
         self.assertIn(secret, json.dumps(snapshot))
 
+    def test_percent_encoded_paths_in_lsp_uris_are_replaced(self):
+        root = Path(self.temp.name) / "Corp Folder" / "한글 프로젝트"
+        redactor = redaction.Redactor(workspace=root, home=Path(self.temp.name), user="")
+        uri = root.joinpath("demo.py").resolve().as_uri()
+        self.assertIn("%20", uri)
+        replaced = redactor.text(uri)
+        self.assertNotIn("Corp%20Folder", replaced)
+        self.assertIn("<WORKSPACE>", replaced)
+
     def test_options_omit_bodies_and_generic_home_paths_and_user_name(self):
         snapshot, secret = self.real_snapshot()
         shared = redaction.share_copy(

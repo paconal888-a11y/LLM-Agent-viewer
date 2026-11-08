@@ -123,6 +123,10 @@ def prepare(run, harness):
         run.role_instructions += '\nYou are the main agent. Call delegate_tasks once to give independent, clearly scoped tasks to subagents using the listed profiles. Read their actual results before synthesizing your answer. tasks_json must be a JSON string array such as [{"profile":"explore","task":"read the requested document"},{"profile":"oracle","task":"check the requested document"}].\n'
         if not any(item["tool"] == "delegate_tasks" for item in run.requirements):
             run.requirements.append({"tool": "delegate_tasks", "arguments": {}})
+
+
+def announce_mode(run):
+    """모드 기록. 호출 예산이 설정 파일까지 반영된 뒤에 남긴다."""
     run.emit(
         "agent.mode",
         "에이전트 모드와 실행 예산 적용",

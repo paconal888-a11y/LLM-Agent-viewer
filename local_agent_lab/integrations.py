@@ -464,7 +464,11 @@ def _lsp_tool(ctx, client, operation, path, line=0, character=0):
             "textDocument": {"uri": uri},
             "position": {"line": line, "character": character},
         }
-    result = client.request(ctx.run, method, params, ctx.parent)
+    try:
+        result = client.request(ctx.run, method, params, ctx.parent)
+    except (RpcError, RuntimeFailure) as error:
+        # 언어 서버의 오류는 도구 실패다. 실행 전체를 끝내지 않고 모델에 알린다.
+        return ctx.finish({"error": "언어 서버 요청이 실패했습니다: " + str(error), "protocol": "lsp"})
     return ctx.finish(
         {"path": path, "document_version": version, "result": result, "protocol": "lsp"}
     )
