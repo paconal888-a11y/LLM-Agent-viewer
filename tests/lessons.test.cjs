@@ -18,6 +18,31 @@ function events(slug) {
 }
 const TABS = new Set(["change", "code", "input", "values", "learn"]);
 
+test("the feedback address carries only the version and a fixed screen name", () => {
+  const lesson = new URL(
+    course.feedbackAddress({ version: "9.9.9", demo: true, lesson: "tools", step: 0, run: "sample-x", view: "journey" }),
+  );
+  assert.equal(lesson.origin + lesson.pathname, "https://github.com/paconal888-a11y/LLM-Agent-viewer/issues/new");
+  assert.equal(lesson.searchParams.get("template"), "stuck.yml");
+  assert.equal(lesson.searchParams.get("version"), "9.9.9");
+  assert.equal(lesson.searchParams.get("screen"), "웹 데모 · 강의 tools 1단계");
+
+  const sample = new URL(course.feedbackAddress({ mode: "sample", run: "sample-tool-basic", view: "journey" }));
+  assert.equal(sample.searchParams.get("screen"), "PC 샘플 보기 · 기록 tool-basic");
+
+  const real = new URL(course.feedbackAddress({ mode: "live", run: "20261109-private", view: "journey" }));
+  assert.equal(real.searchParams.get("screen"), "PC 실행 · 구조 · 실행");
+  assert.ok(!real.href.includes("private"), real.href);
+
+  const odd = new URL(course.feedbackAddress({ mode: "live", view: "C:\\Users\\someone", lesson: "../secret" }));
+  assert.equal(odd.searchParams.get("screen"), "PC 실행");
+});
+
+test("the issue form has the fields the feedback address fills in", () => {
+  const form = fs.readFileSync(path.join(__dirname, "..", ".github", "ISSUE_TEMPLATE", "stuck.yml"), "utf8");
+  for (const id of ["screen", "version"]) assert.match(form, new RegExp(`^\\s+id: ${id}$`, "m"));
+});
+
 test("every lesson step points at a real event in a real sample", () => {
   for (const lesson of course.lessons)
     lesson.steps.forEach((step, number) => {

@@ -157,6 +157,10 @@ node --test tests/architecture.test.cjs tests/inspection.test.cjs tests/editor.t
 
 웹 데모는 `python scripts/build_demo.py site`로 만들고, 태그를 올리면 릴리스 페이지와 함께 자동으로 갱신됩니다. Node.js는 화면 코드 테스트에만 필요합니다. [이슈](https://github.com/paconal888-a11y/LLM-Agent-viewer/issues)에 재현 절차와 실행기 정보를 남기거나, 변경한 기능의 테스트와 함께 PR을 보내 주세요.
 
+## 의견 보내기
+
+어디서 막혔는지, 무엇이 이해되지 않았는지 알려 주세요. 앱의 **의견 보내기**나 [이슈 양식](https://github.com/paconal888-a11y/LLM-Agent-viewer/issues/new/choose)을 쓰면 됩니다. 앱은 사용 기록을 수집하지 않으며, 이 링크는 버전과 화면 이름만 양식에 채웁니다. 이슈는 공개되므로 파일 경로, 계정 이름, 회사 정보는 넣지 마세요.
+
 ## 라이선스
 
 [MIT](LICENSE). 모델·엔진·라이브러리의 라이선스는 [외부 고지](THIRD_PARTY_NOTICES.md)를 참고하세요.

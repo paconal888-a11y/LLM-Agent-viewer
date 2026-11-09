@@ -1810,9 +1810,16 @@ body {
   font: 12.5px var(--mono);
 }
 
-.demolink {
+.demolink,
+.feedbacklink {
   text-decoration: none;
   white-space: nowrap;
+}
+.coachask {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12.5px;
 }
 .lessonlink {
   display: inline-block;
@@ -1820,9 +1827,14 @@ body {
   padding: 7px 12px;
   text-decoration: none;
 }
+.demoonly,
+body.demo .localonly,
 body.demo #export,
 body.demo #bodySearch,
 body.demo #bodySearchKind,
 body.demo #newSession {
   display: none;
+}
+body.demo .demoonly {
+  display: inline;
 }

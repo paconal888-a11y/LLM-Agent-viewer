@@ -66,6 +66,9 @@ def page(source):
     )
     html, replaced = re.subn(r'<button id="help"', link, html, count=1)
     assert replaced == 1
+    # 상태를 읽기 전에도 데모 화면으로 시작한다.
+    html, replaced = re.subn(r"<body>", '<body class="demo">', html, count=1)
+    assert replaced == 1
     return html
 
 

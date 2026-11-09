@@ -23,6 +23,15 @@
       <div class="connection">
         <i id="statusDot"></i><span id="connection">모델 확인 중</span>
       </div>
+      <a
+        id="feedbackLink"
+        class="quiet feedbacklink"
+        href="https://github.com/paconal888-a11y/LLM-Agent-viewer/issues/new/choose"
+        target="_blank"
+        rel="noopener"
+        title="막힌 곳이나 제안을 GitHub에 공개로 남깁니다"
+        >의견 보내기 ↗</a
+      >
       <button id="help" class="quiet" title="사용 안내와 단축키 (?)">사용 안내</button>
     </header>
     <div id="activityBar" class="activitybar hidden" role="status"></div>
@@ -74,14 +83,18 @@
           <div id="toolList"></div>
         </details>
         <footer>
-          모델과 기록은 이 PC에 저장됩니다.<br />외부 API로 자동 전환하지
-          않습니다.
+          <span class="localonly"
+            >모델과 기록은 이 PC에 저장됩니다.<br />외부 API로 자동 전환하지
+            않습니다.</span
+          ><span class="demoonly"
+            >웹 데모는 저장된 기록만 재생합니다.<br />모델은 돌지 않습니다.</span
+          >
         </footer>
       </aside>
       <main class="main">
         <div class="workspacebar">
           <div class="breadcrumbs">
-            로컬 프로젝트 <span>/</span>
+            <span class="localonly">로컬 프로젝트</span><span class="demoonly">웹 데모</span> <span>/</span>
             <strong id="pageName">구조 · 실행</strong>
           </div>
           <button id="newSession" class="quiet">＋ 새 대화</button>

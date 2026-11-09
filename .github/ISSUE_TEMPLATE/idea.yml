@@ -1,0 +1,24 @@
+name: 제안
+description: 더 이해하고 싶은 에이전트 동작이나 보고 싶은 정보를 알려 주세요.
+title: "[제안] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        이 글은 공개됩니다. 올리기 전에 파일 경로, 계정 이름, 회사 정보, 프로젝트 내용이 들어가지 않았는지 확인해 주세요.
+  - type: textarea
+    id: question
+    attributes:
+      label: 무엇이 궁금했나요?
+      placeholder: "예: 압축 뒤에 어떤 사실이 사라졌는지 한눈에 보고 싶었습니다."
+    validations:
+      required: true
+  - type: textarea
+    id: wish
+    attributes:
+      label: 어떻게 보이면 좋겠나요?
+  - type: input
+    id: screen
+    attributes:
+      label: 어느 화면에서 생각났나요?
+      placeholder: "예: 웹 데모 · 구조 · 실행"

@@ -1,0 +1,40 @@
+name: 막힌 곳·오류
+description: 설치, 강의, 화면에서 막히거나 이상했던 곳을 알려 주세요.
+title: "[막힌 곳] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        이 글은 공개됩니다. 올리기 전에 파일 경로, 계정 이름, 회사 정보, 프로젝트 내용이 들어가지 않았는지 확인해 주세요.
+  - type: input
+    id: screen
+    attributes:
+      label: 어느 화면인가요?
+      description: 앱의 "의견 보내기"로 들어오면 자동으로 채워집니다.
+      placeholder: "예: 웹 데모 · 강의 tools 1단계"
+  - type: textarea
+    id: tried
+    attributes:
+      label: 무엇을 하려고 했나요?
+      placeholder: "예: 1강을 시작하고 다음 단계로 넘어가려고 했습니다."
+    validations:
+      required: true
+  - type: textarea
+    id: saw
+    attributes:
+      label: 실제로 어떻게 됐나요?
+      description: 어디서 멈췄는지, 무엇이 이해되지 않았는지 적어 주세요. 화면에 나온 문구나 캡처가 있으면 함께 올려 주세요.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 버전
+      description: 앱의 "의견 보내기"로 들어오면 자동으로 채워집니다.
+      placeholder: "예: 0.6.2"
+  - type: input
+    id: environment
+    attributes:
+      label: 환경
+      description: 실행이 안 될 때만 적어 주세요.
+      placeholder: "예: Windows 11, Chrome, GPU 종류"

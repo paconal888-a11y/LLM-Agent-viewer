@@ -950,6 +950,17 @@
   function lessonText(value) {
     return esc(value).replace(/`([^`]+)`/g, "<code>$1</code>");
   }
+  function feedbackAddress() {
+    return AgentLessons.feedbackAddress({
+      version: state.health?.version,
+      mode: state.health?.mode,
+      demo: state.health?.demo,
+      lesson: state.view === "journey" ? state.lesson?.id : "",
+      step: state.lesson?.step,
+      run: state.run?.id,
+      view: state.view,
+    });
+  }
   function renderCoach() {
     const lesson = state.lesson && AgentLessons.byId(state.lesson.id),
       shown = !!lesson && state.view === "journey";
@@ -966,7 +977,7 @@
       away = expected >= 0 && expected !== state.cursor;
     $("coach").innerHTML =
       `<header><span class="coachname"><b>${lesson.number}강</b>${esc(lesson.title)}</span><span class="coachdots" role="img" aria-label="${index + 1} / ${lesson.steps.length}단계">${lesson.steps.map((_, i) => `<i class="${i < index ? "done" : i === index ? "current" : ""}"></i>`).join("")}</span><small>${index + 1} / ${lesson.steps.length}</small><span class="coachsource">실제 저장 기록 재생</span><button class="quiet" data-coach="list">목록</button><button class="icon" data-coach="exit" aria-label="강의 닫기">×</button></header>` +
-      `<div class="coachbody"><h2>${esc(step.title)}</h2><p>${lessonText(step.body)}</p>${step.look ? `<p class="coachlook">${lessonText(step.look)}</p>` : ""}${owner ? `<p class="coachowner"><span class="decision-kind" data-owner="${owner.owner}">${esc(owner.label)}</span>이 단계를 정한 쪽</p>` : ""}${last ? `<div class="coachtake"><strong>핵심</strong><p>${lessonText(lesson.takeaway)}</p><strong>직접 해 보기</strong><p>${lessonText(lesson.tryIt.text)}</p><button class="secondary" data-coach="try">${lesson.tryIt.file ? "파일 열기 ↗" : lesson.tryIt.view ? "화면 열기 ↗" : "실행 화면으로 ↗"}</button></div>` : ""}</div>` +
+      `<div class="coachbody"><h2>${esc(step.title)}</h2><p>${lessonText(step.body)}</p>${step.look ? `<p class="coachlook">${lessonText(step.look)}</p>` : ""}${owner ? `<p class="coachowner"><span class="decision-kind" data-owner="${owner.owner}">${esc(owner.label)}</span>이 단계를 정한 쪽</p>` : ""}${last ? `<div class="coachtake"><strong>핵심</strong><p>${lessonText(lesson.takeaway)}</p><strong>직접 해 보기</strong><p>${lessonText(lesson.tryIt.text)}</p><button class="secondary" data-coach="try">${lesson.tryIt.file ? "파일 열기 ↗" : lesson.tryIt.view ? "화면 열기 ↗" : "실행 화면으로 ↗"}</button><a class="coachask" href="${esc(feedbackAddress())}" target="_blank" rel="noopener">이 강의에서 막힌 곳 알려 주기 ↗</a></div>` : ""}</div>` +
       `<footer>${away ? '<button class="quiet" data-coach="back">강의 위치로 돌아가기</button>' : ""}<button class="quiet coachdetail" data-coach="detail">상세 열기</button><button class="secondary" data-coach="prev" ${index ? "" : "disabled"}>← 이전</button><button class="primary" data-coach="next">${last ? (next ? "다음 강의 →" : "코스 마치기") : "다음 →"}</button></footer>`;
   }
   async function openLesson(id, index = 0) {
@@ -3810,6 +3821,9 @@
   $("menu").onclick = () => $("project").classList.add("open");
   $("closeProject").onclick = () => $("project").classList.remove("open");
   $("help").onclick = () => $("guide").showModal();
+  $("feedbackLink").onclick = (event) => {
+    event.currentTarget.href = feedbackAddress();
+  };
   $("closeGuide").onclick = () => $("guide").close();
   $("newSession").onclick = () => {
     state.session = "session-" + crypto.randomUUID().slice(0, 12);
