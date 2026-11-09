@@ -43,6 +43,14 @@ test("the issue form has the fields the feedback address fills in", () => {
   for (const id of ["screen", "version"]) assert.match(form, new RegExp(`^\\s+id: ${id}$`, "m"));
 });
 
+test("issue form names are long enough for GitHub to list them", () => {
+  const folder = path.join(__dirname, "..", ".github", "ISSUE_TEMPLATE");
+  for (const file of fs.readdirSync(folder)) {
+    const name = fs.readFileSync(path.join(folder, file), "utf8").match(/^name: (.+?)\s*$/m);
+    assert.ok(name && [...name[1]].length >= 3, file);
+  }
+});
+
 test("every lesson step points at a real event in a real sample", () => {
   for (const lesson of course.lessons)
     lesson.steps.forEach((step, number) => {
