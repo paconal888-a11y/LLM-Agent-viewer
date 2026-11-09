@@ -4,7 +4,7 @@ import json
 import sys
 
 VERSION = "2026-07-28"
-INFO = {"name": "agent-lens-math", "version": "0.8.0"}
+INFO = {"name": "agent-lens-math", "version": "0.8.1"}
 TOOL = {
     "name": "add",
     "description": "Add two integers in the separate local MCP process.",

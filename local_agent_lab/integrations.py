@@ -59,7 +59,7 @@ def mcp_params(client, params=None):
             "io.modelcontextprotocol/clientCapabilities": {},
             "io.modelcontextprotocol/clientInfo": {
                 "name": "Agent Lens",
-                "version": "0.8.0",
+                "version": "0.8.1",
             },
         },
     }
@@ -83,7 +83,7 @@ def prepare_mcp(run, config):
             {
                 "protocolVersion": "2025-11-25",
                 "capabilities": {},
-                "clientInfo": {"name": "Agent Lens", "version": "0.8.0"},
+                "clientInfo": {"name": "Agent Lens", "version": "0.8.1"},
             },
         )
         if info.get("protocolVersion") != "2025-11-25":
@@ -283,7 +283,7 @@ def prepare_lsp(run, config, workspace):
                 "capabilities": {
                     "textDocument": {"publishDiagnostics": {"versionSupport": True}}
                 },
-                "clientInfo": {"name": "Agent Lens", "version": "0.8.0"},
+                "clientInfo": {"name": "Agent Lens", "version": "0.8.1"},
             },
         )
         client.notify(run, "initialized")
