@@ -8,7 +8,7 @@ Agent Lens is a small local agent harness that records everything: which files i
 
 > The interface and the lessons are currently in **Korean only**. Code, event names and the raw records are readable in any language.
 
-![A lesson step showing the real model input](docs/images/lesson-step.png)
+![A run grouped into scenes, with the path lit on the diagram](docs/images/scenes.png)
 
 ## Try it
 

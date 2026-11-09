@@ -10,7 +10,7 @@
 
 프롬프트 한 줄이 규칙 파일 읽기, 입력 조립, 모델 호출, 도구 실행, 완료 판정으로 이어지는 과정을 실행 코드와 함께 기록합니다. 단계마다 코드가 정했는지, 모델이 골랐는지, 설정 파일에서 왔는지 구분해 보여 줍니다.
 
-![강의를 따라 실제 기록의 모델 입력을 살펴보는 화면](docs/images/lesson-step.png)
+![실행을 장면으로 묶어 구조도의 경로와 함께 보는 화면](docs/images/scenes.png)
 
 **[웹 데모 바로 열기](https://paconal888-a11y.github.io/LLM-Agent-viewer/)** · [시작하기](#시작하기) · [배울 수 있는 것](#배울-수-있는-것) · [사용법](docs/WALKTHROUGH.md) · [구조](docs/ARCHITECTURE.md) · [하네스 수정](docs/EXTENDING.md)
 
@@ -84,6 +84,7 @@ cd LLM-Agent-viewer
 
 ## 기능
 
+- **장면으로 따라가기** — 수백 줄의 기록을 요청·입력 조립·모델 호출·도구 실행·완료 판정 같은 몇 개의 장면으로 묶어 무슨 일이 있었는지 먼저 보여 주고, 구조도에서 그 경로를 표시
 - **단계별 기록** — 파일 읽기, 메시지 조립, 모델 호출, 도구 실행을 구조도에서 따라가며 입력·출력과 당시 실행 코드 확인
 - **결정 주체 구분** — 코드가 결정 / 모델이 선택 / 설정·파일에서 옴 / 실행기 계산을 단계마다 표시하고 모델이 고른 단계만 걸러 보기
 - **입력 비교** — 파일 원문이 들어간 메시지로 이동하고, 호출 사이에 추가·변경된 메시지와 도구 정의 확인
@@ -152,7 +153,7 @@ cd LLM-Agent-viewer
 ```powershell
 uv sync --python 3.12 --extra reference --extra integrations --locked
 uv run --extra reference --extra integrations --offline python -m unittest discover -s tests -v
-node --test tests/architecture.test.cjs tests/inspection.test.cjs tests/editor.test.cjs tests/settings.test.cjs tests/export_search.test.cjs tests/lessons.test.cjs
+node --test tests/architecture.test.cjs tests/inspection.test.cjs tests/editor.test.cjs tests/settings.test.cjs tests/export_search.test.cjs tests/lessons.test.cjs tests/story.test.cjs
 ```
 
 웹 데모는 `python scripts/build_demo.py site`로 만들고, 태그를 올리면 릴리스 페이지와 함께 자동으로 갱신됩니다. Node.js는 화면 코드 테스트에만 필요합니다. [이슈](https://github.com/paconal888-a11y/LLM-Agent-viewer/issues)에 재현 절차와 실행기 정보를 남기거나, 변경한 기능의 테스트와 함께 PR을 보내 주세요.
