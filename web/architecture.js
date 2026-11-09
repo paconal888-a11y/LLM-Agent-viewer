@@ -448,6 +448,19 @@
   }
   // 이 배율보다 작아지는 휴대폰 화면에서만 전체를 줄이는 대신 현재 단계를 따라간다.
   const READABLE_SCALE = 0.56;
+  // 실행기 정보 조회나 크기 확인처럼 흐름과 상관없는 기록은 장면의 경로로 표시하지 않는다.
+  const BACKGROUND = new Set([
+    "runtime.capability",
+    "runtime.info",
+    "checkpoint.save",
+    "context.check",
+    "harness.modules",
+    "function.enter",
+    "config.resolve",
+    "config.apply",
+    "agent.mode",
+  ]);
+  const background = (event) => BACKGROUND.has(event?.kind);
   let callbacks = {},
     svg,
     host,
@@ -465,7 +478,7 @@
       `<marker id="${id}" markerWidth="8" markerHeight="8" refX="6.5" refY="3.5" orient="auto"><path d="M1.5 .8 L6.5 3.5 L1.5 6.2"/></marker>`;
     const node = (n) => {
       const small = n.h < 50;
-      return `<g data-arch-node="${n.id}" class="arch-node" role="button" tabindex="0" aria-label="${n.title} 구성과 기록"><title>${n.title} · ${n.description}</title><rect class="node-box" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="3"/><rect class="node-pip" x="${n.x + n.w - 12}" y="${n.y + 7}" width="5" height="5"/><text x="${n.x + 12}" y="${n.y + (small ? 19 : 25)}" class="node-title">${n.title}</text><text x="${n.x + 12}" y="${n.y + (small ? 36 : 45)}" class="node-meta">${n.description}</text>${n.id === "forward" ? `<text x="${n.x + 12}" y="${n.y + 72}" class="model-stage">선택 레이어의 수치 표본</text><text x="${n.x + 12}" y="${n.y + 90}" class="model-stage">실행기에 따라 범위 다름</text>` : ""}</g>`;
+      return `<g data-arch-node="${n.id}" class="arch-node" role="button" tabindex="0" aria-label="${n.title} 구성과 기록"><title>${n.title} · ${n.description}</title><rect class="node-box" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="3"/><rect class="node-pip" x="${n.x + n.w - 12}" y="${n.y + 7}" width="5" height="5"/><text class="node-order" x="${n.x + n.w - 8}" y="${n.y + 16}" text-anchor="end"></text><text x="${n.x + 12}" y="${n.y + (small ? 19 : 25)}" class="node-title">${n.title}</text><text x="${n.x + 12}" y="${n.y + (small ? 36 : 45)}" class="node-meta">${n.description}</text>${n.id === "forward" ? `<text x="${n.x + 12}" y="${n.y + 72}" class="model-stage">선택 레이어의 수치 표본</text><text x="${n.x + 12}" y="${n.y + 90}" class="model-stage">실행기에 따라 범위 다름</text>` : ""}</g>`;
     };
     host.innerHTML = `<svg viewBox="0 0 ${WIDTH} ${HEIGHT}" role="group" aria-label="에이전트 전체 구조도. 단계에 따라 구성 요소와 데이터 경로가 강조됩니다."><defs>${["arch-arrow", "arch-seen-arrow", "arch-hot-arrow"].map(arrow).join("")}</defs><g class="arch-world">${group(202, 24, 410, 562, "하네스", "Python")}${group(682, 24, 406, 430, "추론 경로", "Python / llama.cpp")}${group(682, 474, 406, 112, "외부 프로세스", "")}<text x="24" y="58" class="group-title">사용자 · 브라우저</text><text x="24" y="207" class="group-title">프로젝트 파일</text><g class="arch-edges">${edges.map(([id, path]) => `<path data-arch-edge="${id}" d="${path}" fill="none" marker-end="url(#arch-arrow)"/>`).join("")}</g>${nodes.map(node).join("")}<g class="arch-pulse hidden"><circle r="4.5"/></g></g></svg>`;
     svg = host.querySelector("svg");
@@ -557,10 +570,10 @@
     auto = full;
     transform();
   }
-  function update({ events = [], cursor = -1, run, health }) {
+  function update({ events = [], cursor = -1, run, health, scene = null, order = null }) {
     if (!svg) return;
     const current = events[cursor],
-      location = locate(current),
+      location = { ...locate(current) },
       past = events.slice(0, cursor + 1),
       agent = current?.agent_id;
     const relevant = past.filter(
@@ -572,6 +585,20 @@
       const place = locate(e);
       observed.set(place.node, e);
       place.edges.forEach((id) => travelled.add(id));
+    });
+    // 이번 실행 전체에서 거친 칸과, 지금 장면에서 거친 칸
+    const touched = new Set(),
+      used = new Set(),
+      sceneNodes = new Set(),
+      sceneEdges = new Set();
+    events.forEach((e, index) => {
+      const place = locate(e);
+      touched.add(place.node);
+      place.edges.forEach((id) => used.add(id));
+      if (scene && index >= scene.start && index <= scene.end && !background(e)) {
+        sceneNodes.add(place.node);
+        place.edges.forEach((id) => sceneEdges.add(id));
+      }
     });
     const external =
       run?.conditions?.backend === "llama" ||
@@ -624,6 +651,10 @@
         !!current && !!location.related?.includes(n.id),
       );
       el.classList.toggle("visited", !!record);
+      el.classList.toggle("in-scene", sceneNodes.has(n.id));
+      el.classList.toggle("untouched", events.length > 0 && !touched.has(n.id));
+      el.classList.toggle("ordered", !!order?.has(n.id));
+      el.querySelector(".node-order").textContent = order?.get(n.id) ?? "";
       el.classList.toggle("unavailable", disabled.has(n.id));
       const label =
         n.id === "weights"
@@ -642,8 +673,9 @@
     }
     for (const [id] of edges) {
       const edge = svg.querySelector(`[data-arch-edge="${id}"]`),
-        hot = !!current && location.edges.includes(id);
+        hot = !!current && (scene ? sceneEdges.has(id) : location.edges.includes(id));
       edge.classList.toggle("current", hot);
+      edge.classList.toggle("untouched", events.length > 0 && !used.has(id));
       edge.classList.toggle("visited", !hot && travelled.has(id));
       edge.setAttribute(
         "marker-end",
@@ -684,6 +716,7 @@
     edges,
     definitions,
     locate,
+    background,
     measurement,
     init,
     update,

@@ -755,6 +755,10 @@
         top = { model: 2, tool: 8, other: 15 }[kind];
       groups[kind] += `M${index + 0.5} ${top}V24`;
     });
+    groups.bound = scenes()
+      .slice(1)
+      .map((scene) => `M${scene.start} 0V24`)
+      .join("");
     const paths = Object.entries(groups)
       .map(([kind, d]) => `<path class="${kind}" d="${d}"/>`)
       .join("");
@@ -980,7 +984,8 @@
     $("scrubber").value = state.cursor;
     if (state.ribbonRun !== state.run?.id || state.ribbonCount !== state.events.length) renderRibbon();
     $("ribbonPlayed")?.setAttribute("width", state.cursor + 1);
-    $("position").textContent = state.cursor + 1 + " / " + state.events.length;
+    renderPosition();
+    renderStory();
     const current = state.events[state.cursor];
     if (current)
       $("scrubber").setAttribute(
@@ -997,6 +1002,142 @@
   function lessonProgress() {
     const saved = stored("lessons");
     return { done: saved?.done || {}, last: saved?.last || null };
+  }
+  // 장면: 기록을 사람이 따라갈 단위로 묶어 보여 준다. 커서는 그대로 기록의 위치를 가리킨다.
+  function recordsOpen() {
+    return document.querySelector(".execution").classList.contains("records-open");
+  }
+  function sceneMode() {
+    return !state.lesson && !recordsOpen();
+  }
+  function scenes() {
+    const key = `${state.run?.id}:${state.events.length}:${state.run?.status}`;
+    if (state.sceneKey !== key) {
+      state.sceneKey = key;
+      state.sceneList = AgentStory.scenes(state.events, state.run);
+      state.sceneOrder = new Map();
+      for (const scene of state.sceneList)
+        for (let index = scene.start; index <= scene.end; index++) {
+          if (AgentArchitecture.background(state.events[index])) continue;
+          const node = AgentArchitecture.locate(state.events[index]).node;
+          if (node && !state.sceneOrder.has(node)) state.sceneOrder.set(node, scene.number);
+        }
+    }
+    return state.sceneList;
+  }
+  function currentScene() {
+    const list = scenes();
+    return list[AgentStory.sceneAt(list, state.cursor)] || null;
+  }
+  function moveScene(delta) {
+    const list = scenes(),
+      target = list[Math.max(0, Math.min(list.length - 1, AgentStory.sceneAt(list, state.cursor) + delta))];
+    if (target) select(target.focus);
+  }
+  function ownerBadge(owner, compact = false) {
+    const found = AgentLessons.owners.find(([key]) => key === owner),
+      label = esc(found?.[1] || owner);
+    return `<span class="decision-kind ${compact ? "compact" : ""}" data-owner="${esc(owner)}" ${compact ? `title="${label}"` : ""}>${label}</span>`;
+  }
+  function storyValue(value) {
+    return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  }
+  function storyBlock(block) {
+    const label = `<h4>${esc(block.label)}</h4>`;
+    if (block.type === "list")
+      return `<section class="sblock">${label}<ul>${block.items.map((item) => `<li>${esc(item)}</li>`).join("")}</ul></section>`;
+    if (block.type === "quote") return `<section class="sblock">${label}<blockquote>${esc(block.text)}</blockquote></section>`;
+    if (block.type === "text") return `<section class="sblock">${label}<p>${esc(block.text)}</p></section>`;
+    if (block.type === "value") return `<section class="sblock">${label}<pre>${esc(storyValue(block.value))}</pre></section>`;
+    if (block.type === "chat")
+      return `<section class="sblock">${label}${block.items.map((item) => `<div class="chatline"><b>${esc(item.role)}</b><small>${item.characters.toLocaleString("en-US")}자</small><p>${esc(item.text)}</p></div>`).join("")}</section>`;
+    if (block.type === "call") {
+      const pairs =
+        block.value && typeof block.value === "object"
+          ? `<dl>${Object.entries(block.value)
+              .map(([key, value]) => `<dt>${esc(key)}</dt><dd>${esc(storyValue(value))}</dd>`)
+              .join("")}</dl>`
+          : `<dl><dd>${esc(storyValue(block.value))}</dd></dl>`;
+      return `<section class="sblock">${label}<div class="callcard"><code>${esc(block.name)}</code>${pairs}</div></section>`;
+    }
+    return "";
+  }
+  function storyHead(summary) {
+    const stats = [
+      ["결과", summary.statusLabel],
+      ["시간", `${Number(summary.seconds || 0).toFixed(1)}초`],
+      ["모델", `${summary.modelCalls}회`],
+      ["도구", `${summary.toolCalls}회`],
+    ];
+    if (summary.promptTokens)
+      stats.push(["토큰", `${summary.promptTokens.toLocaleString("en-US")} → ${summary.completionTokens.toLocaleString("en-US")}`]);
+    const outcome = summary.answer
+      ? `<div class="storyanswer"><h3>답변</h3><p>${esc(summary.answer)}</p></div>`
+      : summary.error
+        ? `<div class="storyanswer failed"><h3>오류</h3><p>${esc(summary.error)}</p></div>`
+        : "";
+    const live = state.health.mode !== "sample",
+      actions = [];
+    if (summary.answer) actions.push('<button class="quiet" data-story="answer">답변 전체 보기</button>');
+    if (live) actions.push('<button class="quiet" data-story="next">이어서 요청하기</button>');
+    if (!state.health.demo) actions.push('<button class="quiet" data-story="edit">입력 · 설정 불러오기</button>');
+    return `<header class="storyhead"><p class="storyprompt">${esc(AgentStory.short(summary.prompt, 200))}</p>${outcome}<dl class="storystats">${stats.map(([term, value]) => `<div><dt>${term}</dt><dd>${esc(value)}</dd></div>`).join("")}</dl>${actions.length ? `<div class="storyactions">${actions.join("")}</div>` : ""}</header>`;
+  }
+  function storyBody(scene) {
+    const facts = [ownerBadge(scene.owner)];
+    if (scene.badge) facts.push(`<span>${esc(scene.badge)}</span>`);
+    if (scene.stats) facts.push(`<span>${esc(scene.stats)}</span>`);
+    if (scene.ms) facts.push(`<span>${(scene.ms / 1000).toFixed(2)}초</span>`);
+    const actions = [];
+    if (scene.inputEvent) actions.push(`<button class="quiet" data-story="input" data-input="${scene.inputEvent}">모델 입력 전체 보기</button>`);
+    actions.push('<button class="quiet" data-story="detail">코드 · 원본</button>');
+    if (scene.change) actions.push(`<button class="quiet" data-story="change" data-file="${esc(scene.change.file)}">${esc(scene.change.label)} ↗</button>`);
+    actions.push(`<button class="quiet" data-story="log">이 장면의 기록 ${scene.count}개</button>`);
+    const log =
+      state.sceneLog === scene.number
+        ? `<div class="scenelog">${state.events.slice(scene.start, scene.end + 1).map(eventRow).join("")}</div>`
+        : "";
+    return `<div class="scenebody"><div class="scenefacts">${facts.join("")}</div>${scene.note ? `<p class="scenenote">${esc(scene.note)}</p>` : ""}${scene.blocks.map(storyBlock).join("")}<div class="sceneactions">${actions.join("")}</div>${log}</div>`;
+  }
+  function renderStory() {
+    const box = $("story"),
+      list = state.events.length && !state.lesson ? scenes() : [];
+    box.classList.toggle("hidden", !list.length);
+    if (!list.length) {
+      state.storyKey = "";
+      return;
+    }
+    const at = AgentStory.sceneAt(list, state.cursor),
+      key = [state.sceneKey, at, state.sceneLog, state.sceneLog === list[at].number ? state.cursor : ""].join("|");
+    if (key === state.storyKey) return;
+    const moved = state.storyAt !== at;
+    state.storyKey = key;
+    state.storyAt = at;
+    box.innerHTML =
+      storyHead(AgentStory.overview(state.events, state.run)) +
+      `<ol class="scenes">${list
+        .map(
+          (scene, index) =>
+            `<li class="scene ${index === at ? "selected" : index < at ? "done" : ""}"><button class="scenehead" data-story="scene" data-index="${index}" aria-expanded="${index === at}"><b>${scene.number}</b><span class="scenetext"><strong>${esc(scene.title)}</strong>${scene.summary ? `<small>${esc(scene.summary)}</small>` : ""}</span>${ownerBadge(scene.owner, true)}</button>${index === at ? storyBody(scene) : ""}</li>`,
+        )
+        .join("")}</ol>`;
+    const rail = box.closest(".rail"),
+      row = box.querySelector(".scene.selected");
+    if (moved && row && rail.scrollHeight > rail.clientHeight) {
+      const bounds = rail.getBoundingClientRect(),
+        place = row.getBoundingClientRect();
+      if (place.top < bounds.top || place.bottom > bounds.bottom) rail.scrollTop += place.top - bounds.top - 8;
+    }
+  }
+  function renderPosition() {
+    if (sceneMode() && state.events.length) {
+      const list = scenes();
+      $("position").textContent = `장면 ${AgentStory.sceneAt(list, state.cursor) + 1} / ${list.length}`;
+      $("position").title = `기록 ${state.cursor + 1} / ${state.events.length}`;
+    } else {
+      $("position").textContent = state.cursor + 1 + " / " + state.events.length;
+      $("position").title = "";
+    }
   }
   function lessonText(value) {
     return esc(value).replace(/`([^`]+)`/g, "<code>$1</code>");
@@ -1236,12 +1377,15 @@
     return pretty(value).replace(/\s+/g, " ").slice(0, 130);
   }
   function renderArchitecture() {
-    const stateView = AgentArchitecture.update({
-      events: state.events,
-      cursor: state.cursor,
-      run: state.run,
-      health: state.health,
-    });
+    const scene = sceneMode() && state.events.length ? currentScene() : null,
+      stateView = AgentArchitecture.update({
+        events: state.events,
+        cursor: state.cursor,
+        run: state.run,
+        health: state.health,
+        scene,
+        order: scene ? state.sceneOrder : null,
+      });
     const e = stateView?.current;
     if (!e) return;
     $("diagramLocation").textContent =
@@ -1252,6 +1396,12 @@
       stateView.component +
       " / " +
       (stateView.measurement || e.kind);
+    if (scene) {
+      $("currentStep").innerHTML =
+        `<div class="stepheading"><span class="stepnumber">${scene.number} / ${scenes().length}</span><strong>${esc(scene.title)}</strong>${ownerBadge(scene.owner)}<button class="quiet" id="stepMore">코드 · 원본</button></div><p class="scenesentence">${esc(scene.summary || scene.note || "")}</p>`;
+      $("stepMore").onclick = () => $("inspector").classList.add("open");
+      return;
+    }
     let before = e.input,
       after = e.output;
     if (e.kind === "file.decode") {
@@ -1593,6 +1743,7 @@
     $("journeyView").classList.add("focus");
     state.openGroups = new Set();
     state.openSteps = new Set();
+    state.sceneLog = null;
     state.run = { id, status: "loading" };
     $("runStatus").textContent = "기록 불러오는 중";
     let data;
@@ -3389,15 +3540,17 @@
   };
   $("first").onclick = () => {
     state.live = false;
-    select(0);
+    select(sceneMode() ? (scenes()[0]?.focus ?? 0) : 0);
   };
   $("prev").onclick = () => {
     state.live = false;
-    select(state.cursor - 1);
+    if (sceneMode()) moveScene(-1);
+    else select(state.cursor - 1);
   };
   $("nextEvent").onclick = () => {
     state.live = false;
-    select(state.cursor + 1);
+    if (sceneMode()) moveScene(1);
+    else select(state.cursor + 1);
   };
   $("live").onclick = () => {
     stopPlay();
@@ -3411,15 +3564,24 @@
     }
     if (!state.events.length) return;
     state.live = false;
-    if (state.cursor >= state.events.length - 1) select(0);
+    const atEnd = () => {
+      if (!sceneMode()) return state.cursor >= state.events.length - 1;
+      const list = scenes();
+      return AgentStory.sceneAt(list, state.cursor) >= list.length - 1;
+    };
+    if (atEnd()) select(sceneMode() ? scenes()[0].focus : 0);
     $("play").classList.add("playing");
     state.playing = setInterval(() => {
-      if (state.cursor >= state.events.length - 1) {
+      if (atEnd()) {
         stopPlay();
         return;
       }
+      if (sceneMode()) {
+        moveScene(1);
+        return;
+      }
       select(state.cursor + 1);
-    }, 650);
+    }, sceneMode() ? 1800 : 650);
   };
   $("eventSearch").oninput = renderTimeline;
   $("decisionFocus").onchange = renderTimeline;
@@ -3861,11 +4023,39 @@
   $("zoomOut").onclick = () => AgentArchitecture.scale(-1);
   $("zoomFit").onclick = () => AgentArchitecture.fit();
   $("toggleRecords").onclick = () => {
-    // 오른쪽 칸에서 상세를 닫으면 단계 목록이 보인다.
-    if ($("inspector").classList.contains("open")) $("inspector").classList.remove("open");
-    else document.querySelector(".execution").classList.toggle("records-open");
-    renderTimeline();
+    // 장면과 전체 기록을 오간다. 전체 기록에서는 재생도 기록 한 줄씩 움직인다.
+    $("inspector").classList.remove("open");
+    document.querySelector(".execution").classList.toggle("records-open");
+    $("toggleRecords").setAttribute("aria-pressed", String(recordsOpen()));
+    stopPlay();
+    if (state.events.length) select(state.cursor);
   };
+  $("story").onclick = action(async (event) => {
+    const button = event.target.closest("[data-story]");
+    if (!button) return;
+    const type = button.dataset.story;
+    if (type === "scene") {
+      state.live = false;
+      stopPlay();
+      select(scenes()[Number(button.dataset.index)].focus);
+    } else if (type === "log") {
+      const number = currentScene().number;
+      state.sceneLog = state.sceneLog === number ? null : number;
+      renderStory();
+    } else if (type === "detail") $("inspector").classList.add("open");
+    else if (type === "answer") $("showAnswer").click();
+    else if (type === "change") await openFile(button.dataset.file);
+    else if (type === "edit") $("editPrompt").click();
+    else if (type === "next") {
+      $("journeyView").classList.remove("focus");
+      $("prompt").select();
+    } else if (type === "input") {
+      const at = state.events.findIndex((item) => item.id === Number(button.dataset.input));
+      state.live = false;
+      state.tab = "input";
+      select(at, { open: true });
+    }
+  });
   $("showAnswer").onclick = () => {
     clearInspectionExtras();
     $("componentNavigator").classList.add("hidden");

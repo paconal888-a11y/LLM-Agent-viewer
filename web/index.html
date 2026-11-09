@@ -11,6 +11,7 @@
     <script src="/architecture.js" defer></script>
     <script src="/inspection.js" defer></script>
     <script src="/lessons.js" defer></script>
+    <script src="/story.js" defer></script>
     <script src="/workbench.js" defer></script>
   </head>
   <body>
@@ -101,7 +102,7 @@
         <section id="lessonsView" class="view hidden" aria-label="배우기"></section>
         <section id="journeyView" class="view">
           <h1 class="visually-hidden">구조 · 실행</h1>
-          <section class="execution records-open" aria-label="전체 실행 과정">
+          <section class="execution" aria-label="전체 실행 과정">
             <div class="sectionbar">
               <h2>전체 구조 <span id="runStatus" class="status">대기</span></h2>
               <div class="toolgroups">
@@ -111,7 +112,7 @@
                   ><button id="zoomIn" class="quiet" aria-label="구조도 확대">＋</button>
                 </div>
                 <div class="toolgroup" role="group" aria-label="기록 보기">
-                  <button id="toggleRecords" class="quiet" title="실행 단계를 시간순 목록으로 펼칩니다">단계 목록</button
+                  <button id="toggleRecords" class="quiet" aria-pressed="false" title="코드가 남긴 기록을 시간순으로 모두 봅니다">전체 기록</button
                   ><button id="showInput" class="quiet" disabled title="선택한 시점에 모델이 받은 입력을 봅니다">모델 입력</button
                   ><button id="openDetail" class="quiet" title="선택한 단계의 데이터와 실행 코드를 봅니다">코드 · 데이터</button
                   ><button id="showAnswer" class="quiet" disabled>답변</button>
@@ -153,10 +154,10 @@
               </div>
             </div>
             <div class="replay">
-              <button id="first" aria-label="첫 단계"><svg class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3v10M13 3 6 8l7 5" /></svg></button
-              ><button id="prev" aria-label="이전 단계"><svg class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 3 5 8l5.5 5" /></svg></button
+              <button id="first" aria-label="처음으로"><svg class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3v10M13 3 6 8l7 5" /></svg></button
+              ><button id="prev" aria-label="이전"><svg class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 3 5 8l5.5 5" /></svg></button
               ><button id="play" aria-label="기록 재생"><svg class="glyph solid when-stopped" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11L13.5 8z" /></svg><svg class="glyph solid when-playing" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z" /></svg></button
-              ><button id="nextEvent" aria-label="다음 기록"><svg class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3 11 8l-5.5 5" /></svg></button
+              ><button id="nextEvent" aria-label="다음"><svg class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3 11 8l-5.5 5" /></svg></button
               ><div class="scrub"><svg id="ribbon" aria-hidden="true"></svg><input
                 id="scrubber"
                 type="range"
@@ -385,6 +386,7 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
               </div>
             </details>
           </div>
+          <section id="story" class="story hidden" aria-label="실행 장면"></section>
           <aside class="inspector" id="inspector">
         <div class="inspectbar">
           <strong>단계 상세</strong><span id="detailIndex"></span
@@ -653,8 +655,8 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
           파일을 읽고 로컬 모델을 호출합니다.
         </li>
         <li>
-          <strong>따라가기</strong> — 단계나 재생 막대를 선택하세요.
-          데이터·파일·코드가 같은 시점을 가리킵니다.
+          <strong>따라가기</strong> — 오른쪽의 장면을 고르거나 재생하세요.
+          세부는 장면을 펼치거나 <strong>전체 기록</strong>에서 봅니다.
         </li>
         <li class="localonly">
           <strong>멈추기</strong> — 실행 전에 단계 정지를 켜세요. 교육용은 실제

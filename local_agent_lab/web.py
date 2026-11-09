@@ -660,6 +660,7 @@ def make_handler(app):
                         "architecture.js",
                         "inspection.js",
                         "lessons.js",
+                        "story.js",
                         "diagram.css",
                         "workbench.css",
                         "favicon.svg",

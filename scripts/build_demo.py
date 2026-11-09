@@ -28,6 +28,7 @@ ASSETS = (
     "architecture.js",
     "inspection.js",
     "lessons.js",
+    "story.js",
     "diagram.css",
     "workbench.css",
     "favicon.svg",
@@ -54,7 +55,7 @@ def page(source):
         f'    <meta property="og:description" content="{SUMMARY}" />\n'
         '    <meta property="og:type" content="website" />\n'
         f'    <meta property="og:url" content="{PAGE_URL}" />\n'
-        f'    <meta property="og:image" content="{PAGE_URL}images/lesson-step.png" />\n'
+        f'    <meta property="og:image" content="{PAGE_URL}images/scenes.png" />\n'
         '    <meta name="twitter:card" content="summary_large_image" />\n'
         '    <script src="demo.js"></script>\n    '
     )
@@ -114,7 +115,7 @@ def build(output):
     source = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
     (output / "index.html").write_text(page(source), encoding="utf-8")
     (output / "images").mkdir()
-    shutil.copy2(ROOT / "docs" / "images" / "lesson-step.png", output / "images" / "lesson-step.png")
+    shutil.copy2(ROOT / "docs" / "images" / "scenes.png", output / "images" / "scenes.png")
     (output / ".nojekyll").write_text("", encoding="utf-8")
     return output
 
