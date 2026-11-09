@@ -98,3 +98,17 @@ test("the diagram area is separate from anything that grows or shrinks", () => {
   assert.match(rule(".execution .replay"), /\bheight: 44px/);
   assert.match(rule(".execution .controls"), /position: absolute/);
 });
+
+test("the prompt box stays in one place at the end of the right column", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const html = fs.readFileSync(path.join(__dirname, "..", "web", "index.html"), "utf8");
+  const css = fs.readFileSync(path.join(__dirname, "..", "web", "diagram.css"), "utf8");
+  const dock = html.indexOf('class="composerdock"');
+  assert.ok(dock > html.indexOf('id="inspector"'));
+  for (const id of ["promptForm", "prompt", "run", "newSession"]) assert.ok(html.indexOf(`id="${id}"`) > dock, id);
+  assert.ok(html.indexOf('id="answerPanel"') > dock);
+  assert.match(css, /^\.composerdock \{\s+position: sticky/m);
+  const open = html.indexOf('id="prompt"');
+  assert.ok(html.slice(open, html.indexOf("</textarea>", open)).trimEnd().endsWith(">"), "입력란은 비어 있는 상태로 시작한다");
+});

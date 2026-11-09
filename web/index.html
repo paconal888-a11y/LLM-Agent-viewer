@@ -121,9 +121,6 @@
                   <button id="openLearning" class="quiet" title="예측 → 증거 확인 → 원인 설명 → 한 조건 수정 → 재검증 순서로 기록을 살펴봅니다">원인 찾기</button
                   ><button id="export" class="quiet" disabled>내보내기</button>
                 </div>
-                <div class="toolgroup" role="group" aria-label="대화">
-                  <button id="newSession" class="quiet">새 대화</button>
-                </div>
               </div>
             </div>
             <div class="diagram-caption">
@@ -140,7 +137,7 @@
             <div id="architecture" class="architecture"></div>
             <div id="currentStep" class="currentstep">
               <strong>실행 대기</strong
-              ><span>요청을 실행하거나 왼쪽 위 메뉴의 예제 기록을 선택하세요.</span>
+              ><span>오른쪽 아래 입력란에 요청을 쓰고 실행하세요. 저장된 예제는 왼쪽 위 메뉴에 있습니다.</span>
             </div>
             <div class="route" id="route"></div>
             <div id="connections" class="connections hidden"></div>
@@ -233,12 +230,76 @@
               <p>단계를 이동하면 실행 위치와 데이터가 구조도에 표시됩니다.</p>
             </div>
           </div>
+          <section id="story" class="story hidden" aria-label="실행 장면"></section>
+          <aside class="inspector" id="inspector">
+        <div class="inspectbar">
+          <strong>단계 상세</strong><span id="detailIndex"></span
+          ><button id="closeDetail" class="icon" aria-label="단계 상세 닫기">
+            ×
+          </button>
+        </div>
+        <div id="detailEmpty" class="inspectempty">
+          <span>⌖</span>
+          <h3>실행 기록을 선택하세요.</h3>
+          <p>
+            이 단계에서 바뀐 데이터와 실제 실행한 코드 줄을 함께 보여줍니다.
+          </p>
+          <div class="actorlegend">
+            <p><b>H</b> 하네스 · 입력 구성과 실행 제어</p>
+            <p><b>M</b> 모델 · 토큰과 행동 요청 생성</p>
+            <p><b>T</b> 도구 · 실제 작업 수행</p>
+          </div>
+        </div>
+        <div id="detailBody" class="hidden">
+          <div class="detailhead">
+            <span id="detailActor" class="pill"></span>
+            <span id="evidenceKind" class="evidence-kind"></span>
+            <span id="decisionKind" class="decision-kind"></span>
+            <h2 id="detailTitle"></h2>
+            <code id="detailKind"></code>
+            <code id="detailPath" class="storage-path hidden"></code>
+            <p id="detailExplanation"></p>
+            <p id="decisionNote" class="decision-note"></p>
+          </div>
+          <div id="componentNavigator" class="componentnav hidden"></div>
+          <div id="inputLinks" class="inputlinks hidden"></div>
+          <nav class="detailtabs">
+            <button data-detail="change" class="active">데이터 변화</button
+            ><button data-detail="code">실행 코드</button
+            ><button data-detail="input">모델 입력</button
+            ><button data-detail="values">전체 값</button
+            ><button data-detail="learn">원인 찾기</button>
+          </nav>
+          <div id="sourcePeek" class="sourcepeek hidden"></div>
+          <div id="detailContent" class="detailcontent"></div>
+        </div>
+      </aside>
+          <div class="composerdock">
           <form id="promptForm" class="composer">
             <p id="sampleComposerNote" class="samplenote hidden">
               샘플 보기 모드라 실행할 수 없습니다. 입력과 설정은 살펴볼 수 있으며,
               직접 실행하려면 <code>Start-AgentLens.cmd</code>를 일반 모드로 시작하세요.
             </p>
-            <div class="modebar">
+            <p id="modeNote" class="note">
+              한 대화에서 모델과 도구를 반복 호출합니다. 호출 한도는 기본 8회이고
+              agent-lens.json으로 바꿀 수 있습니다.
+            </p>
+            <div class="composerhead">
+              <label for="prompt">새 요청 입력</label>
+              <span id="sessionNote" class="sessionnote"></span>
+              <button type="button" id="newSession" class="quiet">새 대화로 시작</button>
+            </div>
+            <textarea
+              id="prompt"
+              rows="2"
+              maxlength="6000"
+              placeholder="여기에 에이전트에게 시킬 일을 쓰고 실행을 누르세요."
+            ></textarea>
+            <div id="draftInfo" class="draftinfo">
+              입력한 문자열은 실행할 때 JSON 요청에 담깁니다.
+            </div>
+            <div class="composer-bottom">
+              <div class="modebar">
               <label for="agentMode">작업 방식</label
               ><select id="agentMode">
                 <option value="single">한 에이전트</option>
@@ -247,33 +308,15 @@
                 <option value="team">주 에이전트 + 하위 에이전트</option>
               </select>
             </div>
-            <p id="modeNote" class="note">
-              한 대화에서 모델과 도구를 반복 호출합니다. 호출 한도는 기본 8회이고
-              agent-lens.json으로 바꿀 수 있습니다.
-            </p>
-            <label for="prompt">요청</label
-            ><textarea
-              id="prompt"
-              rows="3"
-              maxlength="6000"
-              placeholder="에이전트에게 시킬 일을 입력하세요."
-            >
-add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</textarea
-            >
-            <div id="draftInfo" class="draftinfo">
-              입력한 문자열은 실행할 때 JSON 요청에 담깁니다.
-            </div>
-            <div class="composer-bottom">
               <label class="check"
-                ><input id="stepMode" type="checkbox" />실제 실행을 단계마다
-                멈추기</label
+                ><input id="stepMode" type="checkbox" />단계마다 멈추기</label
               ><button type="submit" class="primary" id="run" disabled>
                 ▶ 실행 <kbd>Ctrl ↵</kbd>
               </button>
             </div>
           </form>
           <div class="run-options">
-            <details class="examples">
+            <details class="examples" name="composeroptions">
               <summary>예제</summary>
               <div class="examplebuttons">
                 <button data-example="tool">계산 도구</button
@@ -287,7 +330,7 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
                 <button data-example="team">하위 작업</button>
               </div>
             </details>
-            <details class="configuration" id="configuration">
+            <details class="configuration" id="configuration" name="composeroptions">
               <summary>
                 <span>실행 설정</span
                 ><span id="configSummary">Python 실행기 · 하네스</span>
@@ -316,7 +359,7 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
                     rows="3"
                     spellcheck="false"
                   >
-[{"tool":"add_numbers","arguments":{"a":137,"b":248}}]</textarea
+[]</textarea
                   >
                 </label>
                 <p class="note">
@@ -386,50 +429,7 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
               </div>
             </details>
           </div>
-          <section id="story" class="story hidden" aria-label="실행 장면"></section>
-          <aside class="inspector" id="inspector">
-        <div class="inspectbar">
-          <strong>단계 상세</strong><span id="detailIndex"></span
-          ><button id="closeDetail" class="icon" aria-label="단계 상세 닫기">
-            ×
-          </button>
-        </div>
-        <div id="detailEmpty" class="inspectempty">
-          <span>⌖</span>
-          <h3>실행 기록을 선택하세요.</h3>
-          <p>
-            이 단계에서 바뀐 데이터와 실제 실행한 코드 줄을 함께 보여줍니다.
-          </p>
-          <div class="actorlegend">
-            <p><b>H</b> 하네스 · 입력 구성과 실행 제어</p>
-            <p><b>M</b> 모델 · 토큰과 행동 요청 생성</p>
-            <p><b>T</b> 도구 · 실제 작업 수행</p>
           </div>
-        </div>
-        <div id="detailBody" class="hidden">
-          <div class="detailhead">
-            <span id="detailActor" class="pill"></span>
-            <span id="evidenceKind" class="evidence-kind"></span>
-            <span id="decisionKind" class="decision-kind"></span>
-            <h2 id="detailTitle"></h2>
-            <code id="detailKind"></code>
-            <code id="detailPath" class="storage-path hidden"></code>
-            <p id="detailExplanation"></p>
-            <p id="decisionNote" class="decision-note"></p>
-          </div>
-          <div id="componentNavigator" class="componentnav hidden"></div>
-          <div id="inputLinks" class="inputlinks hidden"></div>
-          <nav class="detailtabs">
-            <button data-detail="change" class="active">데이터 변화</button
-            ><button data-detail="code">실행 코드</button
-            ><button data-detail="input">모델 입력</button
-            ><button data-detail="values">전체 값</button
-            ><button data-detail="learn">원인 찾기</button>
-          </nav>
-          <div id="sourcePeek" class="sourcepeek hidden"></div>
-          <div id="detailContent" class="detailcontent"></div>
-        </div>
-      </aside>
           </aside>
           <section id="answerPanel" class="answer hidden">
             <div class="sectionbar">
@@ -651,8 +651,8 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
           저장 기록과 지금 실행하는 계산을 구분해 표시합니다.
         </li>
         <li class="localonly">
-          <strong>실행</strong> — 예제를 선택하고 실행하세요. 하네스가 실제
-          파일을 읽고 로컬 모델을 호출합니다.
+          <strong>실행</strong> — 오른쪽 아래 입력란에 요청을 쓰거나 예제를 고른 뒤
+          실행하세요. 하네스가 실제 파일을 읽고 로컬 모델을 호출합니다.
         </li>
         <li>
           <strong>따라가기</strong> — 오른쪽의 장면을 고르거나 재생하세요.

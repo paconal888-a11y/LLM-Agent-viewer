@@ -3262,3 +3262,215 @@ body.demo .sceneactions [data-story="change"] {
     white-space: nowrap;
   }
 }
+
+/* 입력란: 어느 상태에서든 오른쪽 칸 맨 아래 같은 자리에 있다. */
+.composerdock {
+  position: sticky;
+  bottom: 0;
+  z-index: 6;
+  flex: none;
+  margin-top: auto;
+  background: var(--paper);
+  border-top: 2px solid var(--ink);
+}
+.lesson-active .composerdock,
+body.demo .composerdock {
+  display: none;
+}
+#journeyView .composerdock .composer {
+  display: block !important;
+  position: static;
+  margin: 0;
+  padding: 10px 14px 6px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+.composerhead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.composerhead label {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.sessionnote {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composerhead #newSession {
+  flex: none;
+  margin-left: auto;
+  padding: 2px 6px;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+#journeyView .composerdock .composer textarea {
+  display: block;
+  width: 100%;
+  height: 64px;
+  min-height: 64px;
+  max-height: 150px;
+  padding: 8px 10px;
+  background: #ffffff;
+  border: 1.5px solid var(--ink);
+  border-radius: 2px;
+  field-sizing: content;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: none;
+}
+#journeyView .composerdock .composer textarea:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 1px;
+}
+.composerdock #modeNote,
+#journeyView .composerdock .draftinfo {
+  display: none;
+}
+#journeyView .composerdock .composer-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding-top: 8px;
+  border: 0;
+}
+#journeyView .composerdock .modebar {
+  display: flex;
+  float: none;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+#journeyView .composerdock .composer .modebar label {
+  color: var(--muted);
+  font-size: 12px;
+}
+#journeyView .composerdock .composer .modebar select {
+  width: auto;
+  max-width: 132px;
+  height: 28px;
+  padding: 0 4px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-size: 12px;
+}
+#journeyView .composerdock .composer-bottom .check {
+  color: var(--muted);
+  font-size: 12px;
+}
+#journeyView .composerdock .composer-bottom .primary {
+  margin-left: auto;
+  padding: 8px 18px;
+  font-size: 13px;
+}
+#journeyView .composerdock .samplenote {
+  margin: 0 0 8px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+#journeyView .composerdock .run-options {
+  display: flex !important;
+  flex-direction: row;
+  gap: 4px;
+  padding: 0 8px 8px;
+}
+#journeyView .composerdock .run-options,
+#journeyView .composerdock .examples,
+#journeyView .composerdock .configuration {
+  position: static;
+}
+#journeyView .composerdock .examples,
+#journeyView .composerdock .configuration {
+  display: block !important;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+}
+#journeyView .composerdock details > summary {
+  display: block;
+  padding: 2px 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 400;
+  list-style: none;
+}
+#journeyView .composerdock details > summary::before,
+#journeyView .composerdock details > summary::-webkit-details-marker {
+  display: none;
+}
+#journeyView .composerdock details > summary:hover,
+#journeyView .composerdock details[open] > summary {
+  color: var(--ink);
+}
+#journeyView .composerdock details[open] > summary {
+  font-weight: 650;
+}
+#journeyView .composerdock .configuration summary span:last-child {
+  display: none;
+}
+.composerdock .examplebuttons,
+.composerdock .configbody {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  max-height: min(62vh, 520px);
+  overflow: auto;
+  padding: 12px 14px;
+  background: var(--paper);
+  border-top: 1px solid var(--ink);
+  box-shadow: 0 -10px 24px #0b0d0c26;
+}
+.composerdock .examplebuttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.composerdock .examplebuttons button {
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  font-size: 12px;
+}
+.composerdock .examplebuttons button:hover {
+  border-color: var(--ink);
+}
+.storyempty {
+  padding: 28px 18px;
+}
+.storyempty strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+.storyempty p {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+#journeyView .composerdock .composer .modebar label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.composerdock .examplebuttons {
+  top: auto;
+  width: auto;
+}

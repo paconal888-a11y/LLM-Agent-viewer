@@ -1076,10 +1076,8 @@
       : summary.error
         ? `<div class="storyanswer failed"><h3>오류</h3><p>${esc(summary.error)}</p></div>`
         : "";
-    const live = state.health.mode !== "sample",
-      actions = [];
+    const actions = [];
     if (summary.answer) actions.push('<button class="quiet" data-story="answer">답변 전체 보기</button>');
-    if (live) actions.push('<button class="quiet" data-story="next">이어서 요청하기</button>');
     if (!state.health.demo) actions.push('<button class="quiet" data-story="edit">입력 · 설정 불러오기</button>');
     return `<header class="storyhead"><p class="storyprompt">${esc(AgentStory.short(summary.prompt, 200))}</p>${outcome}<dl class="storystats">${stats.map(([term, value]) => `<div><dt>${term}</dt><dd>${esc(value)}</dd></div>`).join("")}</dl>${actions.length ? `<div class="storyactions">${actions.join("")}</div>` : ""}</header>`;
   }
@@ -1102,9 +1100,14 @@
   function renderStory() {
     const box = $("story"),
       list = state.events.length && !state.lesson ? scenes() : [];
-    box.classList.toggle("hidden", !list.length);
+    renderSessionNote();
+    const empty = !list.length && !state.lesson && !state.health?.demo;
+    box.classList.toggle("hidden", !list.length && !empty);
     if (!list.length) {
       state.storyKey = "";
+      box.innerHTML = empty
+        ? '<div class="storyempty"><strong>오른쪽 아래 입력란에 시킬 일을 쓰고 실행을 누르세요.</strong><p>에이전트가 한 일이 여기에 장면으로 쌓이고, 왼쪽 구조도에 그 경로가 표시됩니다.</p></div>'
+        : "";
       return;
     }
     const at = AgentStory.sceneAt(list, state.cursor),
@@ -1128,6 +1131,10 @@
         place = row.getBoundingClientRect();
       if (place.top < bounds.top || place.bottom > bounds.bottom) rail.scrollTop += place.top - bounds.top - 8;
     }
+  }
+  function renderSessionNote() {
+    // 이미 쓴 대화면 이전 내용이 다음 모델 입력에 들어간다.
+    $("sessionNote").textContent = state.usedSessions?.has(state.session) ? "지난 대화에 이어서 보냅니다" : "새 대화로 보냅니다";
   }
   function renderPosition() {
     if (sceneMode() && state.events.length) {
@@ -1788,6 +1795,11 @@
       toast("진행 중인 요청은 화면 위의 실행 상태에서 계속하거나 중지하세요.");
       return;
     }
+    if (!$("prompt").value.trim()) {
+      $("prompt").focus();
+      toast("에이전트에게 시킬 일을 입력하세요.");
+      return;
+    }
     saveDraft();
     endLesson();
     state.generation = (state.generation || 0) + 1;
@@ -1809,6 +1821,10 @@
       },
     };
     const data = await api("/api/runs", payload);
+    // 보낸 요청은 장면의 맨 위에 남는다. 입력란은 다음 요청을 위해 비운다.
+    $("prompt").value = "";
+    saveDraft();
+    state.usedSessions?.add(payload.session_id);
     state.events = [];
     state.agentFilter = payload.mode === "team" ? data.id : "all";
     state.sources = {};
@@ -2777,6 +2793,7 @@
   }
   async function history() {
     const items = await api("/api/history");
+    state.usedSessions = new Set(items.map((item) => item.session_id));
     state.history = items;
     feedbackOptions();
     $("history").innerHTML =
@@ -4030,6 +4047,10 @@
     stopPlay();
     if (state.events.length) select(state.cursor);
   };
+  document.querySelector(".examplebuttons").addEventListener("click", () => {
+    document.querySelector(".examples").open = false;
+    $("prompt").focus();
+  });
   $("story").onclick = action(async (event) => {
     const button = event.target.closest("[data-story]");
     if (!button) return;
@@ -4046,10 +4067,7 @@
     else if (type === "answer") $("showAnswer").click();
     else if (type === "change") await openFile(button.dataset.file);
     else if (type === "edit") $("editPrompt").click();
-    else if (type === "next") {
-      $("journeyView").classList.remove("focus");
-      $("prompt").select();
-    } else if (type === "input") {
+    else if (type === "input") {
       const at = state.events.findIndex((item) => item.id === Number(button.dataset.input));
       state.live = false;
       state.tab = "input";
@@ -4095,8 +4113,9 @@
     toast(
       "새 대화에서 시작합니다. 이전 대화 이력은 다음 입력에 넣지 않습니다.",
     );
-    $("journeyView").classList.remove("focus");
     saveDraft();
+    renderSessionNote();
+    $("prompt").focus();
   };
   // RUN_IMPORT_START
   async function importRunSettings(run) {
@@ -4305,6 +4324,7 @@
       }
     }
     renderArchitecture();
+    renderStory();
     document.addEventListener("input", (e) => {
       if (e.target.closest("#promptForm,#configuration")) saveDraft();
     });
