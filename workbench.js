@@ -332,6 +332,20 @@
     return activity;
   }
   function view(name) {
+    // 샘플 보기에서 기본 기록으로 열면 비어 있는 화면은 내용이 있는 예제를 먼저 불러온다.
+    const fuller = { feedback: "sample-feedback", memory: "sample-summary-reuse" }[name];
+    if (
+      fuller &&
+      state.health?.mode === "sample" &&
+      (!state.run || state.run.id === "sample-verified-write")
+    ) {
+      loadRun(fuller)
+        .catch((error) => toast(error.message))
+        .finally(() => {
+          if (state.run?.id === fuller) view(name);
+        });
+      return;
+    }
     state.view = name;
     for (const v of ["lessons", "journey", "editor", "learn", "feedback", "memory"])
       $(v + "View").classList.toggle("hidden", v !== name);
@@ -361,7 +375,9 @@
       $("inspector").classList.remove("open");
       renderLessons();
       window.history.replaceState(null, "", "#/lessons");
-    } else if (name !== "journey") window.history.replaceState(null, "", location.pathname);
+    } else if (["learn", "feedback", "memory"].includes(name))
+      window.history.replaceState(null, "", "#/view/" + name);
+    else if (name !== "journey") window.history.replaceState(null, "", location.pathname);
     else if (!state.lesson) window.history.replaceState(null, "", runAddress());
     renderCoach();
     if (name === "memory") loadMemory().catch((e) => toast(e.message));
@@ -562,7 +578,7 @@
     const selected = e.id === state.events[state.cursor]?.id,
       failed = !!e.status && e.status !== "ok";
     // 실패·경고 기록은 통과 기록과 같은 모양이어서는 안 된다(status는 기록에 이미 있는 값이다).
-    return `<button class="event ${selected ? "selected" : ""} ${e.id > state.events[state.cursor]?.id ? "past" : ""} ${failed ? "status-" + esc(e.status) : ""}" data-event="${e.id}"${selected ? ' aria-current="true"' : ""}><span class="actor ${esc(e.actor)}">${actor[0]}</span><span class="eventtext"><span class="eventtitle">${esc(eventName(e))}${failed ? `<em class="statusmark">${e.status === "error" ? "실패" : "주의"}</em>` : ""}</span><span class="eventsub">${esc(pathOf(e) || e.source?.function || e.kind)}</span></span><span class="eventid">#${e.id}</span></button>`;
+    return `<button class="event ${selected ? "selected" : ""} ${e.id > state.events[state.cursor]?.id ? "past" : ""} ${failed ? "status-" + esc(e.status) : ""}" data-event="${e.id}"${selected ? ' aria-current="true"' : ""}><span class="actor ${esc(e.actor)}" title="${esc(actor[1])}" aria-label="${esc(actor[1])}">${actor[0]}</span><span class="eventtext"><span class="eventtitle">${esc(eventName(e))}${failed ? `<em class="statusmark">${e.status === "error" ? "실패" : "주의"}</em>` : ""}</span><span class="eventsub">${esc(pathOf(e) || e.source?.function || e.kind)}</span></span><span class="eventid">#${e.id}</span></button>`;
   }
   function chapterGroups(events) {
     let call = 0;
@@ -716,6 +732,38 @@
   function isTokenFrame(e) {
     return e.kind === "model.stream" || e.kind === "reference.sample";
   }
+  function revealSelectedEvent() {
+    const tray = document.querySelector(".recordtray"),
+      row = $("timeline").querySelector(".event.selected");
+    if (!tray || !row || !tray.clientHeight) return;
+    const box = tray.getBoundingClientRect(),
+      place = row.getBoundingClientRect();
+    if (place.top < box.top + 90 || place.bottom > box.bottom)
+      tray.scrollTop += place.top - box.top - box.height / 3;
+  }
+  // 재생 막대 뒤에 실행의 리듬을 그린다. 모델 호출은 길게, 도구는 중간, 나머지는 짧게.
+  function renderRibbon() {
+    const box = $("ribbon"),
+      count = state.events.length,
+      groups = { model: "", tool: "", other: "" };
+    state.events.forEach((event, index) => {
+      const kind = /^model\.(request|response)$/.test(event.kind)
+          ? "model"
+          : /^(tool|mcp|lsp|agent)\./.test(event.kind)
+            ? "tool"
+            : "other",
+        top = { model: 2, tool: 8, other: 15 }[kind];
+      groups[kind] += `M${index + 0.5} ${top}V24`;
+    });
+    const paths = Object.entries(groups)
+      .map(([kind, d]) => `<path class="${kind}" d="${d}"/>`)
+      .join("");
+    box.setAttribute("viewBox", `0 0 ${Math.max(count, 1)} 24`);
+    box.setAttribute("preserveAspectRatio", "none");
+    box.innerHTML = `<defs><clipPath id="ribbonClip"><rect id="ribbonPlayed" width="0" height="24"/></clipPath></defs><g class="all">${paths}</g><g class="played" clip-path="url(#ribbonClip)">${paths}</g>`;
+    state.ribbonRun = state.run?.id;
+    state.ribbonCount = count;
+  }
   function renderTimeline() {
     if (
       !state.events.length ||
@@ -788,6 +836,7 @@
     // 새 기록 수신에도 사용자가 펼친 그룹을 보존한다.
     for (const d of $("timeline").querySelectorAll("details[data-group]"))
       if (opened.has(d.dataset.group)) d.open = true;
+    revealSelectedEvent();
     for (const d of $("timeline").querySelectorAll("details[data-step]"))
       if (state.openSteps?.has(d.dataset.step)) d.open = true;
     state.timelineRendered = true;
@@ -929,6 +978,8 @@
     highlightFiles();
     renderArchitecture();
     $("scrubber").value = state.cursor;
+    if (state.ribbonRun !== state.run?.id || state.ribbonCount !== state.events.length) renderRibbon();
+    $("ribbonPlayed")?.setAttribute("width", state.cursor + 1);
     $("position").textContent = state.cursor + 1 + " / " + state.events.length;
     const current = state.events[state.cursor];
     if (current)
@@ -950,6 +1001,17 @@
   function lessonText(value) {
     return esc(value).replace(/`([^`]+)`/g, "<code>$1</code>");
   }
+  function feedbackAddress() {
+    return AgentLessons.feedbackAddress({
+      version: state.health?.version,
+      mode: state.health?.mode,
+      demo: state.health?.demo,
+      lesson: state.view === "journey" ? state.lesson?.id : "",
+      step: state.lesson?.step,
+      run: state.run?.id,
+      view: state.view,
+    });
+  }
   function renderCoach() {
     const lesson = state.lesson && AgentLessons.byId(state.lesson.id),
       shown = !!lesson && state.view === "journey";
@@ -966,7 +1028,7 @@
       away = expected >= 0 && expected !== state.cursor;
     $("coach").innerHTML =
       `<header><span class="coachname"><b>${lesson.number}강</b>${esc(lesson.title)}</span><span class="coachdots" role="img" aria-label="${index + 1} / ${lesson.steps.length}단계">${lesson.steps.map((_, i) => `<i class="${i < index ? "done" : i === index ? "current" : ""}"></i>`).join("")}</span><small>${index + 1} / ${lesson.steps.length}</small><span class="coachsource">실제 저장 기록 재생</span><button class="quiet" data-coach="list">목록</button><button class="icon" data-coach="exit" aria-label="강의 닫기">×</button></header>` +
-      `<div class="coachbody"><h2>${esc(step.title)}</h2><p>${lessonText(step.body)}</p>${step.look ? `<p class="coachlook">${lessonText(step.look)}</p>` : ""}${owner ? `<p class="coachowner"><span class="decision-kind" data-owner="${owner.owner}">${esc(owner.label)}</span>이 단계를 정한 쪽</p>` : ""}${last ? `<div class="coachtake"><strong>핵심</strong><p>${lessonText(lesson.takeaway)}</p><strong>직접 해 보기</strong><p>${lessonText(lesson.tryIt.text)}</p><button class="secondary" data-coach="try">${lesson.tryIt.file ? "파일 열기 ↗" : lesson.tryIt.view ? "화면 열기 ↗" : "실행 화면으로 ↗"}</button></div>` : ""}</div>` +
+      `<div class="coachbody"><h2>${esc(step.title)}</h2><p>${lessonText(step.body)}</p>${step.look ? `<p class="coachlook">${lessonText(step.look)}</p>` : ""}${owner ? `<p class="coachowner"><span class="decision-kind" data-owner="${owner.owner}">${esc(owner.label)}</span>이 단계를 정한 쪽</p>` : ""}${last ? `<div class="coachtake"><strong>핵심</strong><p>${lessonText(lesson.takeaway)}</p><strong>직접 해 보기</strong><p>${lessonText(lesson.tryIt.text)}</p><button class="secondary" data-coach="try">${lesson.tryIt.file ? "파일 열기 ↗" : lesson.tryIt.view ? "화면 열기 ↗" : "실행 화면으로 ↗"}</button><a class="coachask" href="${esc(feedbackAddress())}" target="_blank" rel="noopener">이 강의에서 막힌 곳 알려 주기 ↗</a></div>` : ""}</div>` +
       `<footer>${away ? '<button class="quiet" data-coach="back">강의 위치로 돌아가기</button>' : ""}<button class="quiet coachdetail" data-coach="detail">상세 열기</button><button class="secondary" data-coach="prev" ${index ? "" : "disabled"}>← 이전</button><button class="primary" data-coach="next">${last ? (next ? "다음 강의 →" : "코스 마치기") : "다음 →"}</button></footer>`;
   }
   async function openLesson(id, index = 0) {
@@ -1010,6 +1072,24 @@
     state.lessonTicket = (state.lessonTicket || 0) + 1;
     renderCoach();
   }
+  // 첫 화면에서 제품이 다루는 흐름을 한 줄로 보여 준다.
+  function lessonFlow() {
+    const names = Object.fromEntries(AgentLessons.owners.map(([key, label]) => [key, label])),
+      steps = [
+        ["요청", "user"],
+        ["규칙 읽기", "config"],
+        ["입력 조립", "code"],
+        ["모델 호출", "model"],
+        ["도구 검사 · 실행", "code"],
+        ["완료 판정", "code"],
+      ];
+    return `<ol class="heroflow" aria-label="프롬프트 한 줄이 지나가는 단계">${steps
+      .map(
+        ([name, owner]) =>
+          `<li>${esc(name)}<span class="decision-kind" data-owner="${owner}">${esc(names[owner])}</span></li>`,
+      )
+      .join("")}</ol>`;
+  }
   function renderLessons() {
     const progress = lessonProgress(),
       all = AgentLessons.lessons,
@@ -1021,7 +1101,7 @@
       sample = state.health.mode === "sample",
       connected = !!state.health.connected;
     $("lessonsView").innerHTML =
-      `<div class="lessons"><header class="lessonhero"><h1>에이전트가 실제로 하는 일을 기록으로 배웁니다</h1><p>프롬프트 한 줄이 파일 읽기, 모델 호출, 도구 실행, 완료 판정으로 이어지는 과정을 단계별로 따라갑니다. 모든 강의는 실제 로컬 모델을 돌려 저장한 기록이며, 모델을 설치하지 않아도 볼 수 있습니다.</p><div class="lessonactions"><button class="primary" data-lesson="${target.id}" data-step="${step}">${finished === all.length ? "처음부터 다시 보기" : finished || (resume && step) ? `이어서: ${target.number}강 ${esc(target.title)}` : "1강부터 시작"}</button><span>${finished} / ${all.length}강 완료</span></div></header>` +
+      `<div class="lessons"><header class="lessonhero"><h1>에이전트가 실제로 하는 일을 기록으로 배웁니다</h1><p>프롬프트 한 줄이 파일 읽기, 모델 호출, 도구 실행, 완료 판정으로 이어지는 과정을 단계별로 따라갑니다. 모든 강의는 실제 로컬 모델을 돌려 저장한 기록이며, 모델을 설치하지 않아도 볼 수 있습니다.</p><div class="lessonactions"><button class="primary" data-lesson="${target.id}" data-step="${step}">${finished === all.length ? "처음부터 다시 보기" : finished || (resume && step) ? `이어서: ${target.number}강 ${esc(target.title)}` : "1강부터 시작"}</button><span>${finished} / ${all.length}강 완료</span></div>${lessonFlow()}</header>` +
       `<section class="ownerlegend" aria-label="결정 주체 표시"><h2>기록을 읽는 기준: 누가 정했나</h2><p>모든 단계에 이 표시가 붙습니다. 무엇을 고쳐야 결과가 달라지는지 알려 주는 표시입니다.</p><div>${AgentLessons.owners.map(([key, label, note]) => `<article><span class="decision-kind" data-owner="${key}">${esc(label)}</span><small>${esc(note)}</small></article>`).join("")}</div></section>` +
       AgentLessons.chapters
         .map(
@@ -3000,7 +3080,7 @@
   function stopPlay() {
     clearInterval(state.playing);
     state.playing = null;
-    $("play").textContent = "▶";
+    $("play").classList.remove("playing");
   }
   document.addEventListener(
     "click",
@@ -3332,7 +3412,7 @@
     if (!state.events.length) return;
     state.live = false;
     if (state.cursor >= state.events.length - 1) select(0);
-    $("play").textContent = "Ⅱ";
+    $("play").classList.add("playing");
     state.playing = setInterval(() => {
       if (state.cursor >= state.events.length - 1) {
         stopPlay();
@@ -3781,7 +3861,9 @@
   $("zoomOut").onclick = () => AgentArchitecture.scale(-1);
   $("zoomFit").onclick = () => AgentArchitecture.fit();
   $("toggleRecords").onclick = () => {
-    document.querySelector(".execution").classList.toggle("records-open");
+    // 오른쪽 칸에서 상세를 닫으면 단계 목록이 보인다.
+    if ($("inspector").classList.contains("open")) $("inspector").classList.remove("open");
+    else document.querySelector(".execution").classList.toggle("records-open");
     renderTimeline();
   };
   $("showAnswer").onclick = () => {
@@ -3809,7 +3891,14 @@
   $("closeDetail").onclick = () => $("inspector").classList.remove("open");
   $("menu").onclick = () => $("project").classList.add("open");
   $("closeProject").onclick = () => $("project").classList.remove("open");
+  document.addEventListener("pointerdown", (event) => {
+    if ($("project").classList.contains("open") && !event.target.closest("#project, #menu"))
+      $("project").classList.remove("open");
+  });
   $("help").onclick = () => $("guide").showModal();
+  $("feedbackLink").onclick = (event) => {
+    event.currentTarget.href = feedbackAddress();
+  };
   $("closeGuide").onclick = () => $("guide").close();
   $("newSession").onclick = () => {
     state.session = "session-" + crypto.randomUUID().slice(0, 12);
@@ -3974,15 +4063,14 @@
   });
   async function init() {
     restoreDraft();
-    const execution = document.querySelector(".execution"),
-      tray = document.createElement("div");
+    const tray = document.createElement("div");
     tray.className = "recordtray";
     tray.append(
       document.querySelector(".eventtoolbar"),
       $("bodySearchResults"),
       $("timeline"),
     );
-    execution.append(tray);
+    document.querySelector(".rail").insertBefore(tray, $("inspector"));
     AgentArchitecture.init($("architecture"), { select: selectComponent });
     featureUI();
     renderRoute();

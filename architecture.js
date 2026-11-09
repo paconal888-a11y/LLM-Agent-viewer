@@ -1,6 +1,36 @@
 /* 실행 기록을 시스템 구성과 연결한다. 연결선은 처리 중인 데이터의 경계다. */
 ((scope) => {
   "use strict";
+  const WIDTH = 1100,
+    HEIGHT = 600;
+  // 직각 경로의 모서리를 둥글린다.
+  function roundCorners(path, radius = 7) {
+    const points = [];
+    let x = 0,
+      y = 0;
+    path.replace(/([MHV])([\d.]+)(?: ([\d.]+))?/g, (_, command, a, b) => {
+      if (command === "H") x = Number(a);
+      else if (command === "V") y = Number(a);
+      else [x, y] = [Number(a), Number(b)];
+      points.push([x, y]);
+      return "";
+    });
+    let out = `M${points[0][0]} ${points[0][1]}`;
+    for (let i = 1; i < points.length - 1; i++) {
+      const [ax, ay] = points[i - 1],
+        [bx, by] = points[i],
+        [cx, cy] = points[i + 1],
+        before = Math.hypot(bx - ax, by - ay),
+        after = Math.hypot(cx - bx, cy - by),
+        r = Math.min(radius, before / 2, after / 2);
+      if (!r) continue;
+      out +=
+        ` L${bx - ((bx - ax) / before) * r} ${by - ((by - ay) / before) * r}` +
+        ` Q${bx} ${by} ${bx + ((cx - bx) / after) * r} ${by + ((cy - by) / after) * r}`;
+    }
+    const end = points[points.length - 1];
+    return `${out} L${end[0]} ${end[1]}`;
+  }
   const nodes = [
     ["browser", 24, 75, 148, 62, "브라우저", "프롬프트 · 전송"],
     ["api", 218, 75, 140, 62, "요청 수신", "HTTP · 작업 스레드"],
@@ -26,15 +56,7 @@
     ["response", 700, 358, 168, 62, "응답 어댑터", "하네스 · 응답 조립"],
     ["mcp", 700, 506, 168, 62, "MCP 서버", "별도 프로세스의 도구"],
     ["lsp", 902, 506, 168, 62, "언어 서버 · LSP", "진단 · 심볼 · 정의"],
-  ].map(([id, x, y, w, h, title, description]) => ({
-    id,
-    x,
-    y: y * 0.7,
-    w,
-    h: h <= 46 ? 35 : h === 108 ? 88 : 52,
-    title,
-    description,
-  }));
+  ].map(([id, x, y, w, h, title, description]) => ({ id, x, y, w, h, title, description }));
   const edges = [
     ["input", "M172 106 H218"],
     ["api-context", "M358 106 H420"],
@@ -69,15 +91,7 @@
     ["compact-context", "M507 170 V137"],
     ["mcp-tool", "M832 506 V462 H288 V459"],
     ["lsp-tool", "M986 506 V462 H288 V459"],
-  ].map(([id, path]) => [
-    id,
-    path
-      .replace(
-        /([ML])([\d.]+) ([\d.]+)/g,
-        (_, command, x, y) => command + x + " " + Number(y) * 0.7,
-      )
-      .replace(/V([\d.]+)/g, (_, y) => "V" + Number(y) * 0.7),
-  ]);
+  ].map(([id, path]) => [id, roundCorners(path)]);
   const definitions = {
     compaction: [
       "입력이 커지면 줄입니다. 요청 사이에는 이전 대화를 요약해 저장하고, 요청 처리 중에는 오래된 도구 결과의 본문을 빼거나 앞선 작업을 요약합니다. 원본은 남고 모델에 보낼 입력만 달라집니다.",
@@ -432,8 +446,8 @@
       ""
     );
   }
-  // 노드 제목(16px)이 화면에서 11.5px 이상이 되는 배율. 이보다 작아지면 글자를 읽을 수 없다.
-  const READABLE_SCALE = 11.5 / 16;
+  // 이 배율보다 작아지는 휴대폰 화면에서만 전체를 줄이는 대신 현재 단계를 따라간다.
+  const READABLE_SCALE = 0.56;
   let callbacks = {},
     svg,
     host,
@@ -446,36 +460,15 @@
     host = element;
     callbacks = handlers;
     const group = (x, y, w, h, title, sub) =>
-      `<g class="arch-group"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10"/><text x="${x + 16}" y="${y + 25}" class="group-title">${title}</text>${sub ? `<text x="${x + w - 16}" y="${y + 25}" text-anchor="end" class="group-sub">${sub}</text>` : ""}</g>`;
-    host.innerHTML = `<svg viewBox="0 0 1100 600" role="img" aria-label="에이전트 전체 구조도. 단계에 따라 구성 요소와 데이터 경로가 강조됩니다."><defs><marker id="arch-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7"/></marker><marker id="arch-hot-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7"/></marker></defs><g class="arch-world">${group(202, 24, 410, 562, "하네스", "Python")}${group(682, 24, 406, 430, "추론 경로", "Python / llama.cpp")}${group(682, 474, 406, 112, "외부 프로세스", "")}<text x="24" y="58" class="group-title">사용자 · 브라우저</text><text x="24" y="207" class="group-title">프로젝트 파일</text><g class="arch-edges">${edges.map(([id, path]) => `<path data-arch-edge="${id}" d="${path}" fill="none" marker-end="url(#arch-arrow)"/>`).join("")}</g>${nodes.map((n) => `<g data-arch-node="${n.id}" class="arch-node" role="button" tabindex="0" aria-label="${n.title} 구성과 기록"><title>${n.title} · ${n.description}</title><rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="7"/><circle class="node-dot" cx="${n.x + n.w - 12}" cy="${n.y + 13}" r="3"/><text x="${n.x + 12}" y="${n.y + 22}" class="node-title">${n.title}</text><text x="${n.x + 12}" y="${n.y + 41}" class="node-meta">${n.description}</text>${n.id === "forward" ? `<text x="${n.x + 12}" y="${n.y + 66}" class="model-stage">선택 레이어의 수치 표본</text><text x="${n.x + 12}" y="${n.y + 86}" class="model-stage">실행기에 따라 노출 범위 다름</text>` : ""}</g>`).join("")}<g class="arch-pulse hidden"><circle r="5"/></g></g></svg>`;
+      `<g class="arch-group"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3"/><text x="${x + 14}" y="${y + 22}" class="group-title">${title}</text>${sub ? `<text x="${x + w - 14}" y="${y + 22}" text-anchor="end" class="group-sub">${sub}</text>` : ""}</g>`;
+    const arrow = (id) =>
+      `<marker id="${id}" markerWidth="8" markerHeight="8" refX="6.5" refY="3.5" orient="auto"><path d="M1.5 .8 L6.5 3.5 L1.5 6.2"/></marker>`;
+    const node = (n) => {
+      const small = n.h < 50;
+      return `<g data-arch-node="${n.id}" class="arch-node" role="button" tabindex="0" aria-label="${n.title} 구성과 기록"><title>${n.title} · ${n.description}</title><rect class="node-box" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="3"/><rect class="node-pip" x="${n.x + n.w - 12}" y="${n.y + 7}" width="5" height="5"/><text x="${n.x + 12}" y="${n.y + (small ? 19 : 25)}" class="node-title">${n.title}</text><text x="${n.x + 12}" y="${n.y + (small ? 36 : 45)}" class="node-meta">${n.description}</text>${n.id === "forward" ? `<text x="${n.x + 12}" y="${n.y + 72}" class="model-stage">선택 레이어의 수치 표본</text><text x="${n.x + 12}" y="${n.y + 90}" class="model-stage">실행기에 따라 범위 다름</text>` : ""}</g>`;
+    };
+    host.innerHTML = `<svg viewBox="0 0 ${WIDTH} ${HEIGHT}" role="group" aria-label="에이전트 전체 구조도. 단계에 따라 구성 요소와 데이터 경로가 강조됩니다."><defs>${["arch-arrow", "arch-seen-arrow", "arch-hot-arrow"].map(arrow).join("")}</defs><g class="arch-world">${group(202, 24, 410, 562, "하네스", "Python")}${group(682, 24, 406, 430, "추론 경로", "Python / llama.cpp")}${group(682, 474, 406, 112, "외부 프로세스", "")}<text x="24" y="58" class="group-title">사용자 · 브라우저</text><text x="24" y="207" class="group-title">프로젝트 파일</text><g class="arch-edges">${edges.map(([id, path]) => `<path data-arch-edge="${id}" d="${path}" fill="none" marker-end="url(#arch-arrow)"/>`).join("")}</g>${nodes.map(node).join("")}<g class="arch-pulse hidden"><circle r="4.5"/></g></g></svg>`;
     svg = host.querySelector("svg");
-    svg.setAttribute("viewBox", "0 0 1100 430");
-    svg.setAttribute("role", "group");
-    svg.querySelectorAll(".arch-group").forEach((group) => {
-      const rect = group.querySelector("rect");
-      rect.setAttribute("y", Number(rect.getAttribute("y")) * 0.7);
-      rect.setAttribute("height", Number(rect.getAttribute("height")) * 0.7);
-      group
-        .querySelectorAll("text")
-        .forEach((t) => t.setAttribute("y", Number(t.getAttribute("y")) * 0.7));
-    });
-    svg
-      .querySelectorAll(".arch-world > text")
-      .forEach((t) => t.setAttribute("y", Number(t.getAttribute("y")) * 0.7));
-    nodes.forEach((n) => {
-      const el = svg.querySelector(`[data-arch-node="${n.id}"]`);
-      el.querySelector(".node-title").setAttribute(
-        "y",
-        n.y + (n.h < 40 ? 15 : 20),
-      );
-      el.querySelector(".node-meta").setAttribute(
-        "y",
-        n.y + (n.h < 40 ? 29 : 38),
-      );
-      el.querySelectorAll(".model-stage").forEach((t, i) =>
-        t.setAttribute("y", n.y + 62 + i * 16),
-      );
-    });
     const activate = (event) => {
       const node = event.target.closest("[data-arch-node]");
       if (node) callbacks.select?.(node.dataset.archNode);
@@ -496,8 +489,8 @@
     svg.addEventListener("pointermove", (e) => {
       if (!drag) return;
       const bounds = svg.getBoundingClientRect();
-      pan.x = drag.px + ((e.clientX - drag.x) * 1100) / bounds.width;
-      pan.y = drag.py + ((e.clientY - drag.y) * 430) / bounds.height;
+      pan.x = drag.px + ((e.clientX - drag.x) * WIDTH) / bounds.width;
+      pan.y = drag.py + ((e.clientY - drag.y) * HEIGHT) / bounds.height;
       transform();
     });
     svg.addEventListener("pointerup", () => {
@@ -511,7 +504,7 @@
   }
   function view() {
     const bounds = svg.getBoundingClientRect(),
-      base = Math.min(bounds.width / 1100, bounds.height / 430);
+      base = Math.min(bounds.width / WIDTH, bounds.height / HEIGHT);
     if (!base) return null;
     return {
       base,
@@ -530,21 +523,21 @@
       const limit = (value, range) =>
         Math.max(-Math.max(0, range), Math.min(Math.max(0, range), value));
       followX = limit(
-        -(focus.x - 550) * current.effective,
-        (1100 * current.effective - current.width) / 2,
+        -(focus.x - WIDTH / 2) * current.effective,
+        (WIDTH * current.effective - current.width) / 2,
       );
       followY = limit(
-        -(focus.y - 215) * current.effective,
-        (430 * current.effective - current.height) / 2,
+        -(focus.y - HEIGHT / 2) * current.effective,
+        (HEIGHT * current.effective - current.height) / 2,
       );
     }
     svg
       .querySelector(".arch-world")
       .setAttribute(
         "transform",
-        `translate(${pan.x + followX} ${pan.y + followY}) translate(550 215) scale(${current.effective}) translate(-550 -215)`,
+        `translate(${pan.x + followX} ${pan.y + followY}) translate(${WIDTH / 2} ${HEIGHT / 2}) scale(${current.effective}) translate(${-WIDTH / 2} ${-HEIGHT / 2})`,
       );
-    svg.classList.toggle("arch-compact", current.base * current.effective < 0.79);
+    svg.classList.toggle("arch-compact", current.base * current.effective < 0.76);
   }
   function scale(direction) {
     // 사용자가 배율을 직접 바꾸면 자동 맞춤을 멈춘다.
@@ -573,8 +566,13 @@
     const relevant = past.filter(
         (e) => !agent || !e.agent_id || e.agent_id === agent,
       ),
-      observed = new Map();
-    relevant.forEach((e) => observed.set(locate(e).node, e));
+      observed = new Map(),
+      travelled = new Set();
+    relevant.forEach((e) => {
+      const place = locate(e);
+      observed.set(place.node, e);
+      place.edges.forEach((id) => travelled.add(id));
+    });
     const external =
       run?.conditions?.backend === "llama" ||
       (!run && health?.backend === "llama");
@@ -646,9 +644,10 @@
       const edge = svg.querySelector(`[data-arch-edge="${id}"]`),
         hot = !!current && location.edges.includes(id);
       edge.classList.toggle("current", hot);
+      edge.classList.toggle("visited", !hot && travelled.has(id));
       edge.setAttribute(
         "marker-end",
-        `url(#${hot ? "arch-hot-arrow" : "arch-arrow"})`,
+        `url(#${hot ? "arch-hot-arrow" : travelled.has(id) ? "arch-seen-arrow" : "arch-arrow"})`,
       );
     }
     const pulse = svg.querySelector(".arch-pulse"),

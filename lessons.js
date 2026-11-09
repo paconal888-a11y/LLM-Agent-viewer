@@ -763,7 +763,44 @@
       return { name: "run", id: parts[1], event: parts[2] ? Number(parts[2]) : null, tab: parts[3] || null };
     return null;
   }
-  const api = { chapters, owners, glossary, lessons, byId, nextOf, locate, messageIndex, sampleOf, parseRoute };
+  const ISSUE_URL = "https://github.com/paconal888-a11y/LLM-Agent-viewer/issues/new";
+  const SCREENS = {
+    lessons: "강의 목록",
+    journey: "구조 · 실행",
+    learn: "구성 · 비교",
+    feedback: "오류 · 기억",
+    memory: "대화 저장소",
+  };
+  // 의견 양식으로 가는 주소. 버전과 정해진 화면 이름만 넘긴다.
+  // 저장소의 예제가 아닌 실행의 번호, 파일 경로, 입력 내용은 넘기지 않는다.
+  function feedbackAddress({ version, mode, demo, lesson, step, run, view } = {}) {
+    const place = demo ? "웹 데모" : mode === "sample" ? "PC 샘플 보기" : "PC 실행",
+      sample = /^sample-[\w-]+$/.test(run || "") ? run.slice("sample-".length) : "",
+      where = byId(lesson)
+        ? `강의 ${lesson} ${step + 1}단계`
+        : view === "journey" && sample
+          ? `기록 ${sample}`
+          : SCREENS[view] || "",
+      params = new URLSearchParams({
+        template: "stuck.yml",
+        version: version || "",
+        screen: where ? `${place} · ${where}` : place,
+      });
+    return `${ISSUE_URL}?${params}`;
+  }
+  const api = {
+    chapters,
+    owners,
+    glossary,
+    lessons,
+    byId,
+    nextOf,
+    locate,
+    messageIndex,
+    sampleOf,
+    parseRoute,
+    feedbackAddress,
+  };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   scope.AgentLessons = api;
 })(typeof window !== "undefined" ? window : globalThis);
