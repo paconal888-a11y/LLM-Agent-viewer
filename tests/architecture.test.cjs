@@ -40,7 +40,7 @@ test("every event mapping points to an existing component and edge", () => {
   }
   for (const node of graph.nodes) {
     assert.ok(node.x >= 0 && node.x + node.w <= 1100, node.id);
-    assert.ok(node.y >= 0 && node.y + node.h <= 430, node.id);
+    assert.ok(node.y >= 0 && node.y + node.h <= 600, node.id);
   }
 });
 
@@ -71,4 +71,30 @@ test("protocol direction, file ownership and summary requests are distinct", () 
     graph.locate({ kind: "model.request", model_purpose: "answer" }).node,
     "loop",
   );
+});
+
+test("the diagram area is separate from anything that grows or shrinks", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const html = fs.readFileSync(path.join(__dirname, "..", "web", "index.html"), "utf8");
+  const css = fs.readFileSync(path.join(__dirname, "..", "web", "diagram.css"), "utf8");
+  const rail = html.indexOf('class="rail"');
+  const execution = html.indexOf('class="execution');
+  const stage = html.indexOf('id="architecture"');
+  assert.ok(execution < stage && stage < rail);
+  for (const id of ["coach", "requestSummary", "promptForm", "inspector"]) {
+    const at = html.indexOf(`id="${id}"`);
+    assert.ok(at > rail, id);
+  }
+  // 구조도 위아래 줄은 높이를 정해 두고, 구조도만 남은 칸을 채운다.
+  const rule = (selector) => {
+    const start = css.lastIndexOf(`\n${selector} {`);
+    assert.ok(start >= 0, selector);
+    return css.slice(start, css.indexOf("}", start));
+  };
+  assert.match(rule(".architecture"), /flex: 1 1 0/);
+  assert.match(rule(".currentstep"), /\bheight: 64px/);
+  assert.match(rule(".diagram-caption"), /\bheight: 30px/);
+  assert.match(rule(".execution .replay"), /\bheight: 44px/);
+  assert.match(rule(".execution .controls"), /position: absolute/);
 });

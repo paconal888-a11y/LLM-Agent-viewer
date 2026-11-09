@@ -61,7 +61,7 @@ def page(source):
     html, replaced = re.subn(r'<link rel="icon"', meta + '<link rel="icon"', html, count=1)
     assert replaced == 1
     link = (
-        f'<a class="quiet demolink" href="{REPOSITORY}" target="_blank" rel="noopener">설치해서 직접 실행 ↗</a>\n      '
+        f'<a class="quiet demolink" href="{REPOSITORY}" target="_blank" rel="noopener">Windows에 설치해 실행 ↗</a>\n      '
         '<button id="help"'
     )
     html, replaced = re.subn(r'<button id="help"', link, html, count=1)

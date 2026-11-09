@@ -15,11 +15,25 @@
   </head>
   <body>
     <header class="appbar">
-      <button id="menu" class="icon mobile" aria-label="프로젝트 열기">
-        ☰</button
-      ><a href="/" class="brand"
-        ><span class="brandmark">a</span> Agent Lens <small>에이전트 동작 관찰</small></a
-      >
+      <button id="menu" class="icon" aria-label="기록과 파일 열기" title="기록과 파일">
+        <svg class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5h13M1.5 8h13M1.5 12.5h13" /></svg>
+      </button>
+      <a href="/" class="brand">
+        <svg class="brandmark" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="7.5" />
+          <path d="M12 1v5.5M12 17.5V23M1 12h5.5M17.5 12H23" />
+          <circle class="brandpoint" cx="12" cy="12" r="2.4" />
+        </svg>
+        Agent Lens
+      </a>
+      <nav class="mainnav" aria-label="화면">
+        <button data-view="lessons">배우기</button>
+        <button data-view="journey" class="active">구조 · 실행</button>
+        <button data-view="learn">구성 · 비교</button>
+        <button data-view="feedback">오류 · 기억</button>
+        <button data-view="memory">대화 저장소</button>
+      </nav>
+      <div id="activityBar" class="activitybar hidden" role="status"></div>
       <div class="connection">
         <i id="statusDot"></i><span id="connection">모델 확인 중</span>
       </div>
@@ -30,32 +44,18 @@
         target="_blank"
         rel="noopener"
         title="막힌 곳이나 제안을 GitHub에 공개로 남깁니다"
-        >의견 보내기 ↗</a
+        >의견 보내기</a
       >
       <button id="help" class="quiet" title="사용 안내와 단축키 (?)">사용 안내</button>
     </header>
-    <div id="activityBar" class="activitybar hidden" role="status"></div>
     <div class="layout diagram-layout">
       <aside class="project" id="project">
         <div class="project-title">
-          <strong>프로젝트</strong
-          ><button
-            id="closeProject"
-            class="icon mobile"
-            aria-label="프로젝트 닫기"
-          >
-            ×
+          <strong>기록 · 파일</strong
+          ><button id="closeProject" class="icon" aria-label="기록과 파일 닫기">
+            <svg class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" /></svg>
           </button>
         </div>
-        <nav class="mainnav">
-          <button data-view="lessons">
-            ◈ <span>배우기</span></button
-          ><button data-view="journey" class="active">
-            ◉ <span>구조 · 실행</span></button
-          ><button data-view="learn">▦ <span>구성 · 비교</span></button>
-          <button data-view="feedback">↺ <span>오류 · 기억</span></button>
-          <button data-view="memory">▤ <span>대화 저장소</span></button>
-        </nav>
         <div class="treeheading">
           최근 실행
           <button
@@ -97,11 +97,122 @@
             <span class="localonly">로컬 프로젝트</span><span class="demoonly">웹 데모</span> <span>/</span>
             <strong id="pageName">구조 · 실행</strong>
           </div>
-          <button id="newSession" class="quiet">＋ 새 대화</button>
         </div>
         <section id="lessonsView" class="view hidden" aria-label="배우기"></section>
         <section id="journeyView" class="view">
           <h1 class="visually-hidden">구조 · 실행</h1>
+          <section class="execution records-open" aria-label="전체 실행 과정">
+            <div class="sectionbar">
+              <h2>전체 구조 <span id="runStatus" class="status">대기</span></h2>
+              <div class="toolgroups">
+                <div class="toolgroup" role="group" aria-label="구조도 배율">
+                  <button id="zoomOut" class="quiet" aria-label="구조도 축소">−</button
+                  ><button id="zoomFit" class="quiet">전체 보기</button
+                  ><button id="zoomIn" class="quiet" aria-label="구조도 확대">＋</button>
+                </div>
+                <div class="toolgroup" role="group" aria-label="기록 보기">
+                  <button id="toggleRecords" class="quiet" title="실행 단계를 시간순 목록으로 펼칩니다">단계 목록</button
+                  ><button id="showInput" class="quiet" disabled title="선택한 시점에 모델이 받은 입력을 봅니다">모델 입력</button
+                  ><button id="openDetail" class="quiet" title="선택한 단계의 데이터와 실행 코드를 봅니다">코드 · 데이터</button
+                  ><button id="showAnswer" class="quiet" disabled>답변</button>
+                </div>
+                <div class="toolgroup" role="group" aria-label="분석">
+                  <button id="openLearning" class="quiet" title="예측 → 증거 확인 → 원인 설명 → 한 조건 수정 → 재검증 순서로 기록을 살펴봅니다">원인 찾기</button
+                  ><button id="export" class="quiet" disabled>내보내기</button>
+                </div>
+                <div class="toolgroup" role="group" aria-label="대화">
+                  <button id="newSession" class="quiet">새 대화</button>
+                </div>
+              </div>
+            </div>
+            <div class="diagram-caption">
+              <span id="diagramLocation"
+                >구성 요소를 선택하면 역할과 코드를 볼 수 있습니다.</span
+              ><label for="agentFocus" class="agentfocuslabel">관찰 대상</label
+              ><select
+                id="agentFocus"
+                class="hidden"
+                aria-label="관찰할 에이전트"
+              ></select
+              ><span class="stagelegend"><b></b>현재 위치<i></i>지나온 경로</span>
+            </div>
+            <div id="architecture" class="architecture"></div>
+            <div id="currentStep" class="currentstep">
+              <strong>실행 대기</strong
+              ><span>요청을 실행하거나 왼쪽 위 메뉴의 예제 기록을 선택하세요.</span>
+            </div>
+            <div class="route" id="route"></div>
+            <div id="connections" class="connections hidden"></div>
+            <div id="agentPanel" class="agentpanel hidden"></div>
+            <div id="controls" class="controls hidden">
+              <span id="controlState"></span>
+              <div>
+                <button id="next" class="secondary">다음 단계 →</button
+                ><button id="continue" class="secondary">계속 실행</button
+                ><button id="stop" class="quiet danger">중지</button>
+              </div>
+            </div>
+            <div class="replay">
+              <button id="first" aria-label="첫 단계"><svg class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3v10M13 3 6 8l7 5" /></svg></button
+              ><button id="prev" aria-label="이전 단계"><svg class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 3 5 8l5.5 5" /></svg></button
+              ><button id="play" aria-label="기록 재생"><svg class="glyph solid when-stopped" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11L13.5 8z" /></svg><svg class="glyph solid when-playing" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z" /></svg></button
+              ><button id="nextEvent" aria-label="다음 기록"><svg class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3 11 8l-5.5 5" /></svg></button
+              ><div class="scrub"><svg id="ribbon" aria-hidden="true"></svg><input
+                id="scrubber"
+                type="range"
+                min="0"
+                max="0"
+                value="0"
+                aria-label="기록 위치"
+              /></div><span id="position">0 / 0</span><button id="live" title="마지막 기록으로 이동합니다. 저장 기록 재생에서는 새 계산이 아닙니다">마지막 기록</button>
+            </div>
+            <div id="contextComposition" class="composition hidden"></div>
+            <div id="planPanel" class="planpanel hidden"></div>
+            <div class="eventtoolbar">
+              <input
+                id="eventSearch"
+                type="search"
+                placeholder="단계 이름 · 파일 · 도구 찾기"
+                aria-label="단계 검색"
+              /><select id="decisionFocus" aria-label="누가 정했는지로 거르기">
+                <option value="">전체 결정 주체</option>
+                <option value="model">모델이 선택</option>
+                <option value="code">코드가 결정</option>
+                <option value="config">설정·파일에서 옴</option>
+                <option value="runtime">실행기·외부 서버</option>
+                <option value="user">사용자 입력</option>
+              </select><span id="eventCount">기록 없음</span
+              ><input
+                id="bodySearch"
+                type="search"
+                placeholder="본문 검색 · 모델 입력 messages · 도구 결과 · 파일 원문"
+                aria-label="본문 검색"
+                title="제목이 아니라 모델 요청 messages·tools, 도구 결과, 파일 원문 안의 문자열을 찾습니다"
+              /><select id="bodySearchKind" aria-label="본문 검색 범위">
+                <option value="">전체 본문</option>
+                <option value="model.request">모델 요청 (messages · tools)</option>
+                <option value="tool.result">도구 결과</option>
+                <option value="file.decode">파일 원문</option>
+                <option value="model.response">모델 응답</option>
+              </select>
+            </div>
+            <div
+              id="bodySearchResults"
+              class="bodysearchresults hidden"
+              aria-live="polite"
+            ></div>
+            <div id="timeline" class="timeline">
+              <div class="empty">
+                <span class="emptyglyph">→</span>
+                <h3>위에서 요청을 실행하세요.</h3>
+                <p>
+                  입력 수신 → 파일 읽기 → 메시지 조립 → 모델 계산 → 도구 실행 →
+                  완료 검사.<br />실제로 거친 단계만 기록됩니다.
+                </p>
+              </div>
+            </div>
+          </section>
+          <aside class="rail" aria-label="설명과 상세">
           <section id="coach" class="coach hidden" aria-label="강의 안내" aria-live="polite"></section>
           <div id="sampleBanner" class="samplebanner hidden"></div>
           <div id="resumeBanner" class="resumebanner hidden" role="status"></div>
@@ -109,7 +220,7 @@
             <header>
               <span>현재 요청</span
               ><button id="editPrompt" class="quiet" title="이 실행의 요청·모드·하네스 구성·완료 조건·생성 설정을 입력란에 복원합니다">
-                이 실행의 입력 · 설정 가져오기 ↗
+                이 실행의 입력 · 설정 불러오기
               </button>
             </header>
             <p id="summaryPrompt"></p>
@@ -274,114 +385,50 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
               </div>
             </details>
           </div>
-          <section class="execution" aria-label="전체 실행 과정">
-            <div class="sectionbar">
-              <h2>전체 구조 <span id="runStatus" class="status">대기</span></h2>
-              <div class="toolgroups">
-                <div class="toolgroup" role="group" aria-label="구조도 배율">
-                  <button id="zoomOut" class="quiet" aria-label="구조도 축소">−</button
-                  ><button id="zoomFit" class="quiet">전체 보기</button
-                  ><button id="zoomIn" class="quiet" aria-label="구조도 확대">＋</button>
-                </div>
-                <div class="toolgroup" role="group" aria-label="기록 보기">
-                  <button id="toggleRecords" class="quiet" title="실행 단계를 시간순 목록으로 펼칩니다">단계 목록</button
-                  ><button id="showInput" class="quiet" disabled title="선택한 시점에 모델이 받은 입력을 봅니다">모델 입력</button
-                  ><button id="openDetail" class="quiet" title="선택한 단계의 데이터와 실행 코드를 봅니다">코드 · 데이터</button
-                  ><button id="showAnswer" class="quiet" disabled>답변</button>
-                </div>
-                <div class="toolgroup" role="group" aria-label="분석">
-                  <button id="openLearning" class="quiet" title="예측 → 증거 확인 → 원인 설명 → 한 조건 수정 → 재검증 순서로 기록을 살펴봅니다">원인 찾기</button
-                  ><button id="export" class="quiet" disabled>내보내기</button>
-                </div>
-              </div>
-            </div>
-            <div class="diagram-caption">
-              <span id="diagramLocation"
-                >구성 요소를 선택하면 역할과 코드를 볼 수 있습니다.</span
-              ><label for="agentFocus" class="agentfocuslabel">관찰 대상</label
-              ><select
-                id="agentFocus"
-                class="hidden"
-                aria-label="관찰할 에이전트"
-              ></select
-              ><span>● 현재 위치 <i>— 연결 구조</i></span>
-            </div>
-            <div id="architecture" class="architecture"></div>
-            <div id="currentStep" class="currentstep">
-              <strong>실행 대기</strong
-              ><span>요청을 실행하거나 왼쪽 예제 기록을 선택하세요.</span>
-            </div>
-            <div class="route" id="route"></div>
-            <div id="connections" class="connections hidden"></div>
-            <div id="agentPanel" class="agentpanel hidden"></div>
-            <div id="controls" class="controls hidden">
-              <span id="controlState"></span>
-              <div>
-                <button id="next" class="secondary">다음 단계 →</button
-                ><button id="continue" class="secondary">계속 실행</button
-                ><button id="stop" class="quiet danger">중지</button>
-              </div>
-            </div>
-            <div class="replay">
-              <button id="first" aria-label="첫 단계">|‹</button
-              ><button id="prev" aria-label="이전 단계">‹</button
-              ><button id="play" aria-label="기록 재생">▶</button
-              ><button id="nextEvent" aria-label="다음 기록">›</button
-              ><input
-                id="scrubber"
-                type="range"
-                min="0"
-                max="0"
-                value="0"
-                aria-label="기록 위치"
-              /><span id="position">0 / 0</span><button id="live" title="마지막 기록으로 이동합니다. 저장 기록 재생에서는 새 계산이 아닙니다">마지막 기록</button>
-            </div>
-            <div id="contextComposition" class="composition hidden"></div>
-            <div id="planPanel" class="planpanel hidden"></div>
-            <div class="eventtoolbar">
-              <input
-                id="eventSearch"
-                type="search"
-                placeholder="단계 이름 · 파일 · 도구 찾기"
-                aria-label="단계 검색"
-              /><select id="decisionFocus" aria-label="누가 정했는지로 거르기">
-                <option value="">전체 결정 주체</option>
-                <option value="model">모델이 선택</option>
-                <option value="code">코드가 결정</option>
-                <option value="config">설정·파일에서 옴</option>
-                <option value="runtime">실행기·외부 서버</option>
-                <option value="user">사용자 입력</option>
-              </select><span id="eventCount">기록 없음</span
-              ><input
-                id="bodySearch"
-                type="search"
-                placeholder="본문 검색 · 모델 입력 messages · 도구 결과 · 파일 원문"
-                aria-label="본문 검색"
-                title="제목이 아니라 모델 요청 messages·tools, 도구 결과, 파일 원문 안의 문자열을 찾습니다"
-              /><select id="bodySearchKind" aria-label="본문 검색 범위">
-                <option value="">전체 본문</option>
-                <option value="model.request">모델 요청 (messages · tools)</option>
-                <option value="tool.result">도구 결과</option>
-                <option value="file.decode">파일 원문</option>
-                <option value="model.response">모델 응답</option>
-              </select>
-            </div>
-            <div
-              id="bodySearchResults"
-              class="bodysearchresults hidden"
-              aria-live="polite"
-            ></div>
-            <div id="timeline" class="timeline">
-              <div class="empty">
-                <span class="emptyglyph">→</span>
-                <h3>위에서 요청을 실행하세요.</h3>
-                <p>
-                  입력 수신 → 파일 읽기 → 메시지 조립 → 모델 계산 → 도구 실행 →
-                  완료 검사.<br />실제로 거친 단계만 기록됩니다.
-                </p>
-              </div>
-            </div>
-          </section>
+          <aside class="inspector" id="inspector">
+        <div class="inspectbar">
+          <strong>단계 상세</strong><span id="detailIndex"></span
+          ><button id="closeDetail" class="icon" aria-label="단계 상세 닫기">
+            ×
+          </button>
+        </div>
+        <div id="detailEmpty" class="inspectempty">
+          <span>⌖</span>
+          <h3>실행 기록을 선택하세요.</h3>
+          <p>
+            이 단계에서 바뀐 데이터와 실제 실행한 코드 줄을 함께 보여줍니다.
+          </p>
+          <div class="actorlegend">
+            <p><b>H</b> 하네스 · 입력 구성과 실행 제어</p>
+            <p><b>M</b> 모델 · 토큰과 행동 요청 생성</p>
+            <p><b>T</b> 도구 · 실제 작업 수행</p>
+          </div>
+        </div>
+        <div id="detailBody" class="hidden">
+          <div class="detailhead">
+            <span id="detailActor" class="pill"></span>
+            <span id="evidenceKind" class="evidence-kind"></span>
+            <span id="decisionKind" class="decision-kind"></span>
+            <h2 id="detailTitle"></h2>
+            <code id="detailKind"></code>
+            <code id="detailPath" class="storage-path hidden"></code>
+            <p id="detailExplanation"></p>
+            <p id="decisionNote" class="decision-note"></p>
+          </div>
+          <div id="componentNavigator" class="componentnav hidden"></div>
+          <div id="inputLinks" class="inputlinks hidden"></div>
+          <nav class="detailtabs">
+            <button data-detail="change" class="active">데이터 변화</button
+            ><button data-detail="code">실행 코드</button
+            ><button data-detail="input">모델 입력</button
+            ><button data-detail="values">전체 값</button
+            ><button data-detail="learn">원인 찾기</button>
+          </nav>
+          <div id="sourcePeek" class="sourcepeek hidden"></div>
+          <div id="detailContent" class="detailcontent"></div>
+        </div>
+      </aside>
+          </aside>
           <section id="answerPanel" class="answer hidden">
             <div class="sectionbar">
               <h2>최종 응답</h2>
@@ -392,6 +439,7 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
           </section>
         </section>
         <section id="memoryView" class="view hidden">
+          <p class="demonote demoonly">웹 데모에서는 실행·저장·비교를 할 수 없습니다. 설명과 저장된 기록만 볼 수 있고, 직접 해 보려면 <a href="https://github.com/paconal888-a11y/LLM-Agent-viewer#%EC%8B%9C%EC%9E%91%ED%95%98%EA%B8%B0" target="_blank" rel="noopener">Windows PC에 설치</a>하세요.</p>
           <div class="pageintro">
             <div>
               <h1>대화 저장소</h1>
@@ -402,6 +450,7 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
           <div id="memoryStorage"></div>
         </section>
         <section id="editorView" class="view hidden">
+          <p class="demonote demoonly">웹 데모에서는 실행·저장·비교를 할 수 없습니다. 설명과 저장된 기록만 볼 수 있고, 직접 해 보려면 <a href="https://github.com/paconal888-a11y/LLM-Agent-viewer#%EC%8B%9C%EC%9E%91%ED%95%98%EA%B8%B0" target="_blank" rel="noopener">Windows PC에 설치</a>하세요.</p>
           <div class="pageintro">
             <div>
               <p class="eyebrow" id="editorKind">PROJECT FILE</p>
@@ -437,6 +486,7 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
           </p>
         </section>
         <section id="feedbackView" class="view hidden">
+          <p class="demonote demoonly">웹 데모에서는 실행·저장·비교를 할 수 없습니다. 설명과 저장된 기록만 볼 수 있고, 직접 해 보려면 <a href="https://github.com/paconal888-a11y/LLM-Agent-viewer#%EC%8B%9C%EC%9E%91%ED%95%98%EA%B8%B0" target="_blank" rel="noopener">Windows PC에 설치</a>하세요.</p>
           <div class="pageintro">
             <div>
               <p class="eyebrow">ERROR → FEEDBACK → NEXT CALL</p>
@@ -472,10 +522,11 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
           </div>
         </section>
         <section id="learnView" class="view hidden">
+          <p class="demonote demoonly">웹 데모에서는 실행·저장·비교를 할 수 없습니다. 설명과 저장된 기록만 볼 수 있고, 직접 해 보려면 <a href="https://github.com/paconal888-a11y/LLM-Agent-viewer#%EC%8B%9C%EC%9E%91%ED%95%98%EA%B8%B0" target="_blank" rel="noopener">Windows PC에 설치</a>하세요.</p>
           <div class="pageintro">
             <div>
               <p class="eyebrow">READ · CHANGE · RUN</p>
-              <h1>구성 설명</h1>
+              <h1>구성 · 비교</h1>
               <p>
                 각 요소의 역할을 읽고, 파일을 바꾼 뒤 실행 기록으로 확인하세요.
               </p>
@@ -577,49 +628,6 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
           </section>
         </section>
       </main>
-      <aside class="inspector" id="inspector">
-        <div class="inspectbar">
-          <strong>단계 상세</strong><span id="detailIndex"></span
-          ><button id="closeDetail" class="icon" aria-label="단계 상세 닫기">
-            ×
-          </button>
-        </div>
-        <div id="detailEmpty" class="inspectempty">
-          <span>⌖</span>
-          <h3>실행 기록을 선택하세요.</h3>
-          <p>
-            이 단계에서 바뀐 데이터와 실제 실행한 코드 줄을 함께 보여줍니다.
-          </p>
-          <div class="actorlegend">
-            <p><b>H</b> 하네스 · 입력 구성과 실행 제어</p>
-            <p><b>M</b> 모델 · 토큰과 행동 요청 생성</p>
-            <p><b>T</b> 도구 · 실제 작업 수행</p>
-          </div>
-        </div>
-        <div id="detailBody" class="hidden">
-          <div class="detailhead">
-            <span id="detailActor" class="pill"></span>
-            <span id="evidenceKind" class="evidence-kind"></span>
-            <span id="decisionKind" class="decision-kind"></span>
-            <h2 id="detailTitle"></h2>
-            <code id="detailKind"></code>
-            <code id="detailPath" class="storage-path hidden"></code>
-            <p id="detailExplanation"></p>
-            <p id="decisionNote" class="decision-note"></p>
-          </div>
-          <div id="componentNavigator" class="componentnav hidden"></div>
-          <div id="inputLinks" class="inputlinks hidden"></div>
-          <nav class="detailtabs">
-            <button data-detail="change" class="active">데이터 변화</button
-            ><button data-detail="code">실행 코드</button
-            ><button data-detail="input">모델 입력</button
-            ><button data-detail="values">전체 값</button
-            ><button data-detail="learn">원인 찾기</button>
-          </nav>
-          <div id="sourcePeek" class="sourcepeek hidden"></div>
-          <div id="detailContent" class="detailcontent"></div>
-        </div>
-      </aside>
     </div>
     <dialog id="guide">
       <div class="dialogbar">
@@ -630,16 +638,17 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
         이 앱은 프롬프트가 실제 행동으로 이어지는 과정을 기록합니다. 모델의
         숨겨진 생각을 읽는 기능은 아닙니다.
       </p>
+      <p class="demoonly">웹 데모는 저장된 기록을 재생합니다. 실행·저장·비교는 Windows PC에 설치한 앱에서만 됩니다.</p>
       <ol>
         <li>
           <strong>배우기</strong> — 실제 기록을 단계별로 따라가는 강의입니다.
           모델을 설치하지 않아도 볼 수 있습니다.
         </li>
         <li>
-          <strong>기록 보기</strong> — 왼쪽 예제 기록을 직접 재생할 수도 있습니다.
+          <strong>기록 보기</strong> — 왼쪽 위 메뉴의 예제 기록을 직접 재생할 수도 있습니다.
           저장 기록과 지금 실행하는 계산을 구분해 표시합니다.
         </li>
-        <li>
+        <li class="localonly">
           <strong>실행</strong> — 예제를 선택하고 실행하세요. 하네스가 실제
           파일을 읽고 로컬 모델을 호출합니다.
         </li>
@@ -647,20 +656,20 @@ add_numbers 도구를 사용해 137과 248을 더하고 결과를 알려줘.</te
           <strong>따라가기</strong> — 단계나 재생 막대를 선택하세요.
           데이터·파일·코드가 같은 시점을 가리킵니다.
         </li>
-        <li>
+        <li class="localonly">
           <strong>멈추기</strong> — 실행 전에 단계 정지를 켜세요. 교육용은 실제
           forward 내부 관찰 지점에서도 멈춥니다. 빠른 실행기는 하네스 쪽에서
           멈춥니다.
         </li>
-        <li>
-          <strong>바꾸기</strong> — 왼쪽 파일을 열어 수정·검사·저장하세요. 다음
+        <li class="localonly">
+          <strong>바꾸기</strong> — 메뉴의 파일을 열어 수정·검사·저장하세요. 다음
           실행에서 변경을 확인할 수 있습니다.
         </li>
-        <li>
-          <strong>비교</strong> — 구성 설명의 비교 실험에서 실제 호출 수·입력
+        <li class="localonly">
+          <strong>비교</strong> — 구성 · 비교의 비교 실험에서 실제 호출 수·입력
           토큰·계산 시간을 확인하세요.
         </li>
-        <li>
+        <li class="localonly">
           <strong>모드</strong> — 작업 방식을 바꿔 지침·권한·예산·대화 분리의
           차이를 확인하세요. 구조도 위 에이전트 선택은 해당 대화의 마지막
           기록으로 이동합니다.
