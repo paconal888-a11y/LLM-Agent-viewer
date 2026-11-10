@@ -60,6 +60,10 @@ inference.py가 하네스와 실행기 사이의 경계입니다. 외부 실행�
 
 교육용은 모델 로딩·토큰화·forward·KV·샘플링을 구분합니다. 다른 모델 구조를 쓴다면 hook 경로, 캐시 API, head 구분, 도구 표현 파서도 맞춰야 합니다. reference_engine.py는 Qwen3 구조 전용이며 모든 Transformers 모델에 범용으로 동작하지 않습니다.
 
+## 인터넷 검색 바꾸기
+
+`web_search` 도구의 네트워크 부분은 `local_agent_lab/websearch.py` 하나에 있습니다. 요청 주소는 이 파일에 고정되어 있고 모델은 검색어만 정합니다. 다른 검색 서비스를 쓰려면 `search()`가 같은 형식의 결과를 돌려주도록 고치세요. 호출 한도와 검색어 길이도 이 파일의 상수로 바꿉니다. 도구는 실행 설정이나 입력란의 **인터넷 검색**을 켠 실행에서만 모델에게 공개되고, 꺼져 있으면 모델이 호출해도 코드가 거부합니다.
+
 ## MCP와 LSP 연결을 교체하기
 
 실제 어댑터는 integrations.py, framing과 프로세스 수명은 stdio_rpc.py에 있습니다. demo_workspace/integrations.json에서 로컬 서버 실행 프로필을 바꾸세요. command는 실행 파일, args는 인자 목록입니다. shell 문자열을 실행하지 않습니다. UI의 MCP·LSP 스위치를 켠 다음 실행부터 설정을 읽습니다. 외부 서버는 이 PC의 별도 프로세스로 실행하므로 신뢰하는 서버를 연결하세요.
