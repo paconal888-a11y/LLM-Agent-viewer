@@ -57,6 +57,7 @@
       tools: true,
       commands: true,
       writes: false,
+      web: false,
       mcp: false,
       lsp: false,
       feedback_recall: false,
@@ -71,6 +72,7 @@
       tools: "도구",
       commands: "/명령어",
       writes: "파일 쓰기 허용",
+      web: "인터넷 검색",
       mcp: "MCP 도구 연결",
       lsp: "LSP 연결",
       feedback_recall: "동일 요청 지적 재포함",
@@ -145,6 +147,7 @@
     validator: ["V", "검증 코드"],
     mcp: ["C", "MCP 클라이언트"],
     lsp: ["L", "언어 서버 클라이언트"],
+    web: ["W", "인터넷 검색"],
   };
   async function api(path, body) {
     const r = await fetch(
@@ -399,6 +402,9 @@
   function featureUI() {
     if (!features.tools) features.skills = false;
     if (!features.tools) features.writes = false;
+    if (!features.tools) features.web = false;
+    $("webSearch").checked = features.web;
+    $("webNote").classList.toggle("hidden", !features.web);
     if (!features.tools) {
       features.mcp = false;
       features.lsp = false;
@@ -4051,6 +4057,11 @@
     document.querySelector(".examples").open = false;
     $("prompt").focus();
   });
+  $("webSearch").onchange = () => {
+    features.web = $("webSearch").checked;
+    if (features.web) features.tools = true;
+    featureUI();
+  };
   $("story").onclick = action(async (event) => {
     const button = event.target.closest("[data-story]");
     if (!button) return;

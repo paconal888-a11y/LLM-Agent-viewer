@@ -3474,3 +3474,9 @@ body.demo .composerdock {
   top: auto;
   width: auto;
 }
+.webnote {
+  margin: 6px 0 0;
+  color: var(--signal-ink);
+  font-size: 12px;
+  line-height: 1.5;
+}
