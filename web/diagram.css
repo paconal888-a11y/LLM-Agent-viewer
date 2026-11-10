@@ -3480,3 +3480,49 @@ body.demo .composerdock {
   font-size: 12px;
   line-height: 1.5;
 }
+
+/* 아주 좁은 창(앱 옆 브라우저 칸 등): 위쪽 막대를 두 줄로 지키고, 장면 목록이 보일 자리를 남긴다. */
+.composerhead label {
+  flex: none;
+  white-space: nowrap;
+}
+.composerhead .sessionnote {
+  flex: 1 1 auto;
+}
+@media (max-width: 480px) {
+  .connection span {
+    display: none;
+  }
+}
+@media (max-width: 799px) {
+  .architecture {
+    height: clamp(160px, 28dvh, 360px);
+  }
+  #journeyView .composerdock .composer textarea {
+    height: 44px;
+    min-height: 44px;
+  }
+  #journeyView .composerdock .composer-bottom {
+    padding-top: 6px;
+  }
+}
+@media (max-width: 799px) and (max-height: 760px) {
+  #journeyView .execution {
+    position: static;
+  }
+}
+@media (max-width: 480px) {
+  #journeyView .composerdock .modebar {
+    display: none;
+  }
+  #journeyView .composerdock .composer-bottom {
+    gap: 4px 8px;
+  }
+  #journeyView .composerdock .composer-bottom .primary {
+    padding: 7px 12px;
+  }
+  .webnote {
+    margin-top: 4px;
+    font-size: 11.5px;
+  }
+}
