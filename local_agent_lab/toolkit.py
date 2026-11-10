@@ -3,8 +3,10 @@
 import ast
 import json
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
+from . import websearch
 from .files import read_traced, workspace_path
 
 
@@ -61,6 +63,12 @@ TOOLS = [
         "search_text",
         "Search literal text in workspace text files. Returns actual paths and line numbers.",
         {"query": STRING, "path": STRING},
+        ["query"],
+    ),
+    function_tool(
+        "web_search",
+        "Search the public internet for current information such as news, prices and recent events. Returns titles, links and short snippets. The query is sent outside this computer.",
+        {"query": STRING},
         ["query"],
     ),
     function_tool(
@@ -233,6 +241,63 @@ def search_text(ctx, query, path="."):
     )
 
 
+def web_search(ctx, query):
+    query = " ".join(query.split())
+    limit = websearch.MAX_QUERY_CHARACTERS
+    if not 1 <= len(query) <= limit:
+        raise ValueError(f"검색어를 1~{limit}자로 입력하세요.")
+    used = getattr(ctx.run, "web_searches", 0)
+    if used >= websearch.MAX_SEARCHES_PER_RUN:
+        raise ValueError(
+            f"이 실행의 인터넷 검색 한도({websearch.MAX_SEARCHES_PER_RUN}회)를 넘었습니다. 지금까지 받은 결과로 답하세요."
+        )
+    ctx.run.web_searches = used + 1
+    ctx.run.emit(
+        "web.request",
+        "검색어를 외부 검색 서비스로 전송",
+        f"이 검색어는 PC 밖의 {websearch.PROVIDER}로 전송됩니다. 주소는 코드에 고정되어 있고 모델은 검색어만 정합니다.",
+        category="tools",
+        actor="web",
+        parent=ctx.parent,
+        input={
+            "provider": websearch.PROVIDER,
+            "urls": [websearch.NEWS_ENDPOINT, websearch.WEB_ENDPOINT],
+            "query": query,
+        },
+    )
+    try:
+        found = websearch.search(query)
+    except websearch.SearchFailed as error:
+        ctx.run.emit(
+            "web.response",
+            "인터넷 검색 실패",
+            "검색 서비스에서 결과를 받지 못했습니다. 실패 내용을 모델에게 그대로 전달합니다.",
+            category="tools",
+            actor="web",
+            parent=ctx.parent,
+            status="error",
+            output={"error": str(error)},
+        )
+        raise
+    ctx.run.emit(
+        "web.response",
+        f"검색 결과 {len(found['results'])}건 수신",
+        "뉴스와 웹 결과의 제목·주소·짧은 요약입니다. 웹페이지 전체를 읽은 것은 아닙니다.",
+        category="tools",
+        actor="web",
+        parent=ctx.parent,
+        output={"status": found["status"], "bytes": found["bytes"], "partial": found["partial"], "results": found["results"]},
+    )
+    return ctx.finish(
+        {
+            "query": query,
+            "provider": found["provider"],
+            "searched_on": date.today().isoformat(),
+            "results": websearch.for_model(found["results"]),
+        }
+    )
+
+
 def set_plan(ctx, steps):
     lines = [line.strip() for line in steps.splitlines() if line.strip()]
     if not 1 <= len(lines) <= 12 or any(len(line) > 300 for line in lines):
@@ -258,6 +323,7 @@ IMPLEMENTATIONS = {
         check_file,
         add_numbers,
         search_text,
+        web_search,
         set_plan,
         complete_plan_step,
     )

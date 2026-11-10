@@ -54,8 +54,9 @@
     ["cache", 700, 265, 168, 62, "KV 캐시", "과거 위치의 K · V"],
     ["sample", 902, 358, 168, 62, "다음 토큰 선택", "logits → 분포 → ID"],
     ["response", 700, 358, 168, 62, "응답 어댑터", "하네스 · 응답 조립"],
-    ["mcp", 700, 506, 168, 62, "MCP 서버", "별도 프로세스의 도구"],
-    ["lsp", 902, 506, 168, 62, "언어 서버 · LSP", "진단 · 심볼 · 정의"],
+    ["mcp", 692, 506, 124, 62, "MCP 서버", "별도 프로세스"],
+    ["lsp", 824, 506, 124, 62, "언어 서버", "진단 · 심볼"],
+    ["web", 956, 506, 124, 62, "인터넷 검색", "PC 밖 서비스"],
   ].map(([id, x, y, w, h, title, description]) => ({ id, x, y, w, h, title, description }));
   const edges = [
     ["input", "M172 106 H218"],
@@ -82,17 +83,23 @@
     ["tool-context", "M358 428 H378 V120 H420"],
     ["loop-agents", "M507 303 V397"],
     ["agents-context", "M594 428 H621 V91 H594"],
-    ["tool-mcp", "M288 459 V462 H832 V506"],
-    ["tool-lsp", "M288 459 V462 H986 V506"],
+    ["tool-mcp", "M288 459 V462 H754 V506"],
+    ["tool-lsp", "M288 459 V462 H886 V506"],
+    ["tool-web", "M288 459 V462 H1018 V506"],
     ["loop-result", "M594 280 H610 V537 H594"],
     ["result-output", "M420 537 H172"],
     ["memory-compact", "M172 307 H378 V194 H420"],
     ["compact-model", "M594 194 H635 V106 H700"],
     ["compact-context", "M507 170 V137"],
-    ["mcp-tool", "M832 506 V462 H288 V459"],
-    ["lsp-tool", "M986 506 V462 H288 V459"],
+    ["mcp-tool", "M754 506 V462 H288 V459"],
+    ["lsp-tool", "M886 506 V462 H288 V459"],
+    ["web-tool", "M1018 506 V462 H288 V459"],
   ].map(([id, path]) => [id, roundCorners(path)]);
   const definitions = {
+    web: [
+      "모델이 정한 검색어를 코드에 고정된 검색 서비스로 보내고 제목·주소·짧은 요약을 받습니다. 이 도구를 켠 실행에서만 PC 밖으로 나갑니다.",
+      "local_agent_lab/websearch.py",
+    ],
     compaction: [
       "입력이 커지면 줄입니다. 요청 사이에는 이전 대화를 요약해 저장하고, 요청 처리 중에는 오래된 도구 결과의 본문을 빼거나 앞선 작업을 요약합니다. 원본은 남고 모델에 보낼 입력만 달라집니다.",
       "local_agent_lab/compaction.py",
@@ -211,6 +218,11 @@
     if (k.startsWith("checkpoint.")) return { node: "memory", edges: [] };
     if (k === "model.request" && e.model_purpose === "compaction")
       return { node: "compaction", edges: ["compact-model"] };
+    if (k.startsWith("web."))
+      return {
+        node: "web",
+        edges: k === "web.request" ? ["tool-web"] : k === "web.response" ? ["web-tool"] : [],
+      };
     if (k.startsWith("mcp."))
       return {
         node: "mcp",
@@ -630,6 +642,7 @@
         !(feature === "memory" && relevant.some((e) => e.kind.startsWith("checkpoint.")))
       )
         disabled.add(feature);
+    if (run && !effectiveFeatures?.web) disabled.add("web");
     if (run && !effectiveFeatures?.tools) {
       disabled.add("tools");
       disabled.add("gate");
@@ -662,13 +675,15 @@
           : disabled.has(n.id)
             ? external && ["embedding", "forward", "sample"].includes(n.id)
               ? "서버 내부 · 수치 미노출"
-              : "이번 실행에서 사용 안 함"
+              : n.w < 130
+                ? "사용 안 함"
+                : "이번 실행에서 사용 안 함"
             : record
               ? measurement(record)
               : n.description;
       el.querySelector(".node-meta").textContent = short(
         label,
-        svg.classList.contains("arch-compact") ? 16 : 25,
+        n.w < 130 ? 14 : svg.classList.contains("arch-compact") ? 16 : 25,
       );
     }
     for (const [id] of edges) {

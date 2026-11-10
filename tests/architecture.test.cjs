@@ -112,3 +112,11 @@ test("the prompt box stays in one place at the end of the right column", () => {
   const open = html.indexOf('id="prompt"');
   assert.ok(html.slice(open, html.indexOf("</textarea>", open)).trimEnd().endsWith(">"), "입력란은 비어 있는 상태로 시작한다");
 });
+
+test("internet search has its own place, separate from local tools", () => {
+  assert.ok(graph.nodes.some((node) => node.id === "web"));
+  assert.deepEqual(graph.locate({ kind: "web.request" }), { node: "web", edges: ["tool-web"] });
+  assert.deepEqual(graph.locate({ kind: "web.response" }), { node: "web", edges: ["web-tool"] });
+  const edges = new Set(graph.edges.map(([id]) => id));
+  assert.ok(edges.has("tool-web") && edges.has("web-tool"));
+});

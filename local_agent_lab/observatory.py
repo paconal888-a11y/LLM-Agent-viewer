@@ -77,6 +77,7 @@ def catalog(active=None, run=None):
         "check_file": "구문 검사",
         "add_numbers": "정수 덧셈",
         "search_text": "문자열 검색",
+        "web_search": "인터넷 검색",
         "set_plan": "계획 등록",
         "complete_plan_step": "계획 상태 표시",
     }

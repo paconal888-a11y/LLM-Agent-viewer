@@ -20,6 +20,7 @@
     check_file: "파일 검사",
     add_numbers: "덧셈",
     search_text: "파일 내용 검색",
+    web_search: "인터넷 검색",
     load_skill: "스킬 불러오기",
     set_plan: "계획 기록",
     complete_plan_step: "계획 완료 표시",
@@ -102,6 +103,7 @@
     if (typeof output.content === "string") return `${where}${count(output.content.length)}자 읽음`;
     if ("written_bytes" in output) return `${where}${count(output.written_bytes)}바이트 저장`;
     if ("passed" in output) return `${where}${output.passed ? "검사 통과" : "검사 실패"}`;
+    if (Array.isArray(output.results)) return `${short(output.query, 40)} · 결과 ${output.results.length}건`;
     if (Array.isArray(output.matches)) return `${where}${output.matches.length}건 찾음`;
     if (Array.isArray(output.files)) return `파일 ${output.files.length}개`;
     return compact(output);
@@ -330,10 +332,18 @@
         name = dispatch?.input?.function?.name || validate?.input?.name || "도구",
         args = validate?.input?.arguments ?? parseArguments(dispatch?.input?.function?.arguments),
         blocked = validate?.output?.allowed === false,
-        external = range.some((e) => e.actor === "mcp" || e.actor === "lsp"),
+        external = range.some((e) => ["mcp", "lsp", "web"].includes(e.actor)),
+        web = range.find((e) => e.kind === "web.request"),
         reason = validate?.output?.reason || validate?.output?.error || error?.output?.error || error?.detail,
         blocks = [{ type: "call", label: "실행 요청", name: toolLabel(name), value: args }];
-      if (result?.output !== undefined && result?.output !== null)
+      if (web) blocks.push({ type: "text", label: "PC 밖으로 보낸 검색어", text: `${web.input?.query} → ${web.input?.provider}` });
+      if (Array.isArray(result?.output?.results))
+        blocks.push({
+          type: "list",
+          label: "찾은 결과",
+          items: result.output.results.map((item) => item.title),
+        });
+      else if (result?.output !== undefined && result?.output !== null)
         blocks.push({ type: "value", label: "실행 결과", value: result.output });
       if (blocked || error) blocks.push({ type: "text", label: blocked ? "거부 이유" : "오류", text: String(reason ?? "기록된 이유 없음") });
       return {
@@ -347,8 +357,11 @@
         summary: blocked || error ? short(reason) : describeResult(result?.output),
         owner: external ? "external" : "code",
         focus: result || error || validate || range.at(-1),
-        note: "도구 이름, 인자, 경로는 코드가 먼저 검사합니다. 실제 함수도 코드가 실행하고, 결과는 다음 모델 입력에 들어갑니다.",
+        note: web
+          ? "검색어는 모델이 정했고, 보낼 주소는 코드에 고정되어 있습니다. 받은 것은 제목과 짧은 요약이며 웹페이지 전체를 읽은 것은 아닙니다."
+          : "도구 이름, 인자, 경로는 코드가 먼저 검사합니다. 실제 함수도 코드가 실행하고, 결과는 다음 모델 입력에 들어갑니다.",
         blocks,
+        change: web ? { file: "local_agent_lab/websearch.py", label: "검색 서비스 코드 보기" } : undefined,
       };
     },
     agents({ range }) {
@@ -458,7 +471,7 @@
         count: range.length,
         focus: scene.start + Math.max(0, range.indexOf(built.focus)),
         ms: Math.max(0, (events[scene.end].elapsed_ms || 0) - (previous || 0)),
-        change: CHANGE[scene.kind] ? { file: CHANGE[scene.kind][0], label: CHANGE[scene.kind][1] } : null,
+        change: built.change || (CHANGE[scene.kind] ? { file: CHANGE[scene.kind][0], label: CHANGE[scene.kind][1] } : null),
       });
     });
     return list;

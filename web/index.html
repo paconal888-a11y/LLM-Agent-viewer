@@ -86,7 +86,7 @@
         <footer>
           <span class="localonly"
             >모델과 기록은 이 PC에 저장됩니다.<br />외부 API로 자동 전환하지
-            않습니다.</span
+            않습니다.<br />인터넷 검색을 켠 실행만 검색어를 밖으로 보냅니다.</span
           ><span class="demoonly"
             >웹 데모는 저장된 기록만 재생합니다.<br />모델은 돌지 않습니다.</span
           >
@@ -298,6 +298,7 @@
             <div id="draftInfo" class="draftinfo">
               입력한 문자열은 실행할 때 JSON 요청에 담깁니다.
             </div>
+            <p id="webNote" class="webnote hidden">인터넷 검색을 켰습니다. 모델이 정한 검색어가 PC 밖의 Bing으로 전송됩니다.</p>
             <div class="composer-bottom">
               <div class="modebar">
               <label for="agentMode">작업 방식</label
@@ -310,6 +311,8 @@
             </div>
               <label class="check"
                 ><input id="stepMode" type="checkbox" />단계마다 멈추기</label
+              ><label class="check" title="켜면 모델이 정한 검색어가 Bing으로 전송됩니다"
+                ><input id="webSearch" type="checkbox" />인터넷 검색</label
               ><button type="submit" class="primary" id="run" disabled>
                 ▶ 실행 <kbd>Ctrl ↵</kbd>
               </button>

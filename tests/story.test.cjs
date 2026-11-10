@@ -133,3 +133,23 @@ test("the overview adds up the run and sceneAt finds the scene for any event", (
     assert.ok(cursor >= scene.start && cursor <= scene.end);
   });
 });
+
+test("a search scene shows what left the computer and who answered", () => {
+  const results = [{ title: "엔비디아 실적", url: "https://example.com/a", snippet: "요약" }];
+  const events = [
+    { id: 1, kind: "tool.dispatch", input: { function: { name: "web_search", arguments: '{"query":"엔비디아"}' } } },
+    { id: 2, kind: "tool.validate", input: { name: "web_search", arguments: { query: "엔비디아" } }, output: { allowed: true } },
+    { id: 3, kind: "web.request", actor: "web", input: { provider: "DuckDuckGo", query: "엔비디아" } },
+    { id: 4, kind: "web.response", actor: "web", output: { results } },
+    { id: 5, kind: "tool.result", output: { query: "엔비디아", results } },
+    { id: 6, kind: "context.append" },
+  ];
+  const [scene] = story.scenes(events, null);
+  assert.equal(scene.kind, "tool");
+  assert.equal(scene.owner, "external");
+  assert.equal(scene.title, "코드가 검사한 뒤 web_search 도구를 실행했습니다");
+  assert.equal(scene.summary, "엔비디아 · 결과 1건");
+  assert.equal(scene.change.file, "local_agent_lab/websearch.py");
+  assert.deepEqual(scene.blocks.find((block) => block.label === "찾은 결과").items, ["엔비디아 실적"]);
+  assert.match(scene.blocks.find((block) => block.label === "PC 밖으로 보낸 검색어").text, /엔비디아 → DuckDuckGo/);
+});

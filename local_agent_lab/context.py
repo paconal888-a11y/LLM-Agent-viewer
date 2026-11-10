@@ -498,6 +498,8 @@ def build_context(run, workspace, history):
     base = BASE_INSTRUCTIONS
     if run.features["tools"]:
         base += "\nUse the supplied tools for file operations and arithmetic. Paths are relative to the workspace. After changing a file, use check_file before reporting completion.\n"
+        if run.features.get("web"):
+            base += "\nUse web_search for news, prices and anything that may have changed since your training. Answer only from the returned results, say which results you used, and say so when they do not contain the answer.\n"
         if run.features.get("planning"):
             base += "\nFor a requested plan, call set_plan with one item per line. Perform the work using actual tool calls and mark each finished item with complete_plan_step. Do not replace these calls with a description or a claim of completion. Plan status is tracking data, not verification of work.\n"
     else:
@@ -662,6 +664,7 @@ def tools_for(run):
                 run.features.get("planning")
                 or tool["function"]["name"] not in {"set_plan", "complete_plan_step"}
             )
+            and (run.features.get("web", False) or tool["function"]["name"] != "web_search")
         ]
         + run.extra_tools
         if run.allowed_tool_names is None
@@ -670,6 +673,7 @@ def tools_for(run):
             for tool in TOOLS
             if tool["function"]["name"] in run.allowed_tool_names
             and (run.features["skills"] or tool["function"]["name"] != "load_skill")
+            and (run.features.get("web", False) or tool["function"]["name"] != "web_search")
         ]
     )
 

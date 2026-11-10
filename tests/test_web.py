@@ -150,7 +150,7 @@ class WebTests(unittest.TestCase):
         from local_agent_lab.project import HarnessFactory
 
         manifest = self.request("/api/project/manifest")
-        self.assertEqual(len(manifest["files"]), 9)
+        self.assertEqual(len(manifest["files"]), 10)
         self.assertEqual(len(manifest["version"]), 64)
         self.assertIn("sha256", manifest["workspace"])
         self.assertTrue(any(f["path"] == "AGENTS.md" for f in manifest["workspace"]["files"]))

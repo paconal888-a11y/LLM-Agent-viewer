@@ -14,6 +14,7 @@ DEFAULT_FEATURES = {
     "tools": True,
     "commands": True,
     "writes": False,
+    "web": False,
     "mcp": False,
     "lsp": False,
     "feedback_recall": False,
@@ -89,6 +90,7 @@ def normalize_features(values=None):
     if not result["tools"]:
         result["skills"] = False
         result["writes"] = False
+        result["web"] = False
         result["mcp"] = False
         result["lsp"] = False
         result["planning"] = False

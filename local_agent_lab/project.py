@@ -21,6 +21,7 @@ from .trace import ROOT, code_source
 MODULES = (
     "files",
     "toolkit",
+    "websearch",
     "policy",
     "context",
     "inference",
